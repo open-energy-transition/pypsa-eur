@@ -832,6 +832,7 @@ sector:
     - solid biomass
     - gas
     micro_chp: false
+    cc: true
   solar_thermal: true
   solar_cf_correction: 0.788457
   methanation: true
