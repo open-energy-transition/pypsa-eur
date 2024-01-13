@@ -3926,10 +3926,30 @@ def add_biomass(
             "unsustainable biogas"
         ].sum()
 
+
+    if not options["industry"]:
+        # if the industry is not modelled, remove industrial demand from biomass potentials
+        industrial_demand = (
+            pd.read_csv(snakemake.input.industrial_demand, index_col=0) * 1e6
+        ) * nyears
+        if options.get("biomass_spatial", options["biomass_transport"]):
+            p_set = (
+                industrial_demand.loc[spatial.biomass.locations, "solid biomass"].rename(
+                    index=lambda x: x + " solid biomass for industry"
+                )
+                / nhours
+            )
+        else:
+            p_set = industrial_demand["solid biomass"].sum() / nhours
+    else:
+        # if the industry is modelled, keep full biomass potentials
+        p_set = 0
+
+
     if options.get("biomass_spatial", options["biomass_transport"]):
         solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].rename(
             index=lambda x: x + " solid biomass"
-        )
+        ) - p_set
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].rename(index=lambda x: x + " municipal solid waste")
@@ -3941,7 +3961,7 @@ def add_biomass(
         ].rename(index=lambda x: x + " unsustainable bioliquids")
 
     else:
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].sum()
+        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].sum() - p_set
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].sum()
