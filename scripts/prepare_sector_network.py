@@ -634,6 +634,10 @@ def add_carrier_buses(
 
             suffix = " primary"
 
+        # omit gas generators
+        if carrier == "gas":
+            return
+
         n.add(
             "Generator",
             nodes + suffix,
