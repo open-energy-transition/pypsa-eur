@@ -3951,7 +3951,7 @@ def add_biomass(
                 index=lambda x: x + " solid biomass"
             )
             - e_set
-        )
+        ).clip(lower=0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].rename(index=lambda x: x + " municipal solid waste")
@@ -3965,7 +3965,7 @@ def add_biomass(
     else:
         solid_biomass_potentials_spatial = (
             biomass_potentials["solid biomass"].sum() - e_set
-        )
+        ).clip(lower=0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].sum()
