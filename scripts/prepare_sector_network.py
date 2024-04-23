@@ -1396,6 +1396,8 @@ def add_generation(
     spatial: SimpleNamespace,
     options: dict,
     cf_industry: dict,
+    capacities_OCGT: pd.Series,
+    efficiencies_OCGT: pd.Series | None = None,
 ) -> None:
     """
     Add conventional electricity generation to the network.
@@ -1460,8 +1462,12 @@ def add_generation(
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
             p_nom_extendable=True,
+            p_nom=capacities_OCGT if carrier == "gas" else 0,
+            p_nom_min=capacities_OCGT if carrier == "gas" else 0,
             carrier=generator,
-            efficiency=costs.at[generator, "efficiency"],
+            efficiency=efficiencies_OCGT
+            if (carrier == "gas" and efficiencies_OCGT is not None)
+            else costs.at[generator, "efficiency"],
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
@@ -6468,41 +6474,19 @@ def add_import_options(
         )
 
 
-def get_nominal_capacities(n, carrier, component):
+def get_capacities(n, carrier, component):
     """Gets capacities for {carrier} in n.{component}"""
     component_list = ["generators", "storage_units", "links", "stores"]
     component_dict = {name: getattr(n, name) for name in component_list}
     e_nom_carriers = ["stores"]
     nom_col = {x: "e_nom" if x in e_nom_carriers else "p_nom" for x in component_list}
+    eff_col = "efficiency"
 
     capacity = component_dict[component].query("carrier in @carrier")[
         nom_col[component]
     ]
-    return capacity
-
-
-def set_capacities(n, data, carrier, component, nom_types=["nom"]):
-    """
-    Sets capacities for {carrier} in n.{component}
-    nom_type - specifies which nominal is set (i.e. p_nom, p_nom_min).
-               options = {"nom", "nom_min", "nom_max"}
-    """
-    component_list = ["generators", "storage_units", "links", "stores"]
-    component_dict = {name: getattr(n, name) for name in component_list}
-    e_nom_carriers = ["stores"]
-
-    mask = component_dict[component].query("carrier in @carrier").index
-
-    for nom_type in nom_types:
-        nom_col = {
-            x: f"e_{nom_type}" if x in e_nom_carriers else f"p_{nom_type}"
-            for x in component_list
-        }
-        component_dict[component].loc[mask, nom_col[component]] = data
-
-        logger.info(f"Set {nom_col[component]} for {carrier} in {component}")
-
-    return n
+    efficiency = component_dict[component].query("carrier in @carrier")[eff_col]
+    return capacity, efficiency
 
 
 if __name__ == "__main__":
@@ -6544,7 +6528,9 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
-    capacities_OCGT = get_nominal_capacities(n, carrier="OCGT", component="generators")
+    capacities_OCGT, efficiencies_OCGT = get_capacities(
+        n, carrier="OCGT", component="generators"
+    )
 
     fn = snakemake.input.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0)
@@ -6608,14 +6594,8 @@ if __name__ == "__main__":
         spatial=spatial,
         options=options,
         cf_industry=cf_industry,
-    )
-
-    set_capacities(
-        n,
-        data=capacities_OCGT,
-        carrier="OCGT",
-        component="links",
-        nom_types=["nom", "nom_min"],
+        capacities_OCGT=capacities_OCGT,
+        efficiencies_OCGT=efficiencies_OCGT,
     )
 
     add_h2_gas_infrastructure(
