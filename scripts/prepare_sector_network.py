@@ -6474,8 +6474,8 @@ def add_import_options(
         )
 
 
-def get_capacities(n, carrier, component):
-    """Gets capacities for {carrier} in n.{component}"""
+def get_capacities_from_elec(n, carrier, component):
+    """Gets capacities for {carrier} in n.{component} that were previously assigned in add_electricity"""
     component_list = ["generators", "storage_units", "links", "stores"]
     component_dict = {name: getattr(n, name) for name in component_list}
     e_nom_carriers = ["stores"]
@@ -6528,7 +6528,7 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
-    capacities_OCGT, efficiencies_OCGT = get_capacities(
+    capacities_OCGT, efficiencies_OCGT = get_capacities_from_elec(
         n, carrier="OCGT", component="generators"
     )
 
