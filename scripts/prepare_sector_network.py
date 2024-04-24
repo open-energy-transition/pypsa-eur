@@ -6528,9 +6528,12 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
-    capacities_OCGT, efficiencies_OCGT = get_capacities_from_elec(
-        n, carrier="OCGT", component="generators"
-    )
+    if options.get("keep_OCGT", False):
+        capacities_OCGT, efficiencies_OCGT = get_capacities_from_elec(
+            n, carrier="OCGT", component="generators"
+        )
+    else:
+        capacities_OCGT, efficiencies_OCGT = 0, None
 
     fn = snakemake.input.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0)
