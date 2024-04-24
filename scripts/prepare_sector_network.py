@@ -1396,8 +1396,8 @@ def add_generation(
     spatial: SimpleNamespace,
     options: dict,
     cf_industry: dict,
-    capacities_OCGT: pd.Series,
-    efficiencies_OCGT: pd.Series | None = None,
+    existing_capacities: pd.Series,
+    existing_efficiencies: pd.Series | None = None,
 ) -> None:
     """
     Add conventional electricity generation to the network.
@@ -1423,6 +1423,10 @@ def add_generation(
         Configuration dictionary containing settings for the model
     cf_industry : dict
         Dictionary of industrial conversion factors, needed for carrier buses
+    existing_capacities : pd.Series
+        Capacities for the generators that were previously assigned in add_electricity
+    existing_efficiencies : pd.Series | None
+        Efficiencies for the generators that were previously assigned in add_electricity
 
     Returns
     -------
@@ -1462,12 +1466,16 @@ def add_generation(
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
             p_nom_extendable=True,
-            p_nom=capacities_OCGT if carrier == "gas" else 0,
-            p_nom_min=capacities_OCGT if carrier == "gas" else 0,
+            p_nom=existing_capacities[generator] if not existing_capacities == 0 else 0,
+            p_nom_min=existing_capacities[generator]
+            if not existing_capacities == 0
+            else 0,
             carrier=generator,
-            efficiency=efficiencies_OCGT
-            if (carrier == "gas" and efficiencies_OCGT is not None)
-            else costs.at[generator, "efficiency"],
+            efficiency=(
+                existing_efficiencies[generator]
+                if existing_efficiencies is not None
+                else costs.at[generator, "efficiency"]
+            ),
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
@@ -6474,7 +6482,7 @@ def add_import_options(
         )
 
 
-def get_capacities_from_elec(n, carrier, component):
+def get_capacities_from_elec(n, carriers, component):
     """Gets capacities for {carrier} in n.{component} that were previously assigned in add_electricity"""
     component_list = ["generators", "storage_units", "links", "stores"]
     component_dict = {name: getattr(n, name) for name in component_list}
@@ -6482,11 +6490,16 @@ def get_capacities_from_elec(n, carrier, component):
     nom_col = {x: "e_nom" if x in e_nom_carriers else "p_nom" for x in component_list}
     eff_col = "efficiency"
 
-    capacity = component_dict[component].query("carrier in @carrier")[
-        nom_col[component]
-    ]
-    efficiency = component_dict[component].query("carrier in @carrier")[eff_col]
-    return capacity, efficiency
+    capacity_dict = {}
+    efficiency_dict = {}
+    for carrier in carriers:
+        capacity_dict[carrier] = component_dict[component].query("carrier in @carrier")[
+            nom_col[component]
+        ]
+        efficiency_dict[carrier] = component_dict[component].query(
+            "carrier in @carrier"
+        )[eff_col]
+    return capacity_dict, efficiency_dict
 
 
 if __name__ == "__main__":
@@ -6528,12 +6541,14 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
-    if options.get("keep_OCGT", False):
-        capacities_OCGT, efficiencies_OCGT = get_capacities_from_elec(
-            n, carrier="OCGT", component="generators"
+    if options.get("keep_existing_capacities", False):
+        existing_capacities, existing_efficiencies = get_capacities_from_elec(
+            n,
+            carriers=options.get("conventional_generation").keys(),
+            component="generators",
         )
     else:
-        capacities_OCGT, efficiencies_OCGT = 0, None
+        existing_capacities, existing_efficiencies = 0, None
 
     fn = snakemake.input.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0)
@@ -6597,8 +6612,8 @@ if __name__ == "__main__":
         spatial=spatial,
         options=options,
         cf_industry=cf_industry,
-        capacities_OCGT=capacities_OCGT,
-        efficiencies_OCGT=efficiencies_OCGT,
+        existing_capacities=existing_capacities,
+        existing_efficiencies=existing_efficiencies,
     )
 
     add_h2_gas_infrastructure(
