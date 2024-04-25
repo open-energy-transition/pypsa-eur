@@ -6483,7 +6483,10 @@ def add_import_options(
 
 
 def get_capacities_from_elec(n, carriers, component):
-    """Gets capacities for {carrier} in n.{component} that were previously assigned in add_electricity"""
+    """
+    Gets capacities and efficiencies for {carrier} in n.{component}
+    that were previously assigned in add_electricity.
+    """
     component_list = ["generators", "storage_units", "links", "stores"]
     component_dict = {name: getattr(n, name) for name in component_list}
     e_nom_carriers = ["stores"]
