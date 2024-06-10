@@ -10,11 +10,14 @@ Release Notes
 Upcoming Release
 ================
 
+* Reverted outdated hotfix for doubled renewable capacity in myopic optimization.
+
 * Added Enhanced Geothermal Systems for generation of electricity and district heat.
   Cost and available capacity assumptions based on `Aghahosseini et al. (2020)
   <https://www.sciencedirect.com/science/article/pii/S0306261920312551>`__.
   See configuration ``sector: enhanced_geothermal`` for details; by default switched off.
 
+* Enable retaining exisiting conventional capacities added in the power only model for sector coupeled applications.
 
 PyPSA-Eur 0.11.0 (25th May 2024)
 =====================================

@@ -3934,6 +3934,28 @@ def add_enhanced_geothermal(n, egs_potentials, egs_overlap, costs):
                 cyclic_state_of_charge=True,
             )
 
+def get_capacities_from_elec(n, carriers, component):
+    """
+    Gets capacities and efficiencies for {carrier} in n.{component} that were
+    previously assigned in add_electricity.
+    """
+    component_list = ["generators", "storage_units", "links", "stores"]
+    component_dict = {name: getattr(n, name) for name in component_list}
+    e_nom_carriers = ["stores"]
+    nom_col = {x: "e_nom" if x in e_nom_carriers else "p_nom" for x in component_list}
+    eff_col = "efficiency"
+
+    capacity_dict = {}
+    efficiency_dict = {}
+    for carrier in carriers:
+        capacity_dict[carrier] = component_dict[component].query("carrier in @carrier")[
+            nom_col[component]
+        ]
+        efficiency_dict[carrier] = component_dict[component].query(
+            "carrier in @carrier"
+        )[eff_col]
+
+    return capacity_dict, efficiency_dict
 
 # %%
 if __name__ == "__main__":
@@ -3979,6 +4001,18 @@ if __name__ == "__main__":
         pd.read_csv(snakemake.input.pop_weighted_heat_totals, index_col=0) * nyears
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
+
+    if options.get("keep_existing_capacities", False):
+        existing_capacities, existing_efficiencies = get_capacities_from_elec(
+            n,
+            carriers=options.get("conventional_generation").keys(),
+            component="generators",
+        )
+        print(options.get("conventional_generation").keys())
+        print(n.generators.carrier.unique())
+        martha
+    else:
+        existing_capacities, existing_efficiencies = 0, None
 
     patch_electricity_network(n)
 
