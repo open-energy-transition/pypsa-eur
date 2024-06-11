@@ -1475,7 +1475,7 @@ def add_generation(
                 else False
             ),
             p_nom=(
-                existing_capacities[generator] / costs.at[generator, "efficiency"]
+                existing_capacities[generator] / existing_efficiencies[generator]
                 if not existing_capacities == 0
                 else 0
             ),  # NB: existing capacities are MWel
