@@ -4008,9 +4008,6 @@ if __name__ == "__main__":
             carriers=options.get("conventional_generation").keys(),
             component="generators",
         )
-        print(options.get("conventional_generation").keys())
-        print(n.generators.carrier.unique())
-        martha
     else:
         existing_capacities, existing_efficiencies = 0, None
 
