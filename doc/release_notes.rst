@@ -10,11 +10,8 @@ Release Notes
 Upcoming Release
 ================
 
-<<<<<<< HEAD
 * Set p_nom = p_nom_min for generators with baseyear == grouping_year in add_existing_baseyear. This has no effect on the optimization but helps n.statistics to correctly report already installed capacities.
 
-=======
->>>>>>> allow keeping existing capacities in sec from power
 * Reverted outdated hotfix for doubled renewable capacity in myopic optimization.
 
 * Added Enhanced Geothermal Systems for generation of electricity and district heat.
@@ -22,13 +19,10 @@ Upcoming Release
   <https://www.sciencedirect.com/science/article/pii/S0306261920312551>`__.
   See configuration ``sector: enhanced_geothermal`` for details; by default switched off.
 
-<<<<<<< HEAD
 * Allow running the sector model for isolated non-EU28 countries, by filling missing sectoral
   data with defaults, average EU values or zeros, if not available.
 
-=======
 * Enable retaining exisiting conventional capacities added in the power only model for sector coupeled applications.
->>>>>>> allow keeping existing capacities in sec from power
 
 PyPSA-Eur 0.11.0 (25th May 2024)
 =====================================
