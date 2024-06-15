@@ -191,6 +191,16 @@ def define_spatial(nodes, options):
         spatial.coal.demand_locations = ["EU"]
         spatial.coal.industry = ["EU coal for industry"]
 
+    # coal chp
+    spatial.coal_chp = SimpleNamespace()
+    spatial.coal_chp.nodes = ["EU coal_chp"]
+    spatial.coal_chp.locations = ["EU"]
+
+    # gas chp
+    spatial.gas_chp = SimpleNamespace()
+    spatial.gas_chp.nodes = ["EU gas_chp"]
+    spatial.gas_chp.locations = ["EU"]
+
     # lignite
     spatial.lignite = SimpleNamespace()
     spatial.lignite.nodes = ["EU lignite"]
