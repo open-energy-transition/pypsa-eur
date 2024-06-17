@@ -1002,11 +1002,15 @@ def sample_dE_costs_area(
         .set_index(["country_code", "subsector", "bage"])
     )
 
-    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
-        sub_to_sector_dict["AB"] = "residential AB"
-        sub_to_sector_dict["MFH"] = "residential MFH"
-        sub_to_sector_dict["SFH"] = "residential SFH"
+    if (
+        snakemake.params["retrofitting"]["disaggregate_building_types"] or
+        snakemake.params["retrofitting"]["weighting_by_building_types"]
+    ):
+        sub_to_sector_dict["AB"] = "AB"
+        sub_to_sector_dict["MFH"] = "MFH"
+        sub_to_sector_dict["SFH"] = "SFH"
 
+    # weighing based on build year
     cost_dE = (
         pd.concat([costs, dE_space], axis=1)
         .mul(area_reordered.weight, axis=0)
@@ -1014,6 +1018,55 @@ def sample_dE_costs_area(
         .groupby(level=[0, 1])
         .sum()
     )
+
+    if snakemake.params["retrofitting"]["weighting_by_building_types"]:
+        # weighting based on building type
+        residential_weighting = (
+            area_reordered
+            .query("sector == 'residential'")
+            .reset_index()
+            .groupby(["country_code", "subsector"])
+            .sum()
+            .value
+        )
+        services_weighting = (
+            area_reordered
+            .query("sector != 'residential'")
+            .reset_index()
+            .groupby(["country_code", "subsector"])
+            .sum()
+            .value
+        )
+        services_weighting = services_weighting.reset_index()
+        services_weighting.subsector = "services"
+        services_weighting = services_weighting.set_index(
+            ["country_code", "subsector"]
+        ).groupby(["country_code", "subsector"]).sum()
+
+        weighting_by_building_type = pd.concat(
+            [residential_weighting, services_weighting]
+        ).loc[cost_dE.index].reset_index()
+        weighting_by_building_type["weight"] = weighting_by_building_type.apply(
+            lambda b: b.value/weighting_by_building_type.query(
+                "country_code == @b.country_code and subsector != 'services'"
+            ).value.sum() if b.subsector != 'services' else 1,
+            axis=1
+        )
+        weighting_by_building_type = weighting_by_building_type.set_index(
+            ["country_code", "subsector"]
+        ).loc[cost_dE.index]
+
+        sub_to_sector_dict["AB"] = "residential"
+        sub_to_sector_dict["MFH"] = "residential"
+        sub_to_sector_dict["SFH"] = "residential"
+
+        cost_dE = (
+            cost_dE
+            .mul(weighting_by_building_type.weight, axis=0)
+            .rename(sub_to_sector_dict, level=1)
+            .groupby(level=[0, 1])
+            .sum()
+        )
 
     # map missing countries
     for ct in set(countries).difference(cost_dE.index.levels[0]):
