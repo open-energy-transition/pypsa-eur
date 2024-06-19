@@ -200,6 +200,10 @@ if __name__ == "__main__":
     ppl = add_custom_powerplants(
         ppl, snakemake.input.custom_powerplants, custom_ppl_query
     )
+    ppl = (
+        ppl.assign(Technology=replace_natural_gas_technology)
+        .assign(Fueltype=replace_natural_gas_fueltype)
+    )
 
     if countries_wo_ppl := set(countries) - set(ppl.Country.unique()):
         logging.warning(f"No powerplants known in: {', '.join(countries_wo_ppl)}")
