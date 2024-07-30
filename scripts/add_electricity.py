@@ -450,6 +450,7 @@ def attach_conventional_generators(
     ppl,
     conventional_carriers,
     extendable_carriers,
+    renewable_carriers,
     conventional_params,
     conventional_inputs,
     unit_commitment=None,
@@ -470,6 +471,7 @@ def attach_conventional_generators(
         .rename(index=lambda s: f"C{str(s)}")
     )
     ppl["efficiency"] = ppl.efficiency.fillna(ppl.efficiency_r)
+    ppl = ppl.query("carrier not in @renewable_carriers")
 
     # reduce carriers to those in power plant dataset
     carriers = list(set(carriers) & set(ppl.carrier.unique()))
@@ -501,7 +503,7 @@ def attach_conventional_generators(
         )
 
     # Define generators using modified ppl DataFrame
-    caps = ppl.groupby("carrier").p_nom.sum().div(1e3).round(2)
+    caps = ppl.query("carrier not in @renewable_carriers").groupby("carrier").p_nom.sum().div(1e3).round(2)
     logger.info(f"Adding {len(ppl)} generators with capacities [GW] \n{caps}")
 
     n.madd(
@@ -862,6 +864,7 @@ if __name__ == "__main__":
         ppl,
         conventional_carriers,
         extendable_carriers,
+        renewable_carriers,
         params.conventional,
         conventional_inputs,
         unit_commitment=unit_commitment,
