@@ -217,7 +217,7 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
     fill_values = config["fill_values"]
     costs = costs.fillna(fill_values)
 
-    for attr in ("investment", "lifetime"):
+    for attr in ("investment", "lifetime", "FOM", "VOM", "efficiency"):
         overwrites = config.get(attr)
         if overwrites is not None:
             overwrites = pd.Series(overwrites)
