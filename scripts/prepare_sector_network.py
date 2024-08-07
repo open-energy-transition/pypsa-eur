@@ -1066,10 +1066,10 @@ def insert_electricity_distribution_grid(n, costs):
         bus0=nodes + " low voltage",
         bus1=nodes + " home battery",
         carrier="home battery charger",
-        efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
+        efficiency=costs.at["home battery inverter", "efficiency"] ** 0.5,
         capital_cost=costs.at["home battery inverter", "fixed"],
         p_nom_extendable=True,
-        lifetime=costs.at["battery inverter", "lifetime"],
+        lifetime=costs.at["home battery inverter", "lifetime"],
     )
 
     n.madd(
@@ -1078,10 +1078,10 @@ def insert_electricity_distribution_grid(n, costs):
         bus0=nodes + " home battery",
         bus1=nodes + " low voltage",
         carrier="home battery discharger",
-        efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
+        efficiency=costs.at["home battery inverter", "efficiency"] ** 0.5,
         marginal_cost=options["marginal_cost_storage"],
         p_nom_extendable=True,
-        lifetime=costs.at["battery inverter", "lifetime"],
+        lifetime=costs.at["home battery inverter", "lifetime"],
     )
 
 

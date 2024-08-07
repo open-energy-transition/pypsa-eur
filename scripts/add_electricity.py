@@ -217,9 +217,6 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
     fill_values = config["fill_values"]
     costs = costs.fillna(fill_values)
 
-    costs.at["OCGT", "fuel"] = costs.at["gas", "fuel"]
-    costs.at["CCGT", "fuel"] = costs.at["gas", "fuel"]
-
     for attr in ("investment", "lifetime", "FOM", "VOM", "efficiency", "fuel"):
         overwrites = config.get(attr)
         if overwrites is not None:
@@ -237,6 +234,9 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
         * costs["investment"]
         * Nyears
     )
+    
+    costs.at["OCGT", "fuel"] = costs.at["gas", "fuel"]
+    costs.at["CCGT", "fuel"] = costs.at["gas", "fuel"]
 
     costs["marginal_cost"] = costs["VOM"] + costs["fuel"] / costs["efficiency"]
 
