@@ -57,6 +57,10 @@ dependencies:
 - descartes
 - rasterio!=1.2.10
 
+  # plotting
+- plotly
+- python-kaleido
+
 
 - pip:
   - tsam>=2.3.1
