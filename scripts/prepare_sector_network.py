@@ -1094,7 +1094,7 @@ def prepare_costs(cost_file, params, nyears):
         costs.loc[:, "value"].unstack(level=1).groupby("technology").sum(min_count=1)
     )
 
-    costs = costs.fillna(params["fill_values"])
+    costs = costs.fillna(params["costs"]["fill_values"])
 
     def annuity_factor(v):
         return calculate_annuity(v["lifetime"], v["discount rate"]) + v["FOM"] / 100
@@ -1109,7 +1109,7 @@ def prepare_costs(cost_file, params, nyears):
             capital_cost += link2["fixed"]
         return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
 
-    max_hours = snakemake.params.electricity["max_hours"]
+    max_hours = params["electricity"]["max_hours"]
     costs.loc["battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
@@ -4748,7 +4748,7 @@ if __name__ == "__main__":
 
     costs = prepare_costs(
         snakemake.input.costs,
-        snakemake.params.costs,
+        snakemake.params,
         nyears,
     )
 
