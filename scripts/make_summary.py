@@ -774,7 +774,7 @@ if __name__ == "__main__":
 
     costs_db = prepare_costs(
         snakemake.input.costs,
-        snakemake.config,
+        snakemake.params,
         Nyears,
     )
 

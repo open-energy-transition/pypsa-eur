@@ -1109,7 +1109,7 @@ def prepare_costs(cost_file, params, nyears):
             capital_cost += link2["fixed"]
         return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
 
-    max_hours = params["electricity"]["max_hours"]
+    max_hours = params["max_hours"]
     costs.loc["battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
