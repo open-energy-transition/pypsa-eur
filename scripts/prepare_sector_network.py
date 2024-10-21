@@ -1451,10 +1451,19 @@ def add_storageunits(n, costs, carriers, max_hours):
     missing_carriers = list(set(carriers).difference(n.carriers.index))
     n.add("Carrier", missing_carriers)
 
+    # check for not implemented storage technologies
+    implemented = ["H2", "battery"]
+    not_implemented = list(set(carriers).difference(implemented))
+    available_carriers = list(set(carriers).intersection(implemented))
+    if len(not_implemented) > 0:
+        logger.warning(
+            f"{not_implemented} are not yet implemented as Storage technologies in PyPSA-Eur"
+        )
+
     lookup_store = {"H2": "electrolysis", "battery": "battery inverter"}
     lookup_dispatch = {"H2": "fuel cell", "battery": "battery inverter"}
 
-    for carrier in carriers:
+    for carrier in available_carriers:
         roundtrip_correction = 0.5 if carrier == "battery" else 1
         if carrier == "H2":
             cavern_types = snakemake.params.sector[
@@ -1515,7 +1524,7 @@ def add_stores(n, costs, carriers):
 
     # check for not implemented storage technologies
     implemented = ["H2", "battery"]
-    not_implemented = list(set(carriers) - set(implemented))
+    not_implemented = list(set(carriers).difference(implemented))
     if len(not_implemented) > 0:
         logger.warning(
             f"{not_implemented} are not yet implemented as Store technologies in PyPSA-Eur"
