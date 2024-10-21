@@ -1369,12 +1369,12 @@ def insert_electricity_distribution_grid(n, costs):
 
     elif "battery" in snakemake.params.sector["storage_units"]:
         n.add("Carrier", "home battery")
-        max_hours = snakemake.params.electricity["max_hours"]
+        max_hours = snakemake.params.max_hours
 
         n.add(
             "StorageUnit",
             nodes,
-            " home battery",
+            suffix=" home battery",
             bus=nodes + " low voltage",
             carrier="home battery",
             p_nom_extendable=True,
@@ -1466,7 +1466,7 @@ def add_storageunits(n, costs, carriers, max_hours):
             n.add(
                 "StorageUnit",
                 h2_caverns.index,
-                " " + carrier,
+                suffix=" " + carrier,
                 bus=h2_caverns.index,
                 carrier=carrier,
                 p_nom_extendable=True,
@@ -1481,6 +1481,7 @@ def add_storageunits(n, costs, carriers, max_hours):
                 cyclic_state_of_charge=True,
                 lifetime=costs.at["hydrogen storage underground", "lifetime"],
             )
+            # hydrogen stored overground (where not already underground)
             nodes_ = h2_caverns.index.symmetric_difference(nodes)
 
         else:
@@ -1490,7 +1491,7 @@ def add_storageunits(n, costs, carriers, max_hours):
         n.add(
             "StorageUnit",
             nodes_,
-            " " + carrier,
+            suffix=" " + carrier,
             bus=nodes_,
             carrier=carrier,
             p_nom_extendable=True,
@@ -1817,11 +1818,8 @@ def add_storage_and_grids(n, costs):
         )
 
     # add stores and storages as specified in the config
-    stores = options["stores"]
-    storage_units = options["storage_units"]
-    max_hours = snakemake.config["electricity"]["max_hours"]
-    add_stores(n, costs, stores)
-    add_storageunits(n, costs, storage_units, max_hours)
+    add_stores(n, costs, options["stores"])
+    add_storageunits(n, costs, options["storage_units"], snakemake.params.max_hours)
 
     if options["methanation"]:
         n.add(
