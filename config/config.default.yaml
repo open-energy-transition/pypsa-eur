@@ -100,8 +100,8 @@ electricity:
     contingency: 4000
 
   max_hours:
-    battery: 6
-    H2: 168
+    battery: [6]
+    H2: [168]
 
   extendable_carriers:
     Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, OCGT, CCGT]
