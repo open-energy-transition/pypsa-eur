@@ -272,16 +272,32 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             dict(capital_cost=capital_cost, marginal_cost=0.0, co2_emissions=0.0)
         )
 
-    costs.loc["battery"] = costs_for_storage(
+    for max_hour in max_hours["battery"]:
+        costs.loc[f"battery {max_hour}h"] = costs_for_storage(
+            costs.loc["battery storage"],
+            costs.loc["battery inverter"],
+            max_hours=max_hour,
+        )
+    # cost for default 6h battery
+    costs.loc[f"battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
-        max_hours=max_hours["battery"],
+        max_hours=6,
     )
-    costs.loc["H2"] = costs_for_storage(
+
+    for max_hour in max_hours["H2"]:
+        costs.loc[f"H2 {max_hour}h"] = costs_for_storage(
+            costs.loc["hydrogen storage underground"],
+            costs.loc["fuel cell"],
+            costs.loc["electrolysis"],
+            max_hours=max_hour,
+        )
+    # cost for default 168h H2 underground storage
+    costs.loc[f"H2"] = costs_for_storage(
         costs.loc["hydrogen storage underground"],
         costs.loc["fuel cell"],
         costs.loc["electrolysis"],
-        max_hours=max_hours["H2"],
+        max_hours=168,
     )
 
     for attr in ("marginal_cost", "capital_cost"):
@@ -862,23 +878,23 @@ def attach_storageunits(n, costs, extendable_carriers, max_hours):
 
     for carrier in carriers:
         roundtrip_correction = 0.5 if carrier == "battery" else 1
-
-        n.add(
-            "StorageUnit",
-            buses_i,
-            " " + carrier,
-            bus=buses_i,
-            carrier=carrier,
-            p_nom_extendable=True,
-            capital_cost=costs.at[carrier, "capital_cost"],
-            marginal_cost=costs.at[carrier, "marginal_cost"],
-            efficiency_store=costs.at[lookup_store[carrier], "efficiency"]
-            ** roundtrip_correction,
-            efficiency_dispatch=costs.at[lookup_dispatch[carrier], "efficiency"]
-            ** roundtrip_correction,
-            max_hours=max_hours[carrier],
-            cyclic_state_of_charge=True,
-        )
+        for max_hour in max_hours[carrier]:
+            n.add(
+                "StorageUnit",
+                buses_i,
+                f" {carrier} {max_hour}h",
+                bus=buses_i,
+                carrier=carrier,
+                p_nom_extendable=True,
+                capital_cost=costs.at[f"{carrier} {max_hour}h", "capital_cost"],
+                marginal_cost=costs.at[f"{carrier} {max_hour}h", "marginal_cost"],
+                efficiency_store=costs.at[lookup_store[carrier], "efficiency"]
+                ** roundtrip_correction,
+                efficiency_dispatch=costs.at[lookup_dispatch[carrier], "efficiency"]
+                ** roundtrip_correction,
+                max_hours=max_hour,
+                cyclic_state_of_charge=True,
+            )
 
 
 def attach_stores(n, costs, extendable_carriers):
