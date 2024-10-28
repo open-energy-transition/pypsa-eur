@@ -42,7 +42,7 @@ Clone the repository:
 
     git clone https://github.com/open-energy-transition/{{repository}}
 
-You need [mamba](https://mamba.readthedocs.io/en/latest/) to run the analysis. Using `mamba`, you can create an environment from within you can run it:
+You need [mamba](https://mamba.readthedocs.io/en/latest/) to run the analysis. Users may also prefer to use [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or [conda](https://docs.conda.io/projects/conda/en/latest/index.html). Using `mamba`, you can create an environment from within you can run it:
 
     mamba env create -f environment.yaml
 
