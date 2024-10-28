@@ -38,7 +38,7 @@ This repository is a fork of [PyPSA-Eur](https://github.com/pypsa/pypsa-eur) and
 
 ## 1. Installation
 
-Clone the repository including its submodules:
+Clone the repository:
 
     git clone https://github.com/open-energy-transition/{{repository}}
 
