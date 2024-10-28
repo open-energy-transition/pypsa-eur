@@ -46,7 +46,7 @@ You need [mamba](https://mamba.readthedocs.io/en/latest/) to run the analysis. U
 
     mamba env create -f environment.yaml
 
-Activate `{{project_short_name}}` environment:
+Activate the newly created `{{project_short_name}}` environment:
 
     mamba activate {{project_short_name}}
 
