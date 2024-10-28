@@ -28,7 +28,6 @@ This repository is a fork of [PyPSA-Eur](https://github.com/pypsa/pypsa-eur) and
 * `envs`: includes all the `mamba` environment specifications to run the workflow
 * `logs`: will store log files (does not exist initially)
 * `notebooks`: includes all the `notebooks` used for ad-hoc analysis
-* `plots`: includes all the Python scripts executed to produce the graphs of the report
 * `report`: contains all files necessary to build the report; plots and result files are generated automatically
 * `rules`: includes all the `snakemake`rules loaded in the `Snakefile`
 * `resources`: will store intermediate results of the workflow which can be picked up again by subsequent rules (does not exist initially)
