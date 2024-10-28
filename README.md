@@ -59,6 +59,9 @@ This will run all analysis steps to reproduce results and build the report.
 To generate a PDF of the dependency graph of all steps `resources/dag.pdf` run:
 
     snakemake -c1 dag
+
+<sup>*</sup> Open Energy Transition (g)GmbH, Königsallee 52, 95448 Bayreuth, Germany
+
 ----
 
 ----
@@ -156,6 +159,3 @@ The code in PyPSA-Eur is released as free software under the
 [MIT License](https://opensource.org/licenses/MIT), see [`doc/licenses.rst`](doc/licenses.rst).
 However, different licenses and terms of use may apply to the various
 input data, see [`doc/data_sources.rst`](doc/data_sources.rst).
-
-
-<sup>*</sup> Open Energy Transition (g)GmbH, Königsallee 52, 95448 Bayreuth, Germany
