@@ -75,6 +75,7 @@ if config["foresight"] == "perfect":
 rule all:
     input:
         expand(RESULTS + "graphs/costs.svg", run=config["run"]["name"]),
+        "report/report.pdf"
     default_target: True
 
 
