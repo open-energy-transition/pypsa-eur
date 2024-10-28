@@ -2,7 +2,6 @@
 %
 % SPDX-License-Identifier: AGPL-3.0-or-later
 
-{% raw %}
 \documentclass[5p]{elsarticle}
 
 \journal{TBA}
@@ -80,7 +79,6 @@
 \def\el{${}_{\textrm{el}}$}
 \def\th{${}_{\textrm{th}}$}
 \def\deg{${}^\circ$}
-{% endraw %}
 
 \begin{document}
 
@@ -92,7 +90,7 @@
 	\ead{ name.surname@openenergytransition.org }
 
 	\address[affil]{ affiliation }
-{% raw %}
+
 	\begin{abstract}
 		\input{sections/abstract.tex}
 	\end{abstract}
@@ -168,14 +166,11 @@ Validation --
 Visualization --
 Writing - original draft --
 Writing - review \& editing
-{% endraw %}
 
 \section*{Data and Code Availability}
 
 A dataset of the model results is available at \href{zenodoTBA}{doi:zenodoTBA}.
 The code to reproduce the experiments is available at \href{https://github.com/repository}{github.com/repository}.
-
-{% raw %}
 
 % tidy with https://flamingtempura.github.io/bibtex-tidy/
 \addcontentsline{toc}{section}{References}
@@ -208,5 +203,3 @@ The code to reproduce the experiments is available at \href{https://github.com/r
 \bibliographyS{references}
 
 \end{document}
-
-{% endraw %}
