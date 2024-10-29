@@ -1096,8 +1096,11 @@ def prepare_costs(cost_file, params, nyears):
         annuity_factor(v) * v["investment"] * nyears for i, v in costs.iterrows()
     ]
 
-    def costs_for_storage(store, link1, link2=None, max_hours=1.0):
-        capital_cost = link1["fixed"] + max_hours * store["fixed"]
+    def costs_for_storage(store, link1=None, link2=None, max_hours=1.0):
+        capital_cost = max_hours * store["fixed"]
+        # if charger/discharge link cost are already included in store capex
+        if link1 is not None:
+            capital_cost += link1["fixed"]
         if link2 is not None:
             capital_cost += link2["fixed"]
         return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
@@ -1112,6 +1115,10 @@ def prepare_costs(cost_file, params, nyears):
         costs.loc["home battery storage"],
         costs.loc["home battery inverter"],
         max_hours=max_hours["battery"],
+    )
+    costs.loc["iron-air battery storage"] = costs_for_storage(
+        costs.loc["iron-air battery"],
+        max_hours=max_hours["iron-air battery"],
     )
     costs.loc["H2 underground"] = costs_for_storage(
         costs.loc["hydrogen storage underground"],
@@ -1452,7 +1459,7 @@ def add_storageunits(n, costs, carriers, max_hours):
     n.add("Carrier", missing_carriers)
 
     # check for not implemented storage technologies
-    implemented = ["H2", "battery"]
+    implemented = ["H2", "battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
     available_carriers = list(set(carriers).intersection(implemented))
     if len(not_implemented) > 0:
@@ -1460,8 +1467,8 @@ def add_storageunits(n, costs, carriers, max_hours):
             f"{not_implemented} are not yet implemented as Storage technologies in PyPSA-Eur"
         )
 
-    lookup_store = {"H2": "electrolysis", "battery": "battery inverter"}
-    lookup_dispatch = {"H2": "fuel cell", "battery": "battery inverter"}
+    lookup_store = {"H2": "electrolysis", "battery": "battery inverter", "iron-air battery": "iron-air battery charge"}
+    lookup_dispatch = {"H2": "fuel cell", "battery": "battery inverter", "iron-air battery": "iron-air battery discharge"}
 
     for carrier in available_carriers:
         roundtrip_correction = 0.5 if carrier == "battery" else 1
@@ -1497,6 +1504,8 @@ def add_storageunits(n, costs, carriers, max_hours):
             nodes_ = nodes
 
         cost_carrier = "H2 tank" if carrier == "H2" else carrier
+        cost_carrier = "iron-air battery storage" if carrier == "iron-air battery" else cost_carrier
+
         n.add(
             "StorageUnit",
             nodes_,
@@ -1523,7 +1532,7 @@ def add_stores(n, costs, carriers):
     n.add("Carrier", missing_carriers)
 
     # check for not implemented storage technologies
-    implemented = ["H2", "battery"]
+    implemented = ["H2", "battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
     if len(not_implemented) > 0:
         logger.warning(
@@ -1606,6 +1615,48 @@ def add_stores(n, costs, carriers):
             bus1=nodes,
             carrier="battery discharger",
             efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
+            marginal_cost=options["marginal_cost_storage"],
+            p_nom_extendable=True,
+            lifetime=costs.at["battery inverter", "lifetime"],
+        )
+
+    if "iron-air battery" in carriers:
+
+        n.add(
+            "Bus", nodes + " iron-air battery", location=nodes, carrier="iron-air battery", unit="MWh_el"
+        )
+
+        n.add(
+            "Store",
+            nodes + " iron-air battery",
+            bus=nodes + " iron-air battery",
+            e_cyclic=True,
+            e_nom_extendable=True,
+            carrier="iron-air battery",
+            capital_cost=costs.at["iron-air battery", "fixed"],
+            lifetime=costs.at["iron-air battery", "lifetime"],
+        )
+
+        # using capex and lifetime from battery inverter for charge/discharge link since it's missing from iron-air data
+        n.add(
+            "Link",
+            nodes + " iron-air battery charger",
+            bus0=nodes,
+            bus1=nodes + " iron-air battery",
+            carrier="iron-air battery charger",
+            efficiency=costs.at["iron-air battery charge", "efficiency"] ** 0.5,
+            capital_cost=costs.at["battery inverter", "fixed"],
+            p_nom_extendable=True,
+            lifetime=costs.at["battery inverter", "lifetime"],
+        )
+
+        n.add(
+            "Link",
+            nodes + " iron-air battery discharger",
+            bus0=nodes + " iron-air battery",
+            bus1=nodes,
+            carrier="iron-air battery discharger",
+            efficiency=costs.at["iron-air battery discharge", "efficiency"] ** 0.5,
             marginal_cost=options["marginal_cost_storage"],
             p_nom_extendable=True,
             lifetime=costs.at["battery inverter", "lifetime"],
