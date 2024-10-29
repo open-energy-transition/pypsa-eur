@@ -152,7 +152,7 @@ sector:
   tes: false
   marginal_cost_storage: 0. #1e-4
   stores: ["H2"]
-  storage_units: ["battery"]
+  storage_units: ["battery", "iron-air battery"]
   hydrogen_fuel_cell: true
   hydrogen_turbine: false
   hydrogen_underground_storage: true
