@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText:  Open Energy Transition gGmbH
 #
-# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-License-Identifier: MIT
 
 rule report:
     message: "Compile report."
