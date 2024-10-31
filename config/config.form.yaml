@@ -68,6 +68,7 @@ electricity:
   max_hours:
     battery: [4, 6]
     H2: [168]
+    iron-air battery: [100]
   custom_powerplants: false # TODO: Custom PP from EEE project
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
