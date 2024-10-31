@@ -8,6 +8,7 @@ technologies for the buildings, transport and industry sectors.
 """
 
 import logging
+import warnings
 import os
 from itertools import product
 from types import SimpleNamespace
@@ -4739,7 +4740,14 @@ if __name__ == "__main__":
     pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
     nhours = n.snapshot_weightings.generators.sum()
     nyears = nhours / 8760
-
+    # deprecation warning and casting float values to list of float values for max_hours per carrier
+    for carrier in snakemake.params.max_hours:
+        if not isinstance(snakemake.params.max_hours[carrier], list):
+            warnings.warn(
+                "The 'max_hours' configuration as a float is deprecated and will be removed in future versions. Please use a list instead.",
+                DeprecationWarning,
+            )
+            snakemake.params.max_hours[carrier] = [snakemake.params.max_hours[carrier]]
     costs = prepare_costs(
         snakemake.input.costs,
         snakemake.params,

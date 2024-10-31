@@ -112,6 +112,7 @@ network with **zero** initial capacity:
 
 import logging
 from pathlib import Path
+import warnings
 from typing import Dict, List
 
 import numpy as np
@@ -996,6 +997,14 @@ if __name__ == "__main__":
 
     params = snakemake.params
     max_hours = params.electricity["max_hours"]
+    # deprecation warning and casting float values to list of float values for max_hours per carrier
+    for carrier in max_hours.keys():
+        if not isinstance(max_hours[carrier], list):
+            warnings.warn(
+                "The 'max_hours' configuration as a float is deprecated and will be removed in future versions. Please use a list instead.",
+                DeprecationWarning,
+            )
+            max_hours[carrier] = [max_hours[carrier]]
     landfall_lengths = {
         tech: settings["landfall_length"]
         for tech, settings in params.renewable.items()
