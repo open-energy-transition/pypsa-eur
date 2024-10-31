@@ -1103,7 +1103,7 @@ def prepare_costs(cost_file, params, nyears):
         return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
 
     max_hours = params["max_hours"]
-    # TODO: stoarge capex might have to be adjusted for different max hour archetypes
+    # TODO: storage capex might have to be adjusted for different max hour archetypes
     for max_hour in max_hours["battery"]:
         costs.loc[f"battery {max_hour}h"] = costs_for_storage(
             costs.loc["battery storage"],

@@ -282,7 +282,7 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
     costs.loc[f"battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
-        max_hours=6,
+        max_hours=max_hours["battery"][0],
     )
 
     for max_hour in max_hours["H2"]:
