@@ -1106,15 +1106,15 @@ def prepare_costs(cost_file, params, nyears):
         return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
 
     max_hours = params["max_hours"]
-    costs.loc["battery"] = costs_for_storage(
+    costs.loc["li-ion battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
-        max_hours=max_hours["battery"],
+        max_hours=max_hours["li-ion battery"],
     )
-    costs.loc["home battery"] = costs_for_storage(
+    costs.loc["li-ion home battery"] = costs_for_storage(
         costs.loc["home battery storage"],
         costs.loc["home battery inverter"],
-        max_hours=max_hours["battery"],
+        max_hours=max_hours["li-ion battery"],
     )
     costs.loc["iron-air battery storage"] = costs_for_storage(
         costs.loc["iron-air battery"],
@@ -1327,35 +1327,35 @@ def insert_electricity_distribution_grid(n, costs):
         lifetime=costs.at["solar-rooftop", "lifetime"],
     )
 
-    if "battery" in snakemake.params.sector["stores"]:
-        n.add("Carrier", "home battery")
+    if "li-ion battery" in snakemake.params.sector["stores"]:
+        n.add("Carrier", "li-ion home battery")
 
         n.add(
             "Bus",
-            nodes + " home battery",
+            nodes + " li-ion home battery",
             location=nodes,
-            carrier="home battery",
+            carrier="li-ion home battery",
             unit="MWh_el",
         )
 
         n.add(
             "Store",
-            nodes + " home battery",
-            bus=nodes + " home battery",
+            nodes + " li-ion home battery",
+            bus=nodes + " li-ion home battery",
             location=nodes,
             e_cyclic=True,
             e_nom_extendable=True,
-            carrier="home battery",
+            carrier="li-ion home battery",
             capital_cost=costs.at["home battery storage", "fixed"],
             lifetime=costs.at["home battery storage", "lifetime"],
         )
 
         n.add(
             "Link",
-            nodes + " home battery charger",
+            nodes + " li-ion home battery charger",
             bus0=nodes + " low voltage",
-            bus1=nodes + " home battery",
-            carrier="home battery charger",
+            bus1=nodes + " li-ion home battery",
+            carrier="li-ion home battery charger",
             efficiency=costs.at["home battery inverter", "efficiency"] ** 0.5,
             capital_cost=costs.at["home battery inverter", "fixed"],
             p_nom_extendable=True,
@@ -1364,10 +1364,10 @@ def insert_electricity_distribution_grid(n, costs):
 
         n.add(
             "Link",
-            nodes + " home battery discharger",
-            bus0=nodes + " home battery",
+            nodes + " li-ion home battery discharger",
+            bus0=nodes + " li-ion home battery",
             bus1=nodes + " low voltage",
-            carrier="home battery discharger",
+            carrier="li-ion home battery discharger",
             efficiency=costs.at["home battery inverter", "efficiency"] ** 0.5,
             marginal_cost=options["marginal_cost_storage"],
             p_nom_extendable=True,
@@ -1375,21 +1375,21 @@ def insert_electricity_distribution_grid(n, costs):
         )
 
     elif "battery" in snakemake.params.sector["storage_units"]:
-        n.add("Carrier", "home battery")
+        n.add("Carrier", "li-ion home battery")
         max_hours = snakemake.params.max_hours
 
         n.add(
             "StorageUnit",
             nodes,
-            suffix=" home battery",
+            suffix=" li-ion home battery",
             bus=nodes + " low voltage",
-            carrier="home battery",
+            carrier="li-ion home battery",
             p_nom_extendable=True,
-            capital_cost=costs.at["home battery", "fixed"],
+            capital_cost=costs.at["li-ion home battery", "fixed"],
             marginal_cost=options["marginal_cost_storage"],
             efficiency_store=costs.at["home battery inverter", "efficiency"] ** 0.5,
             efficiency_dispatch=costs.at["home battery inverter", "efficiency"] ** 0.5,
-            max_hours=max_hours["battery"],
+            max_hours=max_hours["li-ion battery"],
             cyclic_state_of_charge=True,
             lifetime=costs.at["home battery storage", "lifetime"],
         )
@@ -1459,7 +1459,7 @@ def add_storageunits(n, costs, carriers, max_hours):
     n.add("Carrier", missing_carriers)
 
     # check for not implemented storage technologies
-    implemented = ["H2", "battery", "iron-air battery"]
+    implemented = ["H2", "li-ion battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
     available_carriers = list(set(carriers).intersection(implemented))
     if len(not_implemented) > 0:
@@ -1467,11 +1467,11 @@ def add_storageunits(n, costs, carriers, max_hours):
             f"{not_implemented} are not yet implemented as Storage technologies in PyPSA-Eur"
         )
 
-    lookup_store = {"H2": "electrolysis", "battery": "battery inverter", "iron-air battery": "iron-air battery charge"}
-    lookup_dispatch = {"H2": "fuel cell", "battery": "battery inverter", "iron-air battery": "iron-air battery discharge"}
+    lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery charge"}
+    lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery discharge"}
 
     for carrier in available_carriers:
-        roundtrip_correction = 0.5 if carrier == "battery" else 1
+        roundtrip_correction = 0.5 if carrier == "li-ion battery" else 1
         if carrier == "H2":
             cavern_types = snakemake.params.sector[
                 "hydrogen_underground_storage_locations"
@@ -1532,7 +1532,7 @@ def add_stores(n, costs, carriers):
     n.add("Carrier", missing_carriers)
 
     # check for not implemented storage technologies
-    implemented = ["H2", "battery", "iron-air battery"]
+    implemented = ["H2", "li-ion battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
     if len(not_implemented) > 0:
         logger.warning(
@@ -1579,29 +1579,29 @@ def add_stores(n, costs, carriers):
             ],
         )
 
-    if "battery" in carriers:
+    if "li-ion battery" in carriers:
 
         n.add(
-            "Bus", nodes + " battery", location=nodes, carrier="battery", unit="MWh_el"
+            "Bus", nodes + " li-ion battery", location=nodes, carrier="li-ion battery", unit="MWh_el"
         )
 
         n.add(
             "Store",
-            nodes + " battery",
-            bus=nodes + " battery",
+            nodes + " li-ion battery",
+            bus=nodes + " li-ion battery",
             e_cyclic=True,
             e_nom_extendable=True,
-            carrier="battery",
+            carrier="li-ion battery",
             capital_cost=costs.at["battery storage", "fixed"],
             lifetime=costs.at["battery storage", "lifetime"],
         )
 
         n.add(
             "Link",
-            nodes + " battery charger",
+            nodes + " li-ion battery charger",
             bus0=nodes,
-            bus1=nodes + " battery",
-            carrier="battery charger",
+            bus1=nodes + " li-ion battery",
+            carrier="li-ion battery charger",
             efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
             capital_cost=costs.at["battery inverter", "fixed"],
             p_nom_extendable=True,
@@ -1610,10 +1610,10 @@ def add_stores(n, costs, carriers):
 
         n.add(
             "Link",
-            nodes + " battery discharger",
-            bus0=nodes + " battery",
+            nodes + " li-ion battery discharger",
+            bus0=nodes + " li-ion battery",
             bus1=nodes,
-            carrier="battery discharger",
+            carrier="li-ion battery discharger",
             efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
             marginal_cost=options["marginal_cost_storage"],
             p_nom_extendable=True,
