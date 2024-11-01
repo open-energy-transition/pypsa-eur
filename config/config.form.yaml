@@ -68,6 +68,7 @@ electricity:
   max_hours:
     battery: [4, 6]
     H2: [168]
+    iron-air battery: [100]
   custom_powerplants: false # TODO: Custom PP from EEE project
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
@@ -151,7 +152,7 @@ sector:
   tes: false
   marginal_cost_storage: 0. #1e-4
   stores: ["H2"]
-  storage_units: ["battery"]
+  storage_units: ["li-ion battery", "iron-air battery"]
   hydrogen_fuel_cell: true
   hydrogen_turbine: false
   hydrogen_underground_storage: true
@@ -188,7 +189,7 @@ costs:
     H2: 0.
     electrolysis: 0.
     fuel cell: 0.
-    battery: 0.
+    li-ion battery: 0.
     battery inverter: 0.
   emission_prices:
     enable: false
