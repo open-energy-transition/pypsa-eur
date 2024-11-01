@@ -940,7 +940,7 @@ def attach_stores(n, costs, extendable_carriers):
             e_cyclic=True,
             e_nom_extendable=True,
             capital_cost=costs.at["battery storage", "capital_cost"],
-            marginal_cost=costs.at["battery", "marginal_cost"],
+            marginal_cost=costs.at["li-ion battery", "marginal_cost"],
         )
 
         n.add("Carrier", ["li-ion battery charger", "li-ion battery discharger"])
