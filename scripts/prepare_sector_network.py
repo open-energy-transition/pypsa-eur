@@ -1460,9 +1460,6 @@ def get_salt_caverns(cavern_types, fn_h2_cavern):
 def add_storageunits(n, costs, carriers, max_hours):
     nodes = pop_layout.index
 
-    missing_carriers = list(set(carriers).difference(n.carriers.index))
-    n.add("Carrier", missing_carriers)
-
     # check for not implemented storage technologies
     implemented = ["H2", "li-ion battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
@@ -1471,6 +1468,8 @@ def add_storageunits(n, costs, carriers, max_hours):
         logger.warning(
             f"{not_implemented} are not yet implemented as Storage technologies in PyPSA-Eur"
         )
+    missing_carriers = list(set(available_carriers).difference(n.carriers.index))
+    n.add("Carrier", missing_carriers)
 
     lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery charge"}
     lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery discharge"}
@@ -1533,16 +1532,16 @@ def add_storageunits(n, costs, carriers, max_hours):
 def add_stores(n, costs, carriers):
     nodes = pop_layout.index
 
-    missing_carriers = list(set(carriers).difference(n.carriers.index))
-    n.add("Carrier", missing_carriers)
-
     # check for not implemented storage technologies
     implemented = ["H2", "li-ion battery", "iron-air battery"]
     not_implemented = list(set(carriers).difference(implemented))
+    available_carriers = list(set(carriers).intersection(implemented))
     if len(not_implemented) > 0:
         logger.warning(
             f"{not_implemented} are not yet implemented as Store technologies in PyPSA-Eur"
         )
+    missing_carriers = list(set(available_carriers).difference(n.carriers.index))
+    n.add("Carrier", missing_carriers)
 
     if "H2" in carriers:
         cavern_types = snakemake.params.sector["hydrogen_underground_storage_locations"]
