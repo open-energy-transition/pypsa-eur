@@ -279,7 +279,7 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             costs.loc["battery inverter"],
             max_hours=max_hour,
         )
-    # cost for default li-ion battery
+    # cost for default li-ion battery which will be the first max_hour archetype
     costs.loc[f"li-ion battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
@@ -293,12 +293,12 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             costs.loc["electrolysis"],
             max_hours=max_hour,
         )
-    # cost for default 168h H2 underground storage
+    # cost for default H2 underground storage which will be the first max_hour archetype
     costs.loc[f"H2"] = costs_for_storage(
         costs.loc["hydrogen storage underground"],
         costs.loc["fuel cell"],
         costs.loc["electrolysis"],
-        max_hours=168,
+        max_hours=max_hours["H2"][0],
     )
 
     for attr in ("marginal_cost", "capital_cost"):
