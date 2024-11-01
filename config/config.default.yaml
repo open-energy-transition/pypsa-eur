@@ -100,7 +100,7 @@ electricity:
     contingency: 4000
 
   max_hours:
-    battery: [6]
+    li-ion battery: [6]
     H2: [168]
     iron-air battery: [100]
 
