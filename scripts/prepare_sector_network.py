@@ -1396,7 +1396,7 @@ def insert_electricity_distribution_grid(n, costs):
                 efficiency_dispatch=costs.at["home battery inverter", "efficiency"] ** 0.5,
                 max_hours=max_hour,
                 cyclic_state_of_charge=True,
-                lifetime=costs.at["li-ion home battery storage", "lifetime"],
+                lifetime=costs.at["home battery storage", "lifetime"],
             )
 
 
