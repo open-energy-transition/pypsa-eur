@@ -106,7 +106,7 @@ electricity:
 
   extendable_carriers:
     Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, OCGT, CCGT]
-    StorageUnit: [] # li-ion battery, H2
+    StorageUnit: [] # li-ion battery, H2, lfp, vanadium, lair, pair
     Store: [li-ion battery, H2]
     Link: [] # H2 pipeline
 

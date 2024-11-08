@@ -280,10 +280,67 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             max_hours=max_hour,
         )
     # cost for default li-ion battery which will be the first max_hour archetype
-    costs.loc[f"li-ion battery"] = costs_for_storage(
+    costs.loc["li-ion battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
         max_hours=max_hours["li-ion battery"][0],
+    )
+
+    for max_hour in max_hours["lfp"]:
+        costs.loc[f"lfp {max_hour}h"] = costs_for_storage(
+            costs.loc["Lithium-Ion-LFP-store"],
+            costs.loc["Lithium-Ion-LFP-bicharger"],
+            max_hours=max_hour,
+        )
+    # cost for default li-ion battery which will be the first max_hour archetype
+    costs.loc["lfp"] = costs_for_storage(
+        costs.loc["Lithium-Ion-LFP-store"],
+        costs.loc["Lithium-Ion-LFP-bicharger"],
+        max_hours=max_hours["lfp"][0],
+    )
+
+    for max_hour in max_hours["vanadium"]:
+        costs.loc[f"vanadium {max_hour}h"] = costs_for_storage(
+            costs.loc["Vanadium-Redox-Flow-store"],
+            costs.loc["Vanadium-Redox-Flow-bicharger"],
+            max_hours=max_hour,
+        )
+    
+    # cost for default vanadium which will be the first max_hour archetype
+    costs.loc["vanadium"] = costs_for_storage(
+        costs.loc["Vanadium-Redox-Flow-store"],
+        costs.loc["Vanadium-Redox-Flow-bicharger"],
+        max_hours=max_hours["vanadium"][0],
+    )
+
+    for max_hour in max_hours["lair"]:
+        costs.loc[f"lair {max_hour}h"] = costs_for_storage(
+            costs.loc["Liquid-Air-store"],
+            costs.loc["Liquid-Air-charger"],
+            costs.loc["Liquid-Air-discharger"],
+            max_hours=max_hour,
+        )
+
+    # cost for default liquid air which will be the first max_hour archetype
+    costs.loc["lair"] = costs_for_storage(
+        costs.loc["Liquid-Air-store"],
+        costs.loc["Liquid-Air-charger"],
+        costs.loc["Liquid-Air-discharger"],
+        max_hours=max_hours["lair"][0],
+    )
+
+    for max_hour in max_hours["pair"]:
+        costs.loc[f"pair {max_hour}h"] = costs_for_storage(
+            costs.loc["Compressed-Air-Adiabatic-store"],
+            costs.loc["Compressed-Air-Adiabatic-bicharger"],
+            max_hours=max_hour,
+        )
+
+    # cost for default CAES which will be the first max_hour archetype
+    costs.loc["pair"] = costs_for_storage(
+        costs.loc["Compressed-Air-Adiabatic-store"],
+        costs.loc["Compressed-Air-Adiabatic-bicharger"],
+        max_hours=max_hours["pair"][0],
     )
 
     for max_hour in max_hours["H2"]:
@@ -294,7 +351,7 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             max_hours=max_hour,
         )
     # cost for default H2 underground storage which will be the first max_hour archetype
-    costs.loc[f"H2"] = costs_for_storage(
+    costs.loc["H2"] = costs_for_storage(
         costs.loc["hydrogen storage underground"],
         costs.loc["fuel cell"],
         costs.loc["electrolysis"],
@@ -874,8 +931,10 @@ def attach_storageunits(n, costs, extendable_carriers, max_hours):
 
     buses_i = n.buses.index
 
-    lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter"}
-    lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter"}
+    lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter", "lfp": "Lithium-Ion-LFP-bicharger", 
+    "vanadium": "Vanadium-Redox-Flow-bicharger", "lair":  "Liquid-Air-charger", "pair": "Compressed-Air-Adiabatic-bicharger"}
+    lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter", "lfp": "Lithium-Ion-LFP-bicharger", 
+    "vanadium": "Vanadium-Redox-Flow-bicharger", "lair":  "Liquid-Air-discharger", "pair": "Compressed-Air-Adiabatic-bicharger"}
 
     for carrier in carriers:
         roundtrip_correction = 0.5 if carrier == "li-ion battery" else 1
@@ -985,7 +1044,7 @@ def attach_stores(n, costs, extendable_carriers):
             p_nom_extendable=True,
             marginal_cost=costs.at["battery inverter", "marginal_cost"],
         )
-
+        
 
 if __name__ == "__main__":
     if "snakemake" not in globals():
