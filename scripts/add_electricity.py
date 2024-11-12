@@ -241,7 +241,7 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
     costs.unit = costs.unit.str.replace("/GW", "/MW")
 
     for attr in ("investment", "lifetime", "FOM", "VOM", "efficiency", "fuel"):
-        overwrites = params["costs"].get(attr)
+        overwrites = config.get(attr)
         if overwrites is not None:
             breakpoint()
             overwrites = pd.Series(overwrites)
@@ -1001,7 +1001,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("add_electricity", clusters=100)
+        snakemake = mock_snakemake("add_electricity", clusters=52, configfiles="config/config.form.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
