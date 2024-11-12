@@ -1001,7 +1001,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("add_electricity", clusters=52, configfiles="config/config.form.yaml")
+        snakemake = mock_snakemake("add_electricity", clusters=100)
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
