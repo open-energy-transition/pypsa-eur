@@ -286,6 +286,22 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
         max_hours=max_hours["li-ion battery"][0],
     )
 
+    for max_hour in max_hours["iron-air battery"]:
+        costs.loc[f"iron-air battery {max_hour}h"] = costs_for_storage(
+            costs.loc["iron-air battery"],
+            costs.loc["iron-air battery charge"],
+            costs.loc["iron-air battery discharge"],
+            max_hours=max_hour,
+        )
+
+    # cost for default iron-air battery which will be the first max_hour archetype
+    costs.loc["iron-air battery"] = costs_for_storage(
+        costs.loc["iron-air battery"],
+        costs.loc["iron-air battery charge"],
+        costs.loc["iron-air battery discharge"],
+        max_hours=max_hours["iron-air battery"][0],
+    )
+
     for max_hour in max_hours["lfp"]:
         costs.loc[f"lfp {max_hour}h"] = costs_for_storage(
             costs.loc["Lithium-Ion-LFP-store"],
@@ -931,9 +947,9 @@ def attach_storageunits(n, costs, extendable_carriers, max_hours):
 
     buses_i = n.buses.index
 
-    lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter", "lfp": "Lithium-Ion-LFP-bicharger", 
+    lookup_store = {"H2": "electrolysis", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery charge", "lfp": "Lithium-Ion-LFP-bicharger", 
     "vanadium": "Vanadium-Redox-Flow-bicharger", "lair":  "Liquid-Air-charger", "pair": "Compressed-Air-Adiabatic-bicharger"}
-    lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter", "lfp": "Lithium-Ion-LFP-bicharger", 
+    lookup_dispatch = {"H2": "fuel cell", "li-ion battery": "battery inverter", "iron-air battery": "iron-air battery discharge", "lfp": "Lithium-Ion-LFP-bicharger", 
     "vanadium": "Vanadium-Redox-Flow-bicharger", "lair":  "Liquid-Air-discharger", "pair": "Compressed-Air-Adiabatic-bicharger"}
 
     for carrier in carriers:

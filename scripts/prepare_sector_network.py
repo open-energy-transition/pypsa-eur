@@ -1491,7 +1491,7 @@ def add_storageunits(n, costs, carriers, max_hours):
     nodes = pop_layout.index
 
     # check for not implemented storage technologies
-    implemented = ["H2", "li-ion battery", "iron-air battery"]
+    implemented = ["H2", "li-ion battery", "iron-air battery", "lfp", "vanadium", "lair", "pair"]
     not_implemented = list(set(carriers).difference(implemented))
     available_carriers = list(set(carriers).intersection(implemented))
     if len(not_implemented) > 0:

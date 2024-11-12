@@ -74,6 +74,10 @@ electricity:
     iron-air battery: [100]
   custom_powerplants: false # TODO: Custom PP from EEE project
 
+  extendable_carriers:
+    StorageUnit: ["lfp", "vanadium", "lair", "pair", "iron-air battery"] # li-ion battery, H2, lfp, vanadium, lair, pair
+    Store: [H2]
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
 atlite:
   # TODO: weather year - input from FORM
@@ -210,3 +214,11 @@ clustering:
     DE: 0.6
   temporal:
     resolution_sector: 100H #2920SEG # TODO: low for development, change this later
+
+plotting:
+  tech_colors:
+    # all battery variation:
+    lfp: '#ace37f'
+    vanadium: '#9B111E'
+    lair: '#87CEEB'
+    pair: '#003366'
