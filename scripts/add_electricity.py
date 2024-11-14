@@ -240,6 +240,9 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
     costs.loc[costs.unit.str.contains("/GW"), "value"] /= 1e3
     costs.unit = costs.unit.str.replace("/GW", "/MW")
 
+    fill_values = config["fill_values"]
+    costs = costs.value.unstack().fillna(fill_values)
+
     for attr in ("investment", "lifetime", "FOM", "VOM", "efficiency", "fuel"):
         overwrites = config.get(attr)
         if overwrites is not None:
@@ -248,9 +251,6 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
             logger.info(
                 f"Overwriting {attr} of {overwrites.index} to {overwrites.values}"
             )
-
-    fill_values = config["fill_values"]
-    costs = costs.value.unstack().fillna(fill_values)
 
     costs["capital_cost"] = (
         (
