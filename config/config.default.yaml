@@ -101,6 +101,9 @@ electricity:
 
   max_hours:
     li-ion battery: [6]
+    vanadium: [10]
+    lair: [12]
+    pair: [24]
     H2: [168]
     iron-air battery: [100]
 

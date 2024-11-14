@@ -66,7 +66,7 @@ co2_budget:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#electricity
 electricity:
   max_hours:
-    lfp: [1, 2, 4, 8]
+    li-ion battery: [1, 2, 4, 8]
     vanadium: [10]
     lair: [12]
     pair: [24]
