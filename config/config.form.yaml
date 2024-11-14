@@ -163,7 +163,7 @@ sector:
   tes: true
   marginal_cost_storage: 0. #1e-4
   stores: ["H2"]
-  storage_units: ["lfp", "vanadium", "lair", "pair", "iron-air battery"]
+  storage_units: ["li-ion battery", "vanadium", "lair", "pair", "iron-air battery"]
   hydrogen_fuel_cell: true
   hydrogen_turbine: false
   hydrogen_underground_storage: true
@@ -221,6 +221,12 @@ clustering:
     DE: 0.6
   temporal:
     resolution_sector: 100H #2920SEG # TODO: low for development, change this later
+
+costs:
+  efficiency:
+    Compressed-Air-Adiabatic-bicharger: 0.7745
+  investment:
+    iron-air battery: 23.5
 
 plotting:
   tech_colors:
