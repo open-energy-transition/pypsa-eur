@@ -1093,7 +1093,6 @@ def prepare_costs(cost_file, params, nyears):
     for attr in ("investment", "lifetime", "FOM", "VOM", "efficiency", "fuel"):
         overwrites = params["costs"].get(attr)
         if overwrites is not None:
-            breakpoint()
             overwrites = pd.Series(overwrites)
             costs.loc[overwrites.index, attr] = overwrites
             logger.info(
