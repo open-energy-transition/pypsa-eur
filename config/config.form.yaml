@@ -34,7 +34,7 @@ foresight: myopic
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   ll:
-  - v1.27  # v1.x with x according to NEP and TYNDP (existing_capacities=zero)
+  - v1.11  # v1.x with x according to additional NEP links (existing_capacities=zero)
   clusters:
   - 52
   planning_horizons:
@@ -72,7 +72,10 @@ electricity:
     pair: [24]
     H2: [168]
     iron-air battery: [100]
-  custom_powerplants: false # TODO: Custom PP from EEE project
+  extendable_carriers:
+    Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float]
+  powerplants_filter: DateOut >= 2024 and not Fueltype.isin(['Nuclear', 'Hard Coal', 'Lignite'])
+  custom_powerplants: DateIn <= 2024 and DateOut >= 2024
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#atlite
 atlite:
@@ -108,7 +111,7 @@ lines:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#transmission_projects
 transmission_projects:
-  enable: false
+  enable: true
   include:
     tyndp2020: false
     nep: true
@@ -157,7 +160,7 @@ sector:
   reduce_space_heat_exogenously: true
   reduce_space_heat_exogenously_factor: # TODO: check this for Germany (Regulation or Ariadne?)
     2035: 0.11
-  tes: false
+  tes: true
   marginal_cost_storage: 0. #1e-4
   stores: ["H2"]
   storage_units: ["lfp", "vanadium", "lair", "pair", "iron-air battery"]
@@ -175,7 +178,7 @@ sector:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#costs
 costs:
   year: 2035 # TODO: change to commit with new cost assumptions
-  version: v0.9.2
+  version: 67a5830
   social_discountrate: 0.02
   fill_values:
     FOM: 0
@@ -189,6 +192,14 @@ costs:
   # Marginal and capital costs can be overwritten
   # capital_cost:
   #   onwind: 500
+  fuel:
+    OCGT: 38.84 # https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:52022SC0230 (Annex)
+    CCGT: 38.84
+    gas: 38.84
+    coal: 24.57 # https://businessanalytiq.com/procurementanalytics/index/subbituminous-coal-price-index/
+    lignite: 22.11 # https://businessanalytiq.com/procurementanalytics/index/lignite-coal-price-index/
+    nuclear: 1.75 # https://markets.businessinsider.com/commodities/uranium-price
+    uranium: 1.75
   marginal_cost:
     solar: 0.01
     onwind: 0.015
