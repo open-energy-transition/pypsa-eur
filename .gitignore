@@ -76,3 +76,21 @@ d1gam3xoknrgr2.cloudfront.net/
 merger-todos.md
 
 *.html
+
+
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb
+*.bbl
+*.blg
+*.spl
+report/*.pdf
