@@ -77,7 +77,7 @@ merger-todos.md
 
 *.html
 
-
+# latex files
 *.aux
 *.lof
 *.log
@@ -94,3 +94,6 @@ merger-todos.md
 *.blg
 *.spl
 report/*.pdf
+
+# private dev folder
+dev/*
