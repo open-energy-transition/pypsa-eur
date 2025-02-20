@@ -667,8 +667,9 @@ def base_network(
         "entsoegridkit",
         "osm-raw",
         "osm-prebuilt",
+        "tyndp-raw"
     }, (
-        f"base_network must be either 'entsoegridkit', 'osm-raw' or 'osm-prebuilt', but got '{base_network}'"
+        f"base_network must be either 'entsoegridkit', 'osm-raw', 'osm-prebuilt' or 'tyndp-raw', but got '{base_network}'"
     )
     if base_network == "entsoegridkit":
         warnings.warn(
