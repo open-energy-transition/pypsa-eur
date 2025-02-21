@@ -142,7 +142,7 @@ def build_shapes(
     """
     bidding_zones = gpd.read_file(bz_fn)
 
-    # Extract Northern Irland
+    # Extract Northern Ireland
     bidding_zones = extract_shape_by_bbox(
         bidding_zones, country="GB",
         min_lon=-8.6, max_lon=-5.8, min_lat=54.0, max_lat=55.4,
