@@ -20,10 +20,10 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: ""
-  name: ""
+  prefix: "dev"
+  name: all
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.yaml
   disable_progressbar: false
   shared_resources:
@@ -39,8 +39,6 @@ foresight: overnight
 scenario:
   clusters:
   - 39
-  - 128
-  - 256
   opts:
   - ''
   sector_opts:

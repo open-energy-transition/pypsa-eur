@@ -84,3 +84,7 @@ reset:
 		rm ./config/config.yaml || true; \
 		echo "Reset completed." \
 	) || echo "Reset cancelled."
+
+dev:
+	snakemake resources/dev/osm-prebuilt/networks/base.nc
+	snakemake resources/dev/tyndp-raw/networks/base.nc
