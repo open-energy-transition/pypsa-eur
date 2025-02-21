@@ -74,7 +74,6 @@ def format_bz_names(s: str):
          .replace("IT_NORD", "ITN1")
          .replace("IT_SUD", "ITS1")
          .replace("LU", "LUG1")
-         .replace("NO_1", "NOS0")
          .replace("NO_3", "NOM1")
          .replace("NO_4", "NON1")
          .replace('SE_', 'SE0')
@@ -108,17 +107,30 @@ def extract_shape_by_bbox(
     -------
         - gdf_new: Updated GeoDataFrame with the extracted shape separated.
     """
-    country_gdf = gdf.explode().query(f"country == '{country}'").reset_index(drop=True)
+    country_gdf = (
+        gdf.explode()
+        .query(f"country == '{country}'")
+        .reset_index(drop=True)
+    )
 
-    extracted_region = country_gdf.cx[min_lon:max_lon, min_lat:max_lat].assign(id=region_id)
+    extracted_region = (
+        country_gdf
+        .cx[min_lon:max_lon, min_lat:max_lat]
+        .assign(id=region_id)
+    )
 
-    remaining_country = country_gdf.drop(extracted_region.index).dissolve(by="country").assign(country=country)
+    remaining_country = (
+        country_gdf
+        .drop(extracted_region.index)
+        .dissolve(by="country")
+        .reset_index()
+    )
 
     return pd.concat([
         gdf.query(f"country != '{country}'"),
         remaining_country,
-        extracted_region,
-    ])
+        extracted_region.dissolve(by="country").reset_index(),
+    ]).reset_index(drop=True)
 
 
 def build_shapes(
@@ -162,6 +174,14 @@ def build_shapes(
         min_lon=24.0, max_lon=26.5, min_lat=35.0, max_lat=35.7,
         region_id="GR03"
     )
+
+    # Merge southern bidding zones in Norway
+    nos0_idx = bidding_zones.query("id in ['NO_1', 'NO_2', 'NO_5']").index
+    bidding_zones = pd.concat([
+        bidding_zones.drop(nos0_idx),
+        bidding_zones.loc[nos0_idx].dissolve(by="country").reset_index().assign(id="NOS0")
+    ])
+
 
     # Bidding zone shapes
     bidding_shapes = (
@@ -229,6 +249,11 @@ def build_buses(
         [BUSES_COLUMNS]
     )
     buses = gpd.GeoDataFrame(buses, geometry="geometry", crs=geo_crs)
+
+    # Assume the same coordinates for all LU buses
+    buses.loc["LUB1"] = buses.loc["LUB1"].fillna(buses.loc["LUG1"])
+    buses.loc["LUF1"] = buses.loc["LUF1"].fillna(buses.loc["LUG1"])
+    buses.loc["LUV1"] = buses.loc["LUV1"].fillna(buses.loc["LUG1"])
 
     buses_h2 = (
         country_shapes[["node", "x", "y"]]
