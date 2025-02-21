@@ -74,6 +74,7 @@ def format_bz_names(s: str):
          .replace("GB", "UK00")
          .replace("IT_NORD", "ITN1")
          .replace("IT_SUD", "ITS1")
+         .replace("LU", "LUG1")
          .replace("NO_1", "NOS0")
          .replace("NO_3", "NOM1")
          .replace("NO_4", "NON1")
