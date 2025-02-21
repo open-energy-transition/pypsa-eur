@@ -159,7 +159,7 @@ def build_buses(
         .rename({"NODE": "bus_id", "node": "geometry"}, axis=1)
         .assign(
             station_id=lambda df: df["bus_id"],
-            voltage=None,
+            voltage=380,  # TODO Improve assumption
             dc=None,
             symbol="Substation",
             under_construction="f",
@@ -178,7 +178,7 @@ def build_buses(
             bus_id=lambda df: df[["country"]] + " H2",
             station_id=lambda df: df["bus_id"],
             voltage=None,
-            dc=None,
+            dc="f",
             symbol="Substation",
             under_construction="f",
             tags=lambda df: df["bus_id"],
@@ -246,7 +246,7 @@ def build_links(
         links
         .assign(
             link_id=lambda df: df["bus0"] + "-" + df["bus1"] + "-DC",
-            voltage=None,
+            voltage=380,  # TODO Improve assumption
             length=lambda df: df.geometry.to_crs(distance_crs).length,
             underground="t",
             under_construction="f",
@@ -275,9 +275,9 @@ if __name__ == "__main__":
     # Build links
     links = build_links(snakemake.input.reference_grid, buses)
 
-    lines = gpd.GeoDataFrame(columns=LINES_COLUMNS, geometry="geometry")
-    converters = gpd.GeoDataFrame(columns=CONVERTERS_COLUMNS, geometry="geometry")
-    transformers = gpd.GeoDataFrame(columns=TRANSFORMERS_COLUMNS, geometry="geometry")
+    lines = gpd.GeoDataFrame(columns=LINES_COLUMNS, geometry="geometry").set_index(pd.Index([], name="line_id"))
+    converters = gpd.GeoDataFrame(columns=CONVERTERS_COLUMNS, geometry="geometry").set_index(pd.Index([], name="converter_id"))
+    transformers = gpd.GeoDataFrame(columns=TRANSFORMERS_COLUMNS, geometry="geometry").set_index(pd.Index([], name="transformer_id"))
 
     # Export to csv for base_network
     buses.to_csv(snakemake.output["substations"], quotechar="'")

@@ -701,7 +701,7 @@ def base_network(
         # Set electrical parameters of lines and links
         lines = _set_electrical_parameters_lines_eg(lines, config)
         links = _set_electrical_parameters_links_eg(links, config, links_p_nom)
-    elif base_network in {"osm-prebuilt", "osm-raw"}:
+    elif base_network in {"osm-prebuilt", "osm-raw", "tyndp-raw"}:
         links = _load_links_from_osm(buses, links)
         converters = _load_converters_from_osm(buses, converters)
 
