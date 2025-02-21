@@ -235,7 +235,7 @@ def build_buses(
     """
     buses = (
         pd.read_excel(buses_fn)
-        .merge(bidding_shapes[["country", "node", "x", "y"]], how="left", left_on="NODE", right_index=True)
+        .merge(bidding_shapes[["country", "node", "x", "y"]], how="outer", left_on="NODE", right_index=True)
         .rename({"NODE": "bus_id", "node": "geometry"}, axis=1)
         .assign(
             station_id=lambda df: df["bus_id"],
