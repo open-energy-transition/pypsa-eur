@@ -746,7 +746,7 @@ rule prepare_network:
         "../scripts/prepare_network.py"
 
 
-if config["electricity"]["base_network"] == "osm-raw":
+if lambda w: config_provider("electricity", "base_network")(w) == "osm-raw":
 
     rule clean_osm_data:
         input:
@@ -791,7 +791,7 @@ if config["electricity"]["base_network"] == "osm-raw":
             "../scripts/clean_osm_data.py"
 
 
-if config["electricity"]["base_network"] == "osm-raw":
+if lambda w: config_provider("electricity", "base_network")(w) == "osm-raw":
 
     rule build_osm_network:
         params:
@@ -831,7 +831,7 @@ if config["electricity"]["base_network"] == "osm-raw":
             "../scripts/build_osm_network.py"
 
 
-if config["electricity"]["base_network"] == "tyndp-raw":
+if lambda w: config_provider("electricity", "base_network")(w) == "tyndp-raw":
 
     rule build_tyndp_network:
         params:
