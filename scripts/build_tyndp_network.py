@@ -6,7 +6,6 @@ import logging
 
 import geopandas as gpd
 import pandas as pd
-from geopandas import GeoDataFrame
 from shapely.geometry import LineString
 
 from _helpers import configure_logging, set_scenario_config
@@ -85,6 +84,43 @@ def format_bz_names(s: str):
     return s
 
 
+def extract_shape_by_bbox(
+        gdf: gpd.GeoDataFrame,
+        country: str,
+        min_lon: float,
+        max_lon: float,
+        min_lat: float,
+        max_lat: float,
+        region_id: str
+):
+    """
+    Extracts a shape from a country's GeoDataFrame based on latitude and longitude bounds.
+
+    Parameters
+    ----------
+        - gdf (GeoDataFrame): GeoDataFrame containing country geometries.
+        - country (str): The country code or name to filter.
+        - min_lon, max_lon (float): Longitude bounds for extraction.
+        - min_lat, max_lat (float): Latitude bounds for extraction.
+        - region_id (str): String to assign an ID to the extracted region.
+
+    Returns
+    -------
+        - gdf_new: Updated GeoDataFrame with the extracted shape separated.
+    """
+    country_gdf = gdf.explode().query(f"country == '{country}'").reset_index(drop=True)
+
+    extracted_region = country_gdf.cx[min_lon:max_lon, min_lat:max_lat].assign(id=region_id)
+
+    remaining_country = country_gdf.drop(extracted_region.index).dissolve(by="country").assign(country=country)
+
+    return pd.concat([
+        gdf.query(f"country != '{country}'"),
+        remaining_country,
+        extracted_region,
+    ])
+
+
 def build_shapes(
         bz_fn,
         geo_crs: str = GEO_CRS,
@@ -104,9 +140,32 @@ def build_shapes(
         - bidding_shapes: A GeoDataFrame including bidding zone geometry, representative point and id.
         - country_shapes: A GeoDataFrame including country geometry and representative point.
     """
+    bidding_zones = gpd.read_file(bz_fn)
+
+    # Extract Northern Irland
+    bidding_zones = extract_shape_by_bbox(
+        bidding_zones, country="GB",
+        min_lon=-8.6, max_lon=-5.8, min_lat=54.0, max_lat=55.4,
+        region_id="UKNI"
+    )
+
+    # Extract Corsica
+    bidding_zones = extract_shape_by_bbox(
+        bidding_zones, country="FR",
+        min_lon=8.5, max_lon=9.7, min_lat=41.3, max_lat=43.0,
+        region_id="FR15"
+    )
+
+    # Extract Crete
+    bidding_zones = extract_shape_by_bbox(
+        bidding_zones, country="GR",
+        min_lon=24.0, max_lon=26.5, min_lat=35.0, max_lat=35.7,
+        region_id="GR03"
+    )
+
     # Bidding zone shapes
     bidding_shapes = (
-        gpd.read_file(bz_fn)
+        bidding_zones
         .assign(
             bz_id=lambda df: df["id"].apply(format_bz_names),
             node=lambda df: df.geometry.to_crs(distance_crs).representative_point().to_crs(geo_crs),
@@ -132,8 +191,8 @@ def build_shapes(
 
 def build_buses(
         buses_fn,
-        bidding_shapes: GeoDataFrame,
-        country_shapes: GeoDataFrame,
+        bidding_shapes: gpd.GeoDataFrame,
+        country_shapes: gpd.GeoDataFrame,
         geo_crs: str = GEO_CRS,
         distance_crs: str = DISTANCE_CRS
 ):
@@ -194,7 +253,7 @@ def build_buses(
 
 def build_links(
         grid_fn,
-        buses: GeoDataFrame,
+        buses: gpd.GeoDataFrame,
         geo_crs: str = GEO_CRS,
         distance_crs: str = DISTANCE_CRS
 ):
