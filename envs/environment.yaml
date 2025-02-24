@@ -11,7 +11,7 @@ dependencies:
 - pip
 
 - atlite>=0.2.9
-- pypsa>=0.28
+- pypsa==0.28
 - linopy
 - dask
 
@@ -20,7 +20,7 @@ dependencies:
 - openpyxl!=3.1.1
 - pycountry
 - seaborn
-- snakemake-minimal>=8.11
+- snakemake-minimal==8.10
 - memory_profiler
 - yaml
 - pytables
