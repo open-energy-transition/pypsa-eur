@@ -471,7 +471,8 @@ def set_transmission_costs(
 def attach_wind_and_solar(
     n: pypsa.Network,
     costs: pd.DataFrame,
-    profile_filenames: dict,
+    ppl: pd.DataFrame,
+    profile_filenames: str,
     carriers: list | set,
     extendable_carriers: list | set,
     line_length_factor: float = 1.0,
@@ -538,12 +539,20 @@ def attach_wind_and_solar(
             else:
                 capital_cost = costs.at[car, "capital_cost"]
 
+            if not ppl.query("carrier == @car").empty:
+                caps = ppl.query("carrier == @car").groupby("bus").p_nom.sum()
+                caps = pd.Series(data = caps, index = ds.indexes["bus"]).fillna(0)
+            else:
+                caps = pd.Series(index = ds.indexes["bus"]).fillna(0)
+
             n.add(
                 "Generator",
                 ds.indexes["bus"],
                 " " + car,
                 bus=ds.indexes["bus"],
                 carrier=car,
+                p_nom = caps,
+                p_nom_min = caps,
                 p_nom_extendable=car in extendable_carriers["Generator"],
                 p_nom_max=ds["p_nom_max"].to_pandas(),
                 marginal_cost=costs.at[supcar, "marginal_cost"],
@@ -1171,6 +1180,7 @@ if __name__ == "__main__":
     attach_wind_and_solar(
         n,
         costs,
+        ppl,
         snakemake.input,
         renewable_carriers,
         extendable_carriers,
