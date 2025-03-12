@@ -472,7 +472,7 @@ def attach_wind_and_solar(
     n: pypsa.Network,
     costs: pd.DataFrame,
     ppl: pd.DataFrame,
-    profile_filenames: str,
+    profile_filenames: dict,
     carriers: list | set,
     extendable_carriers: list | set,
     line_length_factor: float = 1.0,
