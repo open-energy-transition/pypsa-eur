@@ -487,6 +487,8 @@ def attach_wind_and_solar(
         The PyPSA network to attach the generators to.
     costs : pd.DataFrame
         DataFrame containing the cost data.
+    ppl : pd.DataFrame
+        DataFrame containing the power plant data.
     profile_filenames : dict
         Dictionary containing the paths to the wind and solar profiles.
     carriers : list | set

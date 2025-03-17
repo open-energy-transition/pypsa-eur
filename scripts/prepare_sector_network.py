@@ -1256,7 +1256,7 @@ def prepare_costs(cost_file, params, nyears):
     return costs
 
 
-def add_generation(n, costs, existing_capacities=0, existing_efficiencies=None):
+def add_generation(n, costs, ext_carriers, existing_capacities=0, existing_efficiencies=None):
     logger.info("Adding electricity generation")
 
     nodes = pop_layout.index
@@ -1279,17 +1279,10 @@ def add_generation(n, costs, existing_capacities=0, existing_efficiencies=None):
             * costs.at[generator, "VOM"],  # NB: VOM is per MWel
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
-            p_nom_extendable=(
-                True
-                if generator
-                in snakemake.params.electricity.get("extendable_carriers", dict()).get(
-                    "Generator", list()
-                )
-                else False
-            ),    
+            p_nom_extendable=bool(generator in ext_carriers.get("Generator", [])),
             p_nom=(
                 existing_capacities[generator] / existing_efficiencies[generator]
-                if not existing_capacities == 0 else 0
+                if existing_capacities is not None else 0
             ), # NB: existing capacities are MWel     
             p_max_pu = 0.7 if carrier == "uranium" else 1, # be conservative for nuclear (maintance or unplanned shut downs)
             p_nom_min=(
@@ -5220,7 +5213,7 @@ if __name__ == "__main__":
             component="generators",
         )
     else:
-        existing_capacities, existing_efficiencies = 0, None
+        existing_capacities = existing_efficiencies = None
 
     carriers_to_keep = snakemake.params.pypsa_eur
     profiles = {
@@ -5257,7 +5250,13 @@ if __name__ == "__main__":
         sequestration_potential_file=snakemake.input.sequestration_potential,
     )
 
-    add_generation(n, costs, existing_capacities, existing_efficiencies)
+    add_generation(
+        n,
+        costs,
+        snakemake.params.electricity.get("extendable_carriers", dict()),
+        existing_capacities,
+        existing_efficiencies,
+    )
 
     add_storage_and_grids(
         n=n,
