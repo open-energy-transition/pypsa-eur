@@ -1256,7 +1256,9 @@ def prepare_costs(cost_file, params, nyears):
     return costs
 
 
-def add_generation(n, costs, ext_carriers, existing_capacities=0, existing_efficiencies=None):
+def add_generation(
+    n, costs, ext_carriers, existing_capacities=0, existing_efficiencies=None
+):
     logger.info("Adding electricity generation")
 
     nodes = pop_layout.index
@@ -1282,12 +1284,15 @@ def add_generation(n, costs, ext_carriers, existing_capacities=0, existing_effic
             p_nom_extendable=bool(generator in ext_carriers.get("Generator", [])),
             p_nom=(
                 existing_capacities[generator] / existing_efficiencies[generator]
-                if existing_capacities is not None else 0
-            ), # NB: existing capacities are MWel     
-            p_max_pu = 0.7 if carrier == "uranium" else 1, # be conservative for nuclear (maintance or unplanned shut downs)
+                if existing_capacities is not None
+                else 0
+            ),  # NB: existing capacities are MWel
+            p_max_pu=0.7
+            if carrier == "uranium"
+            else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
             p_nom_min=(
                 existing_capacities[generator] if not existing_capacities == 0 else 0
-            ),   
+            ),
             carrier=generator,
             efficiency=(
                 existing_efficiencies[generator]
@@ -5140,6 +5145,7 @@ def add_enhanced_geothermal(
                 cyclic_state_of_charge=True,
             )
 
+
 def get_capacities_from_elec(n, carriers, component):
     """
     Gets capacities and efficiencies for {carrier} in n.{component} that were
@@ -5162,6 +5168,7 @@ def get_capacities_from_elec(n, carriers, component):
         )[eff_col]
 
     return capacity_dict, efficiency_dict
+
 
 # %%
 if __name__ == "__main__":
