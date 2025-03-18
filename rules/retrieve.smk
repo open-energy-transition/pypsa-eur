@@ -135,10 +135,10 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_cutout", True
     rule retrieve_cutout:
         input:
             storage(
-                "https://zenodo.org/records/12791128/files/{cutout}.nc",
+                "https://zenodo.org/records/14936211/files/{cutout}.nc",
             ),
         output:
-            "cutouts/" + CDIR + "{cutout}.nc",
+            CDIR + "{cutout}.nc",
         log:
             "logs/" + CDIR + "retrieve_cutout_{cutout}.log",
         resources:
@@ -650,23 +650,38 @@ if config["enable"]["retrieve"]:
         script:
             "../scripts/retrieve_osm_boundaries.py"
 
-
-if config["enable"]["retrieve"]:
-
-    rule retrieve_heat_source_utilisation_potentials:
-        params:
-            heat_source="{heat_source}",
-            heat_utilisation_potentials=config_provider(
-                "sector", "district_heating", "heat_utilisation_potentials"
+    rule retrieve_geothermal_heat_utilisation_potentials:
+        input:
+            isi_heat_potentials=storage(
+                "https://fordatis.fraunhofer.de/bitstream/fordatis/341.3/12/Results_DH_Matching_Cluster.xlsx",
+                keep_local=True,
             ),
-        log:
-            "logs/retrieve_heat_source_potentials_{heat_source}.log",
-        resources:
-            mem_mb=500,
         output:
-            "data/heat_source_utilisation_potentials/{heat_source}.gpkg",
-        script:
-            "../scripts/retrieve_heat_source_utilisation_potentials.py"
+            "data/isi_heat_utilisation_potentials.xlsx",
+        log:
+            "logs/retrieve_geothermal_heat_utilisation_potentials.log",
+        threads: 1
+        retries: 2
+        run:
+            move(input[0], output[0])
+
+    rule retrieve_lau_regions:
+        input:
+            lau_regions=storage(
+                "https://gisco-services.ec.europa.eu/distribution/v2/lau/download/ref-lau-2019-01m.geojson.zip",
+                keep_local=True,
+            ),
+        output:
+            lau_regions="data/lau_regions.geojson",
+        log:
+            "logs/retrieve_lau_regions.log",
+            lau_regions="data/lau_regions.zip",
+        log:
+            "logs/retrieve_lau_regions.log",
+        threads: 1
+        retries: 2
+        run:
+            move(input[0], output[0])
 
 
 if config["enable"]["retrieve"]:
