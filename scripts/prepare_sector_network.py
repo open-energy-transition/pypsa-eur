@@ -1291,7 +1291,7 @@ def add_generation(
             if carrier == "uranium"
             else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
             p_nom_min=(
-                existing_capacities[generator] if not existing_capacities == 0 else 0
+                existing_capacities[generator] if existing_capacities is not None else 0
             ),
             carrier=generator,
             efficiency=(
