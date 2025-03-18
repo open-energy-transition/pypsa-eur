@@ -1257,7 +1257,7 @@ def prepare_costs(cost_file, params, nyears):
 
 
 def add_generation(
-    n, costs, ext_carriers, existing_capacities=0, existing_efficiencies=None
+    n, costs, ext_carriers, existing_capacities=None, existing_efficiencies=None
 ):
     logger.info("Adding electricity generation")
 
