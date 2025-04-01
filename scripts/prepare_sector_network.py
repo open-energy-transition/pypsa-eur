@@ -1993,7 +1993,7 @@ def add_h2_storage(n, nodes, options, cavern_types, h2_cavern_file, costs, logge
     )
 
 
-def add_gas_network(n, gas_pipes, options, costs, gas_input_nodes_file, logger):
+def add_gas_network(n, gas_pipes, options, costs, gas_input_nodes, logger):
     """
     Adds natural gas infrastructure, incl. LNG terminals, production, storage and entry-points.
 
@@ -2010,8 +2010,8 @@ def add_gas_network(n, gas_pipes, options, costs, gas_input_nodes_file, logger):
         - gas_network_connectivity_upgrade : int
     costs : pd.DataFrame
         Technology cost assumptions
-    gas_input_nodes_file : str, optional
-        Path to CSV file containing gas input nodes data
+    gas_input_nodes : pd.DataFrame, optional
+       DataFrame containing gas input node information (LNG, pipeline, etc.)
     logger : logging.Logger, optional
         Logger for output messages. If None, no logging is performed.
 
@@ -2058,8 +2058,6 @@ def add_gas_network(n, gas_pipes, options, costs, gas_input_nodes_file, logger):
 
     # remove fossil generators where there is neither
     # production, LNG terminal, nor entry-point beyond system scope
-
-    gas_input_nodes = pd.read_csv(gas_input_nodes_file, index_col=0)
 
     unique = gas_input_nodes.index.unique()
     gas_i = n.generators.carrier == "gas"
@@ -2283,7 +2281,7 @@ def add_gas_and_h2_infrastructure(
     h2_cavern_file,
     cavern_types,
     clustered_gas_network_file,
-    gas_input_nodes_file,
+    gas_input_nodes,
     spatial,
     options,
     logger,
@@ -2305,8 +2303,8 @@ def add_gas_and_h2_infrastructure(
         List of underground storage types to consider
     clustered_gas_network_file : str, optional
         Path to CSV file containing gas network data
-    gas_input_nodes_file : str, optional
-        Path to CSV file containing gas input nodes data
+    gas_input_nodes : pd.DataFrame, optional
+        DataFrame containing gas input node information (LNG, pipeline, etc.)
     spatial : object, optional
         Object containing spatial information about nodes and their locations
     options : dict, optional
@@ -2389,7 +2387,7 @@ def add_gas_and_h2_infrastructure(
                 gas_pipes=gas_pipes,
                 options=options,
                 costs=costs,
-                gas_input_nodes_file=gas_input_nodes_file,
+                gas_input_nodes=gas_input_nodes,
                 logger=logger,
             )
 
