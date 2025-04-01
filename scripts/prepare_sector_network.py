@@ -6303,9 +6303,6 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
-    fn = snakemake.input.gas_input_nodes_simplified
-    gas_input_nodes = pd.read_csv(fn, index_col=0)
-
     if options.get("keep_existing_capacities", False):
         existing_capacities, existing_efficiencies = get_capacities_from_elec(
             n,
@@ -6377,7 +6374,7 @@ if __name__ == "__main__":
         h2_cavern_file=snakemake.input.h2_cavern,
         cavern_types=snakemake.params.sector["hydrogen_underground_storage_locations"],
         clustered_gas_network_file=snakemake.input.clustered_gas_network,
-        gas_input_nodes=gas_input_nodes,
+        gas_input_nodes_file=snakemake.input.gas_input_nodes_simplified,
         spatial=spatial,
         options=options,
         logger=logger,
