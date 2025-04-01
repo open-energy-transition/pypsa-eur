@@ -2106,7 +2106,7 @@ def add_gas_network(n, gas_pipes, options, costs, gas_input_nodes, logger):
         k_edge_augmentation(G, k_edge, avail=complement_edges.values)
     ):
         new_gas_pipes = pd.DataFrame(augmentation, columns=["bus0", "bus1"])
-        new_gas_pipes["length"] = new_gas_pipes.apply(haversine, axis=1)
+        new_gas_pipes["length"] = new_gas_pipes.apply(haversine, axis=1, args=(n,))
 
         new_gas_pipes.index = new_gas_pipes.apply(
             lambda x: f"gas pipeline new {x.bus0} <-> {x.bus1}", axis=1
