@@ -11,6 +11,7 @@ Release Notes
 Upcoming Release
 ================
 
+* Introduce a new base network using TYNDP 2024 data (https://github.com/open-energy-transition/open-tyndp/pull/18/).
 
 * Added option to use dynamic capacity for pit storage using the ``e_max_pu`` attribute of the store component, which is calculated in the new rule :mod:`build_tes_capacity_profiles` and added to the network in :mod:`prepare_sector_network`.
 
