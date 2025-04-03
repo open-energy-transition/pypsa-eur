@@ -49,6 +49,7 @@ network with **zero** initial capacity:
 """
 
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -201,6 +202,15 @@ def add_co2_emissions(n, costs, carriers):
 
 
 def load_costs(tech_costs, config, max_hours, Nyears=1.0):
+    # deprecation warning and casting float values to list of float values for max_hours per carrier
+    for carrier in max_hours:
+        if not isinstance(max_hours[carrier], list):
+            warnings.warn(
+                "The 'max_hours' configuration as a float is deprecated and will be removed in future versions. Please use a list instead.",
+                DeprecationWarning,
+            )
+            max_hours[carrier] = [max_hours[carrier]]
+
     for key in ("marginal_cost", "capital_cost"):
         if key in config:
             config["overwrites"][key] = config[key]
@@ -250,24 +260,114 @@ def load_costs(tech_costs, config, max_hours, Nyears=1.0):
 
     costs = costs.rename({"solar-utility single-axis tracking": "solar-hsat"})
 
-    def costs_for_storage(store, link1, link2=None, max_hours=1.0):
-        capital_cost = link1["capital_cost"] + max_hours * store["capital_cost"]
+    def costs_for_storage(store, link1=None, link2=None, max_hours=1.0):
+        capital_cost = max_hours * store["capital_cost"]
+        # if charger/discharge link cost are already included in store capex
+        if link1 is not None:
+            capital_cost += link1["capital_cost"]
         if link2 is not None:
             capital_cost += link2["capital_cost"]
-        return pd.Series(
-            dict(capital_cost=capital_cost, marginal_cost=0.0, co2_emissions=0.0)
-        )
+        return pd.Series(dict(fixed=capital_cost, lifetime=store["lifetime"]))
 
-    costs.loc["battery"] = costs_for_storage(
+    for max_hour in max_hours["li-ion battery"]:
+        costs.loc[f"li-ion battery {max_hour}h"] = costs_for_storage(
+            costs.loc["battery storage"],
+            costs.loc["battery inverter"],
+            max_hours=max_hour,
+        )
+    # cost for default li-ion battery which will be the first max_hour archetype
+    costs.loc["li-ion battery"] = costs_for_storage(
         costs.loc["battery storage"],
         costs.loc["battery inverter"],
-        max_hours=max_hours["battery"],
+        max_hours=max_hours["li-ion battery"][0],
     )
+
+    for max_hour in max_hours["iron-air battery"]:
+        costs.loc[f"iron-air battery {max_hour}h"] = costs_for_storage(
+            costs.loc["iron-air battery"],
+            costs.loc["iron-air battery charge"],
+            costs.loc["iron-air battery discharge"],
+            max_hours=max_hour,
+        )
+
+    # cost for default iron-air battery which will be the first max_hour archetype
+    costs.loc["iron-air battery"] = costs_for_storage(
+        costs.loc["iron-air battery"],
+        costs.loc["iron-air battery charge"],
+        costs.loc["iron-air battery discharge"],
+        max_hours=max_hours["iron-air battery"][0],
+    )
+
+    for max_hour in max_hours["lfp"]:
+        costs.loc[f"lfp {max_hour}h"] = costs_for_storage(
+            costs.loc["Lithium-Ion-LFP-store"],
+            costs.loc["Lithium-Ion-LFP-bicharger"],
+            max_hours=max_hour,
+        )
+    # cost for default li-ion battery which will be the first max_hour archetype
+    costs.loc["lfp"] = costs_for_storage(
+        costs.loc["Lithium-Ion-LFP-store"],
+        costs.loc["Lithium-Ion-LFP-bicharger"],
+        max_hours=max_hours["lfp"][0],
+    )
+
+    for max_hour in max_hours["vanadium"]:
+        costs.loc[f"vanadium {max_hour}h"] = costs_for_storage(
+            costs.loc["Vanadium-Redox-Flow-store"],
+            costs.loc["Vanadium-Redox-Flow-bicharger"],
+            max_hours=max_hour,
+        )
+
+    # cost for default vanadium which will be the first max_hour archetype
+    costs.loc["vanadium"] = costs_for_storage(
+        costs.loc["Vanadium-Redox-Flow-store"],
+        costs.loc["Vanadium-Redox-Flow-bicharger"],
+        max_hours=max_hours["vanadium"][0],
+    )
+
+    for max_hour in max_hours["lair"]:
+        costs.loc[f"lair {max_hour}h"] = costs_for_storage(
+            costs.loc["Liquid-Air-store"],
+            costs.loc["Liquid-Air-charger"],
+            costs.loc["Liquid-Air-discharger"],
+            max_hours=max_hour,
+        )
+
+    # cost for default liquid air which will be the first max_hour archetype
+    costs.loc["lair"] = costs_for_storage(
+        costs.loc["Liquid-Air-store"],
+        costs.loc["Liquid-Air-charger"],
+        costs.loc["Liquid-Air-discharger"],
+        max_hours=max_hours["lair"][0],
+    )
+
+    for max_hour in max_hours["pair"]:
+        costs.loc[f"pair {max_hour}h"] = costs_for_storage(
+            costs.loc["Compressed-Air-Adiabatic-store"],
+            costs.loc["Compressed-Air-Adiabatic-bicharger"],
+            max_hours=max_hour,
+        )
+
+    # cost for default CAES which will be the first max_hour archetype
+    costs.loc["pair"] = costs_for_storage(
+        costs.loc["Compressed-Air-Adiabatic-store"],
+        costs.loc["Compressed-Air-Adiabatic-bicharger"],
+        max_hours=max_hours["pair"][0],
+    )
+
+    for max_hour in max_hours["H2"]:
+        costs.loc[f"H2 {max_hour}h"] = costs_for_storage(
+            costs.loc["hydrogen storage underground"],
+            costs.loc["fuel cell"],
+            costs.loc["electrolysis"],
+            max_hours=max_hour,
+        )
+    # cost for default H2 underground storage which will be the first max_hour archetype
     costs.loc["H2"] = costs_for_storage(
         costs.loc["hydrogen storage underground"],
         costs.loc["fuel cell"],
         costs.loc["electrolysis"],
-        max_hours=max_hours["H2"],
+        max_hours=max_hours["H2"][0],
     )
 
     for attr in ("marginal_cost", "capital_cost"):
@@ -962,32 +1062,48 @@ def attach_storageunits(
     """
     carriers = extendable_carriers["StorageUnit"]
 
-    n.add("Carrier", carriers)
-
     buses_i = n.buses.index
 
-    lookup_store = {"H2": "electrolysis", "battery": "battery inverter"}
-    lookup_dispatch = {"H2": "fuel cell", "battery": "battery inverter"}
+    lookup_store = {
+        "H2": "electrolysis",
+        "li-ion battery": "battery inverter",
+        "iron-air battery": "iron-air battery charge",
+        "lfp": "Lithium-Ion-LFP-bicharger",
+        "vanadium": "Vanadium-Redox-Flow-bicharger",
+        "lair": "Liquid-Air-charger",
+        "pair": "Compressed-Air-Adiabatic-bicharger",
+    }
+    lookup_dispatch = {
+        "H2": "fuel cell",
+        "li-ion battery": "battery inverter",
+        "iron-air battery": "iron-air battery discharge",
+        "lfp": "Lithium-Ion-LFP-bicharger",
+        "vanadium": "Vanadium-Redox-Flow-bicharger",
+        "lair": "Liquid-Air-discharger",
+        "pair": "Compressed-Air-Adiabatic-bicharger",
+    }
 
     for carrier in carriers:
-        roundtrip_correction = 0.5 if carrier == "battery" else 1
+        roundtrip_correction = 0.5 if carrier == "li-ion battery" else 1
+        for max_hour in max_hours[carrier]:
+            n.add("Carrier", f" {carrier} {max_hour}h")
 
-        n.add(
-            "StorageUnit",
-            buses_i,
-            " " + carrier,
-            bus=buses_i,
-            carrier=carrier,
-            p_nom_extendable=True,
-            capital_cost=costs.at[carrier, "capital_cost"],
-            marginal_cost=costs.at[carrier, "marginal_cost"],
-            efficiency_store=costs.at[lookup_store[carrier], "efficiency"]
-            ** roundtrip_correction,
-            efficiency_dispatch=costs.at[lookup_dispatch[carrier], "efficiency"]
-            ** roundtrip_correction,
-            max_hours=max_hours[carrier],
-            cyclic_state_of_charge=True,
-        )
+            n.add(
+                "StorageUnit",
+                buses_i,
+                f" {carrier} {max_hour}h",
+                bus=buses_i,
+                carrier=f" {carrier} {max_hour}h",
+                p_nom_extendable=True,
+                capital_cost=costs.at[f"{carrier} {max_hour}h", "capital_cost"],
+                marginal_cost=costs.at[f"{carrier} {max_hour}h", "marginal_cost"],
+                efficiency_store=costs.at[lookup_store[carrier], "efficiency"]
+                ** roundtrip_correction,
+                efficiency_dispatch=costs.at[lookup_dispatch[carrier], "efficiency"]
+                ** roundtrip_correction,
+                max_hours=max_hour,
+                cyclic_state_of_charge=True,
+            )
 
 
 def attach_stores(
@@ -1052,30 +1168,33 @@ def attach_stores(
             marginal_cost=costs.at["fuel cell", "marginal_cost"],
         )
 
-    if "battery" in carriers:
+    if "li-ion battery" in carriers:
         b_buses_i = n.add(
-            "Bus", buses_i + " battery", carrier="battery", location=buses_i
+            "Bus",
+            buses_i + " li-ion battery",
+            carrier="li-ion battery",
+            location=buses_i,
         )
 
         n.add(
             "Store",
             b_buses_i,
             bus=b_buses_i,
-            carrier="battery",
+            carrier="li-ion battery",
             e_cyclic=True,
             e_nom_extendable=True,
             capital_cost=costs.at["battery storage", "capital_cost"],
-            marginal_cost=costs.at["battery", "marginal_cost"],
+            marginal_cost=costs.at["li-ion battery", "marginal_cost"],
         )
 
-        n.add("Carrier", ["battery charger", "battery discharger"])
+        n.add("Carrier", ["li-ion battery charger", "li-ion battery discharger"])
 
         n.add(
             "Link",
             b_buses_i + " charger",
             bus0=buses_i,
             bus1=b_buses_i,
-            carrier="battery charger",
+            carrier="li-ion battery charger",
             # the efficiencies are "round trip efficiencies"
             efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
             capital_cost=costs.at["battery inverter", "capital_cost"],
@@ -1088,7 +1207,7 @@ def attach_stores(
             b_buses_i + " discharger",
             bus0=b_buses_i,
             bus1=buses_i,
-            carrier="battery discharger",
+            carrier="li-ion battery discharger",
             efficiency=costs.at["battery inverter", "efficiency"] ** 0.5,
             p_nom_extendable=True,
             marginal_cost=costs.at["battery inverter", "marginal_cost"],

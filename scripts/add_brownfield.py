@@ -56,7 +56,7 @@ def add_brownfield(
     dc_i = n.links[n.links.carrier == "DC"].index
     n.links.loc[dc_i, "p_nom_min"] = n_p.links.loc[dc_i, "p_nom_opt"]
 
-    for c in n_p.iterate_components(["Link", "Generator", "Store"]):
+    for c in n_p.iterate_components(["Link", "Generator", "Store", "StorageUnit"]):
         attr = "e" if c.name == "Store" else "p"
 
         # first, remove generators, links and stores that track

@@ -43,7 +43,7 @@ def add_build_year_to_new_assets(n: pypsa.Network, baseyear: int) -> None:
         Year in which optimized assets are built
     """
     # Give assets with lifetimes and no build year the build year baseyear
-    for c in n.iterate_components(["Link", "Generator", "Store"]):
+    for c in n.iterate_components(["Link", "Generator", "Store", "StorageUnit"]):
         assets = c.df.index[(c.df.lifetime != np.inf) & (c.df.build_year == 0)]
         c.df.loc[assets, "build_year"] = baseyear
 
@@ -728,7 +728,7 @@ if __name__ == "__main__":
     Nyears = n.snapshot_weightings.generators.sum() / 8760.0
     costs = prepare_costs(
         snakemake.input.costs,
-        snakemake.params.costs,
+        snakemake.params,
         Nyears,
     )
 

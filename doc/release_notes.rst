@@ -11,6 +11,8 @@ Release Notes
 Upcoming Release
 ================
 
+* Added Iron-Air battery, Lithium iron phosphate (lpf), Vanadium, Liquid-air (lair) and Compressed-air (pair) storage technology and changed nomenclature for lithium-ion battery storages from ``battery`` to ``li-ion battery``.
+
 * Fail on solving status 'warning' because results are likely not valid.
 
 * Introduced heat-venting in all heating systems at given marginal cost and added marginal cost for water tank charging. Renamed config setting for marginal cost of home-battery charging to ``marginal_cost_home_battery_storage``. (https://github.com/PyPSA/pypsa-eur/pull/1563)

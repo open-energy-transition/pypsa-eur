@@ -36,7 +36,7 @@ electricity:
 
   extendable_carriers:
     Generator: [OCGT]
-    StorageUnit: [battery]
+    StorageUnit: [li-ion battery]
     Store: [H2]
     Link: [H2 pipeline]
 
