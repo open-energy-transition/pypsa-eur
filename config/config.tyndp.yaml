@@ -5,17 +5,38 @@
 run:
   prefix: "tyndp"
 
+# TODO set foresight
+foresight: overnight
+
 scenario:
   clusters:
   - all
+  planning_horizons:
+  - 2030
 
 countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK']
+
+snapshots:
+  # TODO define multiple climatic years, being either 1995 2008 or 2009
+  start: "2013-01-01"
+  end: "2014-01-01"
 
 enable:
   retrieve_tyndp_bundle: true
 
+co2_budget:
+  # TODO define carbon budget compliant with EU 2030 and 2050 targets
+  2020: 0.701
+  2025: 0.524
+  2030: 0.297
+  2035: 0.150
+  2040: 0.071
+  2045: 0.032
+  2050: 0.000
+
 electricity:
   base_network: tyndp-raw
+  transmission_limit: v1.0
 
 transmission_projects:
   enable: true
@@ -24,9 +45,82 @@ transmission_projects:
     nep: false
     manual: false
 
+load:
+  source: tyndp # opsd, tyndp
+  manual_adjustments: false
+  supplement_synthetic: true
+  tyndp_scenario:
+    scenario: DE  # NT, DE or GA
+    year: 2030  # 2030, 2040 or 2050 (only for DE or GA)
+
+pypsa_eur:
+  Bus:
+  - AC
+  Link:
+  - DC
+  Generator:
+  - onwind
+  - offwind-ac
+  - offwind-dc
+  - offwind-float
+  - solar-hsat
+  - solar
+  - ror
+  StorageUnit:
+  - PHS
+  - hydro
+  Store: []
+
+sector:
+  transport: false
+  heating: true
+  biomass: false
+  industry: false
+  shipping: false
+  aviation: false
+  agriculture: false
+  fossil_fuels: true
+
+  land_transport_fuel_cell_share:  # Not modelled
+    2020: 0
+    2025: 0
+    2030: 0
+    2035: 0
+    2040: 0
+    2045: 0
+    2050: 0
+  land_transport_electric_share:
+    2020: 0
+    2025: 0.15
+    2030: 0.3
+    2035: 0.45
+    2040: 0.7
+    2045: 0.85
+    2050: 1
+  land_transport_ice_share:  # Not modelled
+    2020: 0
+    2025: 0
+    2030: 0
+    2035: 0
+    2040: 0
+    2045: 0
+    2050: 0
+  h2_topology_tyndp:
+    enable: true
+    tyndp_scenario:
+      scenario: DE  # NT, DE or GA
+      year: 2030  # 2030, 2035, 2040, 2045 or 2050 (only for DE or GA)
+  ATR: false
+  hydrogen_fuel_cell: false
+  hydrogen_turbine: true
+  transmission_efficiency:
+    enable:
+    - gas pipeline
+    - electricity distribution grid
+
 clustering:
   mode: administrative  # TODO Switch to Bidding zones to preserve bidding zones shapes
   administrative:
     level: 3
   temporal:
-    resolution_sector: 50SEG
+    resolution_sector: 365SEG
