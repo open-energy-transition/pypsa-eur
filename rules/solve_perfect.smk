@@ -144,17 +144,11 @@ def input_networks_make_summary_perfect(w):
 
 
 rule make_summary_perfect:
-    params:
-        costs=config_provider("costs"),
-        max_hours=config_provider("electricity", "max_hours"),
     input:
         unpack(input_networks_make_summary_perfect),
         costs=resources("costs_2020.csv"),
     output:
-        nodal_costs=RESULTS + "csvs/nodal_costs.csv",
         nodal_capacities=RESULTS + "csvs/nodal_capacities.csv",
-        nodal_cfs=RESULTS + "csvs/nodal_cfs.csv",
-        cfs=RESULTS + "csvs/cfs.csv",
         costs=RESULTS + "csvs/costs.csv",
         capacities=RESULTS + "csvs/capacities.csv",
         curtailment=RESULTS + "csvs/curtailment.csv",
