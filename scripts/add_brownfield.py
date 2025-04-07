@@ -17,6 +17,7 @@ from _helpers import (
     set_scenario_config,
     update_config_from_wildcards,
 )
+from add_electricity import sanitize_carriers
 from add_existing_baseyear import add_build_year_to_new_assets
 
 logger = logging.getLogger(__name__)
@@ -326,6 +327,31 @@ def update_dynamic_ptes_capacity(
     ].values
 
 
+def add_missing_buses(n: pypsa.Network, n_p: pypsa.Network) -> None:
+    """
+    Identify and add buses that are present in the result network but absent in the original network.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Original network.
+    n_p : pypsa.Network
+        Network with updated parameters.
+
+    Returns
+    -------
+    None
+        Updates buses in-place.
+    """
+    missing_buses = set(n_p.buses.index) - set(n.buses.index)
+
+    if missing_buses:
+        logger.info(f"Missing buses: {missing_buses}")
+
+        for i in missing_buses:
+            n.buses.loc[i] = n_p.buses.loc[i]
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
@@ -356,6 +382,8 @@ if __name__ == "__main__":
 
     n_p = pypsa.Network(snakemake.input.network_p)
 
+    add_missing_buses(n, n_p)
+
     update_heat_pump_efficiency(n, n_p, year)
 
     if snakemake.params.tes and snakemake.params.dynamic_ptes_capacity:
@@ -371,6 +399,8 @@ if __name__ == "__main__":
     )
 
     disable_grid_expansion_if_limit_hit(n)
+
+    sanitize_carriers(n, snakemake.config)
 
     n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
     n.export_to_netcdf(snakemake.output[0])

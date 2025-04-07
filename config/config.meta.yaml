@@ -1,0 +1,147 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#top-level-configuration
+version: v2025.01.0
+tutorial: false
+
+logging:
+  level: INFO
+  format: '%(levelname)s:%(name)s:%(message)s'
+
+private:
+  keys:
+    entsoe_api:
+
+remote:
+  ssh: ""
+  path: ""
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
+run:
+  prefix: ""
+  name: "baseline-3H"
+  scenarios:
+    enable: false
+    file: config/scenarios.yaml
+  disable_progressbar: false
+  shared_resources:
+    policy: false
+    exclude: []
+  shared_cutouts: true
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#foresight
+foresight: myopic
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#scenario
+# Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
+scenario:
+  clusters:
+  - 39
+  opts:
+  - ''
+  sector_opts:
+  - ''
+  planning_horizons:
+  - 2025
+  - 2030
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
+countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'XK']
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
+snapshots:
+  start: "2013-01-01"
+  end: "2014-01-01"
+  inclusive: 'left'
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#enable
+enable:
+  retrieve: auto
+  retrieve_databundle: false
+  retrieve_cost_data: true
+  build_cutout: false
+  retrieve_cutout: false
+  custom_busmap: false
+  drop_leap_day: true
+  sector: false
+  procurement: true
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#electricity
+electricity:
+  max_hours:
+    li-ion battery: [8]
+    vanadium: [10]
+    lair: [12]
+    pair: [24]
+    H2: [168]
+    iron-air battery: [100]
+
+  extendable_carriers:
+    StorageUnit: [li-ion battery, iron-air battery, vanadium, lair, pair] # 
+    Store: [H2]
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#sector
+sector:
+  transport: false
+  heating: false
+  biomass: false
+  ammonia: false
+  #methanol: false
+  industry: false
+  shipping: false
+  aviation: false
+  agriculture: false
+  dac: false
+  H2_network: false
+  co2_network: false
+  allam_cycle_gas: false
+  imports:
+    enable: false
+  gas_distribution_grid: false
+  cluster_heat_buses: false
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#costs
+costs:
+  year: 2025
+  version: v0.10.1
+
+  overwrite:
+    fuel:
+      OCGT: 38.84 # https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:52022SC0230 (Annex)
+      CCGT: 38.84
+      gas: 38.84
+      coal: 24.57 # https://businessanalytiq.com/procurementanalytics/index/subbituminous-coal-price-index/
+      lignite: 22.11 # https://businessanalytiq.com/procurementanalytics/index/lignite-coal-price-index/
+      nuclear: 1.75 # https://markets.businessinsider.com/commodities/uranium-price
+      uranium: 1.75
+    efficiency:
+      Compressed-Air-Adiabatic-bicharger: 0.7745
+    investment:
+      iron-air battery: 21710  # in EUR/MWh (2020) from 23,500 EUR/MWh (2024)
+      Compressed-Air-Adiabatic-store: 28835  # in EUR/MWh (2020) from 30,000 EUR/MWh (2022)
+      Compressed-Air-Adiabatic-bicharger: 1658016  # in EUR/MW (2020) from 1,725,000 EUR/MW (2022)
+    lifetime:
+      Compressed-Air-Adiabatic-store: 40  # years
+      Compressed-Air-Adiabatic-bicharger: 40  # years
+
+  marginal_cost:
+    solar: 0.01
+    onwind: 0.015
+    offwind: 0.015
+    hydro: 0.
+    H2: 0.
+    electrolysis: 0.
+    fuel cell: 0.
+    li-ion battery: 0.
+    battery inverter: 0.
+  emission_prices:
+    enable: false
+    co2: 0.
+    co2_monthly_prices: false
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#clustering
+clustering:
+  temporal:
+    resolution_sector: 3H
