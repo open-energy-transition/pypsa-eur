@@ -131,6 +131,45 @@ def add_missing_carriers(n, carriers):
         n.add("Carrier", missing_carriers)
 
 
+def sanitize_storage_units(n, config):
+    """
+    Sanitize the carrier information related to storage units in a PyPSA Network object.
+
+    This is because the carrier names of storage units have the max_hours appended.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        A PyPSA Network object that represents an electrical power system.
+    config : dict
+        A dictionary containing configuration information, specifically the
+        "plotting" key with "nice_names" and "tech_colors" keys for carriers.
+
+    Returns
+    -------
+    None
+    """
+
+    carriers_with_digits = [
+        carrier
+        for carrier in n.storage_units.carrier.unique()
+        if any(char.isdigit() for char in carrier)
+    ]
+
+    nice_names = config["plotting"]["nice_names"]
+    tech_colors = config["plotting"]["tech_colors"]
+
+    for carrier in carriers_with_digits:
+        for name in nice_names:
+            if name in carrier:
+                n.carriers.loc[carrier, "nice_name"] = (
+                    nice_names[name] + carrier[len(name) :]
+                )
+        for name in tech_colors:
+            if name in carrier:
+                n.carriers.loc[carrier, "color"] = tech_colors[name]
+
+
 def sanitize_carriers(n, config):
     """
     Sanitize the carrier information in a PyPSA Network object.
@@ -181,6 +220,8 @@ def sanitize_carriers(n, config):
         missing_i = list(colors.index[colors.isna()])
         logger.warning(f"tech_colors for carriers {missing_i} not defined in config.")
     n.carriers["color"] = n.carriers.color.where(n.carriers.color != "", colors)
+
+    sanitize_storage_units(n, config)
 
 
 def sanitize_locations(n):
@@ -279,7 +320,8 @@ def load_costs(
 
     # Calculate storage costs if max_hours is provided
     if max_hours is not None:
-    
+        print("max_hours is activated")
+
         def costs_for_storage(store, link1=None, link2=None, max_hours=1.0):
             capital_cost = max_hours * store["capital_cost"]
             # if charger/discharge link cost are already included in store capex
@@ -314,7 +356,7 @@ def load_costs(
             max_hours=max_hours["li-ion battery"][0],
         )
 
-        costs.loc[f"li-ion home battery"] = costs_for_storage(
+        costs.loc["li-ion home battery"] = costs_for_storage(
             costs.loc["home battery storage"],
             costs.loc["home battery inverter"],
             max_hours=max_hour,
@@ -400,13 +442,26 @@ def load_costs(
                 costs.loc["electrolysis"],
                 max_hours=max_hour,
             )
+            costs.loc[f"H2 underground {max_hour}h"] = costs_for_storage(
+                costs.loc["hydrogen storage underground"],
+                costs.loc["fuel cell"],
+                costs.loc["electrolysis"],
+                max_hours=max_hour,
+            )
+            costs.loc[f"H2 tank {max_hour}h"] = costs_for_storage(
+                costs.loc["hydrogen storage tank type 1 including compressor"],
+                costs.loc["fuel cell"],
+                costs.loc["electrolysis"],
+                max_hours=max_hour,
+            )
+
         # cost for default H2 underground storage which will be the first max_hour archetype
         costs.loc["H2"] = costs_for_storage(
             costs.loc["hydrogen storage underground"],
             costs.loc["fuel cell"],
             costs.loc["electrolysis"],
             max_hours=max_hours["H2"][0],
-    )
+        )
 
     for attr in ("marginal_cost", "capital_cost"):
         overwrites = config["overwrites"].get(attr)
@@ -1125,14 +1180,14 @@ def attach_storageunits(
     for carrier in carriers:
         roundtrip_correction = 0.5 if carrier == "li-ion battery" else 1
         for max_hour in max_hours[carrier]:
-            n.add("Carrier", f" {carrier} {max_hour}h")
+            n.add("Carrier", f"{carrier} {max_hour}h")
 
             n.add(
                 "StorageUnit",
                 buses_i,
                 f" {carrier} {max_hour}h",
                 bus=buses_i,
-                carrier=f" {carrier} {max_hour}h",
+                carrier=f"{carrier} {max_hour}h",
                 p_nom_extendable=True,
                 capital_cost=costs.at[f"{carrier} {max_hour}h", "capital_cost"],
                 marginal_cost=costs.at[f"{carrier} {max_hour}h", "marginal_cost"],

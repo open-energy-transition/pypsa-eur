@@ -252,9 +252,13 @@ plotting:
     PHS: "Pumped Hydro Storage"
     hydro: "Reservoir & Dam"
     battery: "Battery Storage"
+    lfp: "Lithium Iron Phosphate Battery Storage"
     li-ion battery: "Li-Ion Battery Storage"
     li-ion home battery: "Li-Ion Home Battery Storage"
     iron-air battery: "Iron-Air Battery Storage"
+    vanadium: "Vanadium-Redox Battery Storage"
+    lair: "Liquid Air Energy Storage"
+    pair: "Compressed Air Energy Storage"
     H2: "Hydrogen Storage"
     lines: "Transmission Lines"
     ror: "Run of River"
@@ -400,6 +404,13 @@ plotting:
     land transport EV: '#baf238'
     land transport demand: '#38baf2'
     EV battery: '#baf238'
+    # other batteries
+    lfp: '#ace37f'
+    li-ion battery: '#ace37f'
+    iron-air battery: '#1c404c'
+    vanadium: '#9B111E'
+    lair: '#87CEEB'
+    pair: '#003366'
     # hot water storage
     water tanks: '#e69487'
     residential rural water tanks: '#f7b7a3'

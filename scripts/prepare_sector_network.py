@@ -8,7 +8,6 @@ technologies for the buildings, transport and industry sectors.
 
 import logging
 import os
-import warnings
 from itertools import product
 from types import SimpleNamespace
 
@@ -1752,9 +1751,8 @@ def add_electricity_grid_connection(n, costs):
 
 def get_salt_caverns(
     h2_cavern_file,
-    cavern_types, 
+    cavern_types,
 ):
-        
     """
     Detirmine the potential of hydrogen cavern storage.
 
@@ -1765,7 +1763,7 @@ def get_salt_caverns(
     cavern_types : list
         List of underground storage types to consider
     """
-    
+
     h2_caverns = pd.read_csv(h2_cavern_file, index_col=0)
 
     if (
@@ -1790,13 +1788,12 @@ def get_salt_caverns(
 
 
 def add_storageunits(
-    n, 
-    costs, 
-    carriers, 
-    max_hours, 
-    h2_caverns = None,
+    n,
+    costs,
+    carriers,
+    max_hours,
+    h2_caverns=None,
 ):
-    
     """
     Add storage technologies as components of StorageUnit.
 
@@ -1812,7 +1809,7 @@ def add_storageunits(
         Maximum hours of storage if flexible
     h2_caverns : pd.DataFrame
         DataFrame containing the potential of hydrogen underground storage
-    
+
     Returns
     -------
     None
@@ -1837,7 +1834,7 @@ def add_storageunits(
             f"{not_implemented} are not yet implemented as Storage technologies in PyPSA-Eur"
         )
     available_carriers_max_hours = [
-        f"{carrier} {max_hour}"
+        f"{carrier} {max_hour}h"
         for carrier in available_carriers
         if carrier in max_hours
         for max_hour in max_hours[carrier]
@@ -1898,11 +1895,6 @@ def add_storageunits(
                 nodes_ = nodes
 
             cost_carrier = "H2 tank" if carrier == "H2" else carrier
-            cost_carrier = (
-                "iron-air battery storage"
-                if carrier == "iron-air battery"
-                else cost_carrier
-            )
             n.add(
                 "StorageUnit",
                 nodes_,
@@ -1925,12 +1917,11 @@ def add_storageunits(
 
 
 def add_stores(
-    n, 
-    costs, 
-    carriers, 
-    h2_caverns = None, 
+    n,
+    costs,
+    carriers,
+    h2_caverns=None,
 ):
-    
     """
     Add storage technologies as components of Stores and Links.
 
