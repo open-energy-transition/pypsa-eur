@@ -1348,19 +1348,198 @@ def solve_network(
         raise RuntimeError("Solving status 'infeasible'. Infeasibilities computed.")
 
 
+# metastudy
+
+
+def strip_network(n: pypsa.Network, config: dict) -> None:
+    """
+    Removes unnecessary components from a pypsa network.
+
+    Args:
+    - n (pypsa.Network): The network object to be stripped.
+
+    Returns:
+    - None
+    """
+    ci_names = config["ci"].keys()
+    ci_locations = [config["ci"][ci_name]["location"] for ci_name in ci_names]
+    zone = set(n.buses.country[bus] for bus in ci_locations)
+
+    # Perform queries and combine results into a single set
+    bus_core = n.buses.query("country.isin(@zone)", engine="python").index.unique()
+    combined_lines = n.lines.query(
+        "bus1.isin(@bus_core) | bus0.isin(@bus_core)", engine="python"
+    )
+    combined_links = n.links.query(
+        "bus1.isin(@bus_core) | bus0.isin(@bus_core)", engine="python"
+    )
+
+    # Combine the results of bus0 and bus1 in lines and links
+    bus_connect = (
+        set(combined_lines.bus0.unique())
+        | set(combined_lines.bus1.unique())
+        | set(combined_links.bus0.unique())
+        | set(combined_links.bus1.unique())
+    )
+
+    zone_all = set(n.buses.country[bus] for bus in bus_connect)
+    nodes_to_keep = n.buses.query("country.isin(@zone_all)").index.unique()
+
+    n.remove("Bus", n.buses.index.symmetric_difference(nodes_to_keep))
+
+    # make sure lines are kept
+    n.lines.carrier = "AC"
+
+    for c in n.iterate_components(
+        ["Generator", "Link", "Line", "Store", "StorageUnit", "Load"]
+    ):
+        if c.name in ["Link", "Line"]:
+            location_boolean = c.df.bus0.isin(nodes_to_keep) & c.df.bus1.isin(
+                nodes_to_keep
+            )
+        else:
+            location_boolean = c.df.bus.isin(nodes_to_keep)
+        to_keep = c.df.index[location_boolean]
+        to_drop = c.df.index.symmetric_difference(to_keep)
+        n.remove(c.name, to_drop)
+
+
+def load_profile(
+    n: pypsa.Network,
+    location: str,
+    profile_shape: str,
+    config,
+) -> pd.Series:
+    """
+    Create daily load profile for C&I buyers based on config setting.
+
+    Args:
+    - n (object): object
+    - profile_shape (str): shape of the load profile, must be one of 'baseload' or 'industry'
+    - config (dict): config settings
+
+    Returns:
+    - pd.Series: annual load profile for C&I buyers
+    """
+
+    procurement = config["procurement"]
+    scaling = n.snapshot_weightings.objective.sum() / len(
+        n.snapshot_weightings.objective
+    )  # e.g., 3 for 3H time resolution
+
+    shapes = {
+        "baseload": [1 / 24] * 24,
+        "industry": [0.009] * 5
+        + [0.016, 0.031, 0.07, 0.072, 0.073, 0.072, 0.07]
+        + [0.052, 0.054, 0.066, 0.07, 0.068, 0.063]
+        + [0.035] * 2
+        + [0.045] * 2
+        + [0.009] * 2,
+    }
+
+    try:
+        shape = shapes[profile_shape]
+    except KeyError:
+        print(
+            f"'profile_shape' option must be one of 'baseload' or 'industry'. Now is {profile_shape}."
+        )
+        sys.exit()
+
+    if procurement["strategy"] == "ref":
+        load = 0.0
+    else:
+        country = n.buses.country[location]
+        load_year = (
+            pd.read_csv(procurement["load"])
+            .groupby("Country Code")["2023"]
+            .sum()[country]
+        )  # GWh
+        load = load_year / 8760 * 1000 * procurement["participation"] / 100  # MW
+
+    load_day = load * 24  # daily load in MWh
+    load_profile_day = pd.Series(shape) * load_day
+    load_profile_year = pd.concat([load_profile_day] * 365)
+
+    if scaling != 1.0:
+        load_profile_year.index = pd.date_range(
+            start="2013-01-01", periods=len(load_profile_year), freq="h"
+        )
+        profile = (
+            load_profile_year.resample(f"{int(scaling)}h")
+            .mean()
+            .reindex(n.snapshots, method="nearest")
+        )
+    else:
+        profile = load_profile_year.set_axis(n.snapshots)
+
+    return profile
+
+
+def add_ci(n: pypsa.Network, year: str, config: dict) -> None:
+    """
+    Add C&I buyer(s) to the network.
+
+    Args:
+    - n: pypsa.Network to which the C&I buyer(s) will be added.
+    - year: the year of optimisation based on config setting.
+
+    Returns:
+    - None
+    """
+    # tech_palette options
+    procurement = config["procurement"]
+    ci = procurement["ci"]
+
+    for name in ci.keys():
+        location = ci[name]["location"]
+        profile = procurement["profile"]
+
+        n.add("Bus", name)
+
+        n.add(
+            "Link",
+            f"{name}" + " export",
+            bus0=name,
+            bus1=location,
+            marginal_cost=0.1,  # large enough to avoid optimization artifacts, small enough not to influence PPA portfolio
+            p_nom=1e6,
+        )
+
+        n.add(
+            "Link",
+            f"{name}" + " import",
+            bus0=location,
+            bus1=name,
+            marginal_cost=0.001,  # large enough to avoid optimization artifacts, small enough not to influence PPA portfolio
+            p_nom=1e6,
+        )
+
+        n.add(
+            "Load",
+            f"{name}" + " load",
+            carrier="electricity",
+            bus=name,
+            p_set=load_profile(n, location, profile, config),
+        )
+
+        # C&I following voluntary clean energy procurement is a share of C&I load -> subtract it from node's profile
+        n.loads_t.p_set[location] -= n.loads_t.p_set[f"{name}" + " load"]
+
+
 # %%
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "solve_sector_network",
+            "solve_sector_network_myopic",
+            run="baseline-3H",
             opts="",
-            clusters="5",
-            configfiles="config/test/config.overnight.yaml",
+            clusters="39",
+            configfiles="config/config.meta.yaml",
             ll="v1.0",
             sector_opts="",
-            # planning_horizons="2030",
+            planning_horizons="2030",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
@@ -1388,6 +1567,21 @@ if __name__ == "__main__":
     with memory_logger(
         filename=getattr(snakemake.log, "memory", None), interval=logging_frequency
     ) as mem:
+        # metastudy
+        if snakemake.params.procurement_enable:
+            print("procurement_enable is activated")
+            procurement = snakemake.params.procurement
+
+            if procurement["strip_network"]:
+                print("stript_network is activated")
+                strip_network(n, procurement)
+
+            add_ci(
+                n,
+                snakemake.wildcards.planning_horizons,
+                snakemake.params,
+            )
+
         solve_network(
             n,
             config=snakemake.config,
