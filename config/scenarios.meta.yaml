@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: MIT
+
+# This file is used to define the scenarios that are run by snakemake. Each entry on the first level is a scenario. Each scenario can contain configuration overrides with respect to the config/config.yaml settings.
+#
+# Example
+#
+# custom-scenario: # name of the scenario
+#   electricity:
+#       renewable_carriers: [wind, solar] # override the list of renewable carriers
+
+# ======== Baseline model without procurement ========
+# ====================================================
+
+baseline-3H:
+  enable:
+    procurement: false
+
+baseline-1H:
+  enable:
+    procurement: false
+
+  clustering:
+    temporal:
+      resolution_sector: 1H
+
+baseline-3H-noline:
+  scenario:
+    ll:
+    - v1.0
+  enable:
+    procurement: false
+
+  transmission_projects:
+    enable: false
+
+baseline-3H-storage:
+  enable:
+    procurement: false
+
+  electricity:
+    StorageUnit: [li-ion battery, iron-air battery, vanadium, lair, pair] # 
+    Store: [H2]
+
+# ======== Baseline model with volume matching ========
+# =====================================================
+
+vol-match-3H-DE:
+  procurement:
+    strategy: vol-match
+    scope: "all"
+    energy_matching: 100
+    participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+
+    strip_network: false
+
+vol-match-3H-DE-FR-IT:
+  procurement:
+    strategy: vol-match
+    scope: "all"
+    energy_matching: 100
+    participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+      France:
+        location: "FR0 0"
+      Italy:
+        location: "IT0 0"
+
+    strip_network: false
