@@ -1419,6 +1419,42 @@ def excess_constraints(n):
             excess <= share * total_load, name=f"Excess_constraint_{name}"
         )
 
+def emission_matching_constraints(n):
+    """
+    Implement strategies for emission matching.
+
+    The avoided emissions (according to MOER) from all CI-related generators (renewable carriers) and links (conventional/clean carriers) are greater than or equal to some percentage of their annual emissions from load consumption.
+    """
+    weights = n.snapshot_weightings["generators"]
+    emission_matching = n.config["procurement"]["emission_matching"] / 100
+    participation = n.config["procurement"]["load"]["participation"] / 100
+    moer = pd.Series(0.382, index = n.snapshots) # t_CO2/MWh
+
+    for name in n.config["procurement"]["ci"]:
+        gen_ci = list(n.generators.query("ci == @name").index)
+        links_ci = list(n.links.query("ci == @name").index)
+
+        gen_avoided = (n.model["Generator-p"].loc[:, gen_ci] * weights * moer).sum()
+        link_avoided = (
+            n.model["Link-p"].loc[:, links_ci]
+            * n.links.loc[links_ci].efficiency
+            * weights
+            * moer
+        ).sum()
+
+        link_emitted = (
+            n.model["Link-p"].loc[:, links_ci]
+            * n.links.loc[links_ci].efficiency2
+            * weights
+        ).sum()
+
+        lhs = emission_matching * (gen_avoided + link_avoided - link_emitted)
+
+        total_emissions = participation * (n.loads_t.p_set[name + " load"] * weights * moer).sum()
+        
+        n.model.add_constraints(
+            lhs >= total_emissions, name=f"emission_matching_{name}"
+        )
 
 def extra_functionality(
     n: pypsa.Network, snapshots: pd.DatetimeIndex, planning_horizons: str | None = None
@@ -1506,6 +1542,7 @@ def extra_functionality(
         procurement = config["procurement"]
         strategy = procurement["strategy"]
         energy_matching = procurement["energy_matching"]
+        emission_matching = procurement["emission_matching"]
         res_capacity_constraints(n)
 
         if procurement["res_target"]:
@@ -1514,6 +1551,13 @@ def extra_functionality(
         if strategy == "vol-match":
             logger.info(f"Setting annual volume matching of {energy_matching}%")
             res_annual_matching_constraints(n)
+            excess_constraints(n)
+        elif strategy == "emi-match":
+            logger.info(f"Setting annual avoided emission target of {emission_matching}%")
+            logger.info(f"Setting annual volume matching of {energy_matching}%")
+            emission_matching_constraints(n)
+            res_annual_matching_constraints(n)
+            excess_constraints(n)
             excess_constraints(n)
         else:
             logger.info("no target set")
@@ -1715,9 +1759,8 @@ def strip_network(n: pypsa.Network, config: dict) -> None:
 
 def load_profile(
     n: pypsa.Network,
-    location: str,
-    profile_shape: str,
     config,
+    location: str,
 ) -> pd.Series:
     """
     Create daily load profile for C&I buyers based on config setting.
@@ -1732,6 +1775,7 @@ def load_profile(
     """
 
     procurement = config["procurement"]
+    load = procurement["load"]
     scaling = n.snapshot_weightings.objective.sum() / len(
         n.snapshot_weightings.objective
     )  # e.g., 3 for 3H time resolution
@@ -1747,25 +1791,55 @@ def load_profile(
     }
 
     try:
-        shape = shapes[profile_shape]
+        shape = shapes[load["profile"]]
     except KeyError:
         print(
-            f"'profile_shape' option must be one of 'baseload' or 'industry'. Now is {profile_shape}."
+            f"'profile_shape' option must be one of 'baseload' or 'industry'. Now is {load["profile"]}."
         )
         sys.exit()
 
+    # CI consumer nominal load in MW
     if procurement["strategy"] == "ref":
         load = 0.0
     else:
         country = n.buses.country[location]
-        load_year = (
-            pd.read_csv(procurement["load"])
-            .groupby("Country Code")["2023"]
-            .sum()[country]
-        )  # GWh
-        load = load_year / 8760 * 1000 * procurement["participation"] / 100  # MW
+        
+        import requests
+        url = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/3.0/data/dataflow/ESTAT/nrg_cb_e/1.0/*.*.*.*.*?c[freq]=A&c[nrg_bal]=FC,FC_IND_E,FC_OTH_CP_E&c[siec]=E7000&c[unit]=GWH&c[geo]=EU27_2020,EA20,BE,BG,CZ,DK,DE,EE,IE,EL,ES,FR,HR,IT,CY,LV,LT,LU,HU,MT,NL,AT,PL,PT,RO,SI,SK,FI,SE,IS,LI,NO,UK,BA,ME,MD,MK,GE,AL,RS,TR,UA,XK&c[TIME_PERIOD]=2023,2022,2021,2020&compress=false&format=csvdata&formatVersion=2.0&lang=en&labels=name"
+        try:
+            response = requests.get(url)
+            with open(load["load_path"], "wb") as file:
+                file.write(response.content)
+            data = pd.read_csv(load["load_path"])
+        except requests.ConnectionError:
+            logger.warning("No internet connection. Reading data from the local file.")
+            data = pd.read_csv(load["load_path"])
+        
+        # Ensure data for the specified year exists for all countries
+        data["reference_year"] = int(load["load_year"])
+        years = list(data["TIME_PERIOD"].unique())
+        years.reverse()
+        for geo in data["geo"].unique():
+            if not ((data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == geo)).any():
+                for fallback_year in years[1:]:
+                    if ((data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)).any():
+                        fallback_row = data[(data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)].copy()
+                        fallback_row["TIME_PERIOD"] = int(load["load_year"])
+                        data = pd.concat([data, fallback_row], ignore_index=True)
+                        data.loc[(data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == geo), "reference_year"] = fallback_year
+                        break
+        
+        filtered_data = data[(data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == country)]
+        industrial_consumption = filtered_data[filtered_data["nrg_bal"] == "FC_IND_E"]["OBS_VALUE"].values[0]
+        commercial_consumption = filtered_data[filtered_data["nrg_bal"] == "FC_OTH_CP_E"]["OBS_VALUE"].values[0]
+        total_consumption = filtered_data[filtered_data["nrg_bal"] == "FC"]["OBS_VALUE"].values[0]
+        share = (industrial_consumption + commercial_consumption) / total_consumption # (-)
+        load_year = share * (n.loads_t.p_set[location]*n.snapshot_weightings.objective).sum() # MWh
+        logger.info(f"CI load in {country} (raw data from Eurostat):\nannual consumption: {round((industrial_consumption + commercial_consumption)/1000)} TWh\nreference year: {filtered_data['reference_year'].values[0]}\nshare: {round(share*100,0)}%")
+        logger.info(f"CI load in {country} (PyPSA data):\nannual consumption {round(load_year/10**6)} TWh\nreference year: {load["load_year"]}")
+        load = load_year / 8760 * load["participation"] / 100 # MW
 
-    load_day = load * 24  # daily load in MWh
+    load_day = load * 24 
     load_profile_day = pd.Series(shape) * load_day
     load_profile_year = pd.concat([load_profile_day] * 365)
 
@@ -1805,8 +1879,7 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
 
     for name in ci.keys():
         location = ci[name]["location"]
-        profile = procurement["profile"]
-
+        
         n.add("Bus", name, country="")
 
         n.add(
@@ -1834,7 +1907,7 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
             f"{name}" + " load",
             carrier="electricity",
             bus=name,
-            p_set=load_profile(n, location, profile, config),
+            p_set=load_profile(n, config, location),
             ci=name,  # C&I markers used in constraints
         )
 
@@ -1904,7 +1977,9 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
                 else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
                 carrier=generator,
                 efficiency=costs.at[generator, "efficiency"],
-                efficiency2=costs.at[carrier, "CO2 intensity"],
+                efficiency2= costs.at[carrier, "CO2 intensity"]
+                if generator != "allam"
+                else 0.02 * costs.at[carrier, "CO2 intensity"],
                 lifetime=costs.at[generator, "lifetime"],
                 reversed=False,
                 ci=name,  # C&I markers used in constraints
