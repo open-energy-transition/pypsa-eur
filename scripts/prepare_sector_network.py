@@ -5283,23 +5283,30 @@ def add_industry(
         lifetime=costs.at["cement capture", "lifetime"],
     )
 
-    # TODO Link properly Industry to H2 topology
-    nodes_ind_z2 = spatial.h2_tyndp.nodes[spatial.h2_tyndp.nodes.str.contains("Z2")]
-    nodes_ind_z2 = nodes_ind_z2[~(nodes_ind_z2.isin(["IBFI H2 Z2", "IBIT H2 Z2"]))]
-    nodes_ind = n.buses.loc[nodes_ind_z2].country.values + "00"
-    nodes_ind[nodes_ind == "IT00"] = "ITCN"
-    nodes_ind[nodes_ind == "DK00"] = "DKE1"
-    nodes_ind[nodes_ind == "LU00"] = "LUG1"
-    nodes_ind[nodes_ind == "NO00"] = "NOS0"
-    nodes_ind[nodes_ind == "SE00"] = "SE01"
+    if options["h2_topology_tyndp"]["enable"]:
+        # TODO Link properly Industry to H2 topology
+        nodes_ind_h2 = spatial.h2_tyndp.nodes[spatial.h2_tyndp.nodes.str.contains("Z2")]
+        nodes_ind_h2 = nodes_ind_h2[~(nodes_ind_h2.isin(["IBFI H2 Z2", "IBIT H2 Z2"]))]
+        nodes_ind = n.buses.loc[nodes_ind_h2].country.values + "00"
+        nodes_ind[nodes_ind == "IT00"] = "ITCN"
+        nodes_ind[nodes_ind == "DK00"] = "DKE1"
+        nodes_ind[nodes_ind == "LU00"] = "LUG1"
+        nodes_ind[nodes_ind == "NO00"] = "NOS0"
+        nodes_ind[nodes_ind == "SE00"] = "SE01"
+    else:
+        nodes_ind = nodes
+        nodes_ind_h2 = nodes + " H2"
     industrial_demand_zones = industrial_demand.reindex(nodes_ind, fill_value=0)
     n.add(
         "Load",
         nodes_ind,  # TODO Improve assumptions
-        suffix=" H2 Z2 for industry",
-        bus=nodes_ind_z2,  # TODO Improve assumptions
+        suffix=" H2 Z2 for industry"
+        if options["h2_topology_tyndp"]["enable"]
+        else " H2 for industry",  # TODO Improve assumptions
+        bus=nodes_ind_h2,  # TODO Improve assumptions
         carrier="H2 for industry",
-        p_set=industrial_demand_zones["hydrogen"] / nhours,  # TODO Improve assumptions
+        p_set=industrial_demand_zones["hydrogen"]
+        / nhours,  # TODO Improve assumptions for zones
     )
 
     # methanol for industry
@@ -5340,10 +5347,11 @@ def add_industry(
         # CO2 intensity methanol based on stoichiometric calculation with 22.7 GJ/t methanol (32 g/mol), CO2 (44 g/mol), 277.78 MWh/TJ = 0.218 t/MWh
     )
 
+    # TODO Link properly Industry to H2 topology
     n.add(
         "Link",
         nodes_ind + " methanolisation",  # TODO Improve this assumption
-        bus0=nodes_ind_z2,  # TODO Improve this assumption
+        bus0=nodes_ind_h2,  # TODO Improve this assumption
         bus1=spatial.methanol.nodes,
         bus2=nodes_ind,  # TODO Improve this assumption
         bus3=spatial.co2.nodes,
@@ -5383,10 +5391,11 @@ def add_industry(
                     lifetime=costs.at["decentral oil boiler", "lifetime"],
                 )
 
+    # TODO Link properly Industry to H2 topology
     n.add(
         "Link",
         nodes_ind + " Fischer-Tropsch",  # TODO Improve assumptions
-        bus0=nodes_ind_z2,  # TODO Improve assumptions
+        bus0=nodes_ind_h2,  # TODO Improve assumptions
         bus1=spatial.oil.nodes,
         bus2=spatial.co2.nodes,
         carrier="Fischer-Tropsch",

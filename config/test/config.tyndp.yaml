@@ -3,7 +3,11 @@
 # SPDX-License-Identifier: CC0-1.0
 
 run:
-  prefix: "tyndp"
+  prefix: "test-tyndp"
+  disable_progressbar: true
+  shared_resources:
+    policy: "test"
+  shared_cutouts: true
 
 # TODO set foresight
 foresight: overnight
@@ -17,30 +21,51 @@ scenario:
 countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'CY', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK']
 
 snapshots:
-  # TODO define multiple climatic years, being either 1995 2008 or 2009
-  start: "2013-01-01"
-  end: "2014-01-01"
+  start: "2013-03-01"
+  end: "2013-03-08"
 
 enable:
   retrieve_tyndp_bundle: true
-
-co2_budget:
-  # TODO define carbon budget compliant with EU 2030 and 2050 targets
-  2020: 0.701
-  2025: 0.524
-  2030: 0.297
-  2035: 0.150
-  2040: 0.071
-  2045: 0.032
-  2050: 0.000
 
 electricity:
   base_network: tyndp-raw
   transmission_limit: v1.0
 
+  extendable_carriers:
+    Generator: [OCGT]
+    StorageUnit: [battery]
+    Store: [H2]
+    Link: [H2 pipeline]
+
+  renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float]
+
 links:
   p_max_pu: 1.0
   p_min_pu: 0
+
+atlite:
+  default_cutout: europe-2013-03-sarah3-era5
+  cutouts:
+    europe-2013-03-sarah3-era5:
+      time: ["2013-03-01", "2013-03-08"]
+
+renewable:
+  onwind:
+    cutout: europe-2013-03-sarah3-era5
+  offwind-ac:
+    cutout: europe-2013-03-sarah3-era5
+    max_depth: false
+  offwind-dc:
+    cutout: europe-2013-03-sarah3-era5
+    max_depth: false
+  offwind-float:
+    cutout: europe-2013-03-sarah3-era5
+    max_depth: false
+    min_depth: false
+  solar:
+    cutout: europe-2013-03-sarah3-era5
+  solar-hsat:
+    cutout: europe-2013-03-sarah3-era5
 
 transmission_projects:
   enable: true
@@ -120,3 +145,9 @@ clustering:
     level: 3
   temporal:
     resolution_sector: 6H
+
+solving:
+  solver:
+    name: highs
+    options: highs-default
+  mem: 4000
