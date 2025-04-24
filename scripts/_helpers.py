@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: : 2017-2024 The PyPSA-Eur Authors
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: MIT
 
@@ -9,15 +8,21 @@ import hashlib
 import logging
 import os
 import re
-import urllib
-from functools import partial
+import time
+from functools import partial, wraps
 from os.path import exists
 from pathlib import Path
 from shutil import copyfile
+from tempfile import NamedTemporaryFile
+from typing import Callable, Union
 
+import atlite
+import fiona
 import pandas as pd
+import pypsa
 import pytz
 import requests
+import xarray as xr
 import yaml
 from snakemake.utils import update_config
 from tqdm import tqdm
@@ -107,11 +112,27 @@ def get_run_path(fn, dir, rdir, shared_resources, exclude_from_shared):
         irrelevant_wildcards = {"technology", "year", "scope", "kind"}
         no_relevant_wildcards = not existing_wildcards - irrelevant_wildcards
         not_shared_rule = (
-            not fn.startswith("networks/elec")
+            not fn.endswith("elec.nc")
             and not fn.startswith("add_electricity")
             and not any(fn.startswith(ex) for ex in exclude_from_shared)
         )
         is_shared = no_relevant_wildcards and not_shared_rule
+        shared_files = (
+            "networks/base_s_{clusters}.nc",
+            "regions_onshore_base_s_{clusters}.geojson",
+            "regions_offshore_base_s_{clusters}.geojson",
+            "busmap_base_s_{clusters}.csv",
+            "linemap_base_s_{clusters}.csv",
+            "cluster_network_base_s_{clusters}",
+            "profile_{clusters}_",
+            "build_renewable_profile_{clusters}",
+            "regions_by_class_{clusters}",
+            "availability_matrix_",
+            "determine_availability_matrix_",
+            "solar_thermal",
+        )
+        if any(prefix in fn for prefix in shared_files) or is_shared:
+            is_shared = True
         rdir = "" if is_shared else rdir
     elif isinstance(shared_resources, str):
         rdir = shared_resources + "/"
@@ -143,6 +164,16 @@ def path_provider(dir, rdir, shared_resources, exclude_from_shared):
         shared_resources=shared_resources,
         exclude_from_shared=exclude_from_shared,
     )
+
+
+def get_shadow(run):
+    """
+    Returns 'shallow' or None depending on the user setting.
+    """
+    shadow_config = run.get("use_shadow_directory", True)
+    if shadow_config:
+        return "shallow"
+    return None
 
 
 def get_opt(opts, expr, flags=None):
@@ -186,13 +217,13 @@ def set_scenario_config(snakemake):
     scenario = snakemake.config["run"].get("scenarios", {})
     if scenario.get("enable") and "run" in snakemake.wildcards.keys():
         try:
-            with open(scenario["file"], "r") as f:
+            with open(scenario["file"]) as f:
                 scenario_config = yaml.safe_load(f)
         except FileNotFoundError:
             # fallback for mock_snakemake
             script_dir = Path(__file__).parent.resolve()
             root_dir = script_dir.parent
-            with open(root_dir / scenario["file"], "r") as f:
+            with open(root_dir / scenario["file"]) as f:
                 scenario_config = yaml.safe_load(f)
         update_config(snakemake.config, scenario_config[snakemake.wildcards.run])
 
@@ -253,7 +284,7 @@ def configure_logging(snakemake, skip_handlers=False):
 
 def update_p_nom_max(n):
     # if extendable carriers (solar/onwind/...) have capacity >= 0,
-    # e.g. existing assets from the OPSD project are included to the network,
+    # e.g. existing assets from GEM are included to the network,
     # the installed capacity might exceed the expansion limit.
     # Hence, we update the assumptions.
 
@@ -415,6 +446,47 @@ def progress_retrieve(url, file, disable=False):
                     t.update(len(data))
 
 
+def retry(func: Callable) -> Callable:
+    """
+    Retry decorator to run retry function on specific exceptions, before raising them.
+
+    Can for example be used for debugging issues which are hard to replicate or
+    for for handling retrieval errors.
+
+    Currently catches:
+    - fiona.errors.DriverError
+
+    Parameters
+    ----------
+    retries : int
+        Number of retries before raising the exception.
+    delay : int
+        Delay between retries in seconds.
+
+    Returns
+    -------
+    callable
+        A decorator function that can be used to wrap the function to be retried.
+    """
+    retries = 3
+    delay = 5
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        for attempt in range(retries):
+            try:
+                return func(*args, **kwargs)
+            except fiona.errors.DriverError as e:
+                logger.warning(
+                    f"Attempt {attempt + 1} failed: {type(e).__name__} - {e}. "
+                    f"Retrying..."
+                )
+                time.sleep(delay)
+        raise Exception("Retrieval retries exhausted.")
+
+    return wrapper
+
+
 def mock_snakemake(
     rulename,
     root_dir=None,
@@ -465,6 +537,7 @@ def mock_snakemake(
     else:
         root_dir = Path(root_dir).resolve()
 
+    workdir = None
     user_in_script_dir = Path.cwd().resolve() == script_dir
     if str(submodule_dir) in __file__:
         # the submodule_dir path is only need to locate the project dir
@@ -472,12 +545,14 @@ def mock_snakemake(
     elif user_in_script_dir:
         os.chdir(root_dir)
     elif Path.cwd().resolve() != root_dir:
-        raise RuntimeError(
-            "mock_snakemake has to be run from the repository root"
-            f" {root_dir} or scripts directory {script_dir}"
+        logger.info(
+            "Not in scripts or root directory, will assume this is a separate workdir"
         )
+        workdir = Path.cwd()
+
     try:
         for p in SNAKEFILE_CHOICES:
+            p = root_dir / p
             if os.path.exists(p):
                 snakefile = p
                 break
@@ -498,6 +573,7 @@ def mock_snakemake(
             storage_settings,
             dag_settings,
             storage_provider_settings=dict(),
+            overwrite_workdir=workdir,
         )
         workflow.include(snakefile)
 
@@ -645,6 +721,11 @@ def update_config_from_wildcards(config, w, inplace=True):
                 config["adjustments"]["electricity"], {attr: {carrier: factor}}
             )
 
+        for o in opts:
+            if o.startswith("lv") or o.startswith("lc"):
+                config["electricity"]["transmission_expansion"] = o[1:]
+                break
+
     if w.get("sector_opts"):
         opts = w.sector_opts.split("-")
 
@@ -704,9 +785,9 @@ def update_config_from_wildcards(config, w, inplace=True):
         if dg_enable:
             config["sector"]["electricity_distribution_grid"] = True
             if dg_factor is not None:
-                config["sector"][
-                    "electricity_distribution_grid_cost_factor"
-                ] = dg_factor
+                config["sector"]["electricity_distribution_grid_cost_factor"] = (
+                    dg_factor
+                )
 
         if "biomasstransport" in opts:
             config["sector"]["biomass_transport"] = True
@@ -816,21 +897,77 @@ def validate_checksum(file_path, zenodo_url=None, checksum=None):
         for chunk in iter(lambda: f.read(65536), b""):  # 64kb chunks
             hasher.update(chunk)
     calculated_checksum = hasher.hexdigest()
-    assert (
-        calculated_checksum == checksum
-    ), "Checksum is invalid. This may be due to an incomplete download. Delete the file and re-execute the rule."
+    assert calculated_checksum == checksum, (
+        "Checksum is invalid. This may be due to an incomplete download. Delete the file and re-execute the rule."
+    )
 
 
-def get_snapshots(snapshots, drop_leap_day=False, freq="h", **kwargs):
+def get_snapshots(
+    snapshots: dict, drop_leap_day: bool = False, freq: str = "h", **kwargs
+) -> pd.DatetimeIndex:
     """
-    Returns pandas DateTimeIndex potentially without leap days.
-    """
+    Returns a DateTimeIndex of snapshots, supporting multiple time ranges.
 
-    time = pd.date_range(freq=freq, **snapshots, **kwargs)
+    Parameters
+    ----------
+    snapshots : dict
+        Dictionary containing time range parameters. 'start' and 'end' can be
+        strings or lists of strings for multiple date ranges.
+    drop_leap_day : bool, default False
+        If True, removes February 29th from the DateTimeIndex in leap years.
+    freq : str, default "h"
+        Frequency string indicating the time step interval (e.g., "h" for hourly)
+    **kwargs : dict
+        Additional keyword arguments passed to pd.date_range().
+
+    Returns
+    -------
+    pd.DatetimeIndex
+    """
+    start = (
+        snapshots["start"]
+        if isinstance(snapshots["start"], list)
+        else [snapshots["start"]]
+    )
+    end = snapshots["end"] if isinstance(snapshots["end"], list) else [snapshots["end"]]
+
+    assert len(start) == len(end), (
+        "Lists of start and end dates must have the same length"
+    )
+
+    time_periods = []
+    for s, e in zip(start, end):
+        period = pd.date_range(
+            start=s, end=e, freq=freq, inclusive=snapshots["inclusive"], **kwargs
+        )
+        time_periods.append(period)
+
+    time = pd.DatetimeIndex([])
+    for period in time_periods:
+        time = time.append(period)
+
     if drop_leap_day and time.is_leap_year.any():
         time = time[~((time.month == 2) & (time.day == 29))]
 
     return time
+
+
+def sanitize_custom_columns(n: pypsa.Network):
+    """
+    Sanitize non-standard columns used throughout the workflow.
+
+    Parameters
+    ----------
+        n (pypsa.Network): The network object.
+
+    Returns
+    -------
+        None
+    """
+    if "reversed" in n.links.columns:
+        # Replace NA values with default value False
+        n.links.loc[n.links.reversed.isna(), "reversed"] = False
+        n.links.reversed = n.links.reversed.astype(bool)
 
 
 def rename_techs(label: str) -> str:
@@ -839,12 +976,12 @@ def rename_techs(label: str) -> str:
 
     Removes some prefixes and renames if certain conditions defined in function body are met.
 
-    Parameters:
+    Parameters
     ----------
     label: str
         Technology label to be renamed
 
-    Returns:
+    Returns
     -------
     str
         Renamed label
@@ -918,3 +1055,35 @@ def rename_techs(label: str) -> str:
         if old == label:
             label = new
     return label
+
+
+def load_cutout(
+    cutout_files: Union[str, list[str]], time: Union[None, pd.DatetimeIndex] = None
+) -> atlite.Cutout:
+    """
+    Load and optionally combine multiple cutout files.
+
+    Parameters
+    ----------
+    cutout_files : str or list of str
+        Path to a single cutout file or a list of paths to multiple cutout files.
+        If a list is provided, the cutouts will be concatenated along the time dimension.
+    time : pd.DatetimeIndex, optional
+        If provided, select only the specified times from the cutout.
+
+    Returns
+    -------
+    atlite.Cutout
+        Merged cutout with optional time selection applied.
+    """
+    if isinstance(cutout_files, str):
+        cutout = atlite.Cutout(cutout_files)
+    elif isinstance(cutout_files, list):
+        cutout_da = [atlite.Cutout(c).data for c in cutout_files]
+        combined_data = xr.concat(cutout_da, dim="time", data_vars="minimal")
+        cutout = atlite.Cutout(NamedTemporaryFile().name, data=combined_data)
+
+    if time is not None:
+        cutout.data = cutout.data.sel(time=time)
+
+    return cutout

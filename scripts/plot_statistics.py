@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: : 2017-2024 The PyPSA-Eur Authors
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: MIT
 
@@ -20,7 +18,6 @@ if __name__ == "__main__":
             "plot_elec_statistics",
             opts="Ept-12h",
             clusters="37",
-            ll="v1.0",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)

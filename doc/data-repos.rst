@@ -1,5 +1,5 @@
 ..
-  SPDX-FileCopyrightText: 2024 The PyPSA-Eur Authors
+  SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 
   SPDX-License-Identifier: CC-BY-4.0
 
@@ -155,24 +155,6 @@ Data in this section is included in the PyPSA-Eur repository in the ``data`` fol
 - **Link:** https://www.eia.gov/international/data/world/electricity/electricity-generation
 - **License:** CC0 (`reference <https://www.eia.gov/about/copyrights_reuse.php>`__)
 - **Description:** Contains country-level hydro-electric generato for Europe by year.
-
-``data/era5-annual-HDD-per-country.csv``
-
-- **Source:** Neumann, Fabian
-- **Link:** https://gist.github.com/fneum/d99e24e19da423038fd55fe3a4ddf875
-- **License:** CC-BY 4.0
-- **Description:** Contains country-level annual sum of heating degree days in
-  Europe. Used for rescaling heat demand in weather years not covered by energy
-  balance statistics.
-
-``data/era5-annual-runoff-per-country.csv``
-
-- **Source:** Neumann, Fabian
-- **Link:** https://gist.github.com/fneum/d99e24e19da423038fd55fe3a4ddf875
-- **License:** CC-BY 4.0
-- **Description:** Contains country-level annual sum of runoff in Europe. Used
-  for rescaling hydro-electricity availability in weather years not covered by
-  EIA hydro-generation statistics.
 
 ``data/gr-e-11.03.02.01.01-cc.csv``
 

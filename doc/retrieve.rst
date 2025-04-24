@@ -1,5 +1,5 @@
 ..
-  SPDX-FileCopyrightText: 2019-2024 The PyPSA-Eur Authors
+  SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 
   SPDX-License-Identifier: CC-BY-4.0
 
@@ -36,6 +36,12 @@ Rule ``retrieve_eurostat_household_data``
 =========================================
 
 .. automodule:: retrieve_eurostat_household_data
+
+
+Rule ``retrieve_co2stop``
+===============================
+
+.. automodule:: retrieve_co2stop
 
 
 Rule ``retrieve_gas_infrastructure_data``

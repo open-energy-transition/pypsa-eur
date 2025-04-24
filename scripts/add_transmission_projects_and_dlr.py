@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: : 2017-2024 The PyPSA-Eur Authors
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: MIT
 """
@@ -74,7 +73,7 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake("add_transmission_projects_and_dlr")
-    configure_logging(snakemake)
+    configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
 
     params = snakemake.params
@@ -82,11 +81,9 @@ if __name__ == "__main__":
     n = pypsa.Network(snakemake.input.network)
 
     if params["transmission_projects"]["enable"]:
-
         attach_transmission_projects(n, snakemake.input.transmission_projects)
 
     if params["dlr"]["activate"]:
-
         rating = xr.open_dataarray(snakemake.input.dlr).to_pandas().transpose()
 
         s_max_pu = params["s_max_pu"]
