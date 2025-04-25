@@ -161,9 +161,9 @@ procurement:
     profile: "industry" # type of load profile (e.g., "baseload", "industry")
     participation: 10 # share of CI load participating to the procurement
 
-  ci:
-    Germany: # Set name here
-      location: "DE0 0"
+  #ci:
+  #  Germany: # Set name here
+  #    location: "DE0 0"
 
   technology:
     generation_tech: ["onwind", "solar", "allam", "geothermal"]  # "nuclear"
