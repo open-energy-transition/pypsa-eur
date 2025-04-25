@@ -47,25 +47,40 @@ baseline-3H-storage:
 # ======== Baseline model with volume matching ========
 # =====================================================
 
+vol-match-3H-IT:
+  procurement:
+    strategy: vol-match
+    scope: "all"
+    energy_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Italy:
+        location: "IT0 0"
+
 vol-match-3H-DE:
   procurement:
     strategy: vol-match
     scope: "all"
     energy_matching: 100
-    participation: 10
+
+    load:
+      participation: 10
 
     ci:
       Germany:
         location: "DE0 0"
-
-    strip_network: false
 
 vol-match-3H-DE-FR-IT:
   procurement:
     strategy: vol-match
     scope: "all"
     energy_matching: 100
-    participation: 10
+
+    load:
+      participation: 10
 
     ci:
       Germany:
@@ -75,4 +90,103 @@ vol-match-3H-DE-FR-IT:
       Italy:
         location: "IT0 0"
 
-    strip_network: false
+# ======== Baseline model with 247 CFE matching ========
+# ======================================================
+
+247-cfe-3H-IT:
+  procurement:
+    strategy: 247-cfe
+    scope: "all"
+    energy_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Italy:
+        location: "IT0 0"
+
+    strip_network: true
+
+247-cfe-3H-DE:
+  procurement:
+    strategy: 247-cfe
+    scope: "all"
+    energy_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+
+    strip_network: true
+
+247-cfe-3H-DE-FR-IT:
+  procurement:
+    strategy: 247-cfe
+    scope: "all"
+    energy_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+      France:
+        location: "FR0 0"
+      Italy:
+        location: "IT0 0"
+
+    strip_network: true
+
+# ======= Baseline model with emission matching =======
+# =====================================================
+
+emi-match-3H-IT:
+  procurement:
+    strategy: emi-match
+    scope: "all"
+    energy_matching: 100
+    emission_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Italy:
+        location: "IT0 0"
+
+emi-match-3H-DE:
+  procurement:
+    strategy: emi-match
+    scope: "all"
+    energy_matching: 100
+    emission_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+
+emi-match-3H-DE-FR-IT:
+  procurement:
+    strategy: emi-match
+    scope: "all"
+    energy_matching: 100
+    emission_matching: 100
+
+    load:
+      participation: 10
+
+    ci:
+      Germany:
+        location: "DE0 0"
+      France:
+        location: "FR0 0"
+      Italy:
+        location: "IT0 0"

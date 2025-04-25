@@ -21,9 +21,9 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: ""
-  name: "vol-match-3H-DE"
+  name: "vol-match-3H-IT"
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.meta.yaml
   disable_progressbar: false
   shared_resources:
@@ -44,7 +44,7 @@ scenario:
   sector_opts:
   - ''
   planning_horizons:
-  # - 2025
+  - 2025
   - 2030
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
@@ -150,14 +150,14 @@ clustering:
 # ================ Procurment Metastudy ================
 procurement:
   year: 2030
-  strategy: emi-match # name of procurement strategy: vol-match, emi-match, 24-7 cfe
+  strategy: vol-match # name of procurement strategy: vol-match, emi-match, 247-cfe
   scope: "all" # "node", "country", "all"
   energy_matching: 100 # share of CI energy demand to be procured
   emission_matching: 100 # share of CI emissions to be compensated
 
   load:
     load_path: data/CI-load.csv # path to CI load input data (from https://ec.europa.eu/eurostat/databrowser/view/nrg_cb_e__custom_16270810/default/table?lang=en (CSV 2.0))
-    load_year: 2023 
+    load_year: 2023
     profile: "industry" # type of load profile (e.g., "baseload", "industry")
     participation: 10 # share of CI load participating to the procurement
 
@@ -169,7 +169,7 @@ procurement:
     generation_tech: ["onwind", "solar", "allam", "geothermal"]  # "nuclear"
     storage_tech: ["li-ion battery"] # "iron-air battery"
 
-  strip_network: true # [ true, false ] If true, model only the countries with the CI loads and their neighbors
+  strip_network: false # [ true, false ] If true, model only the countries with the CI loads and their neighbors
   excess_share: 0.  # share of excess CI generation that can be sold to the grid [percentage]
   min_iterations: 2
 
