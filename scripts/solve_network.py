@@ -597,6 +597,7 @@ def calculate_grid_score(
     )
     all_p = pd.concat([df_gen_total, -df_link_total], axis=1).T.groupby(level=0).sum().T
 
+    n.buses_t[f"{name}_all_p"] = all_p
     n.buses_t[f"{name}_score"] = n.buses_t[f"{name}_p"] / all_p
     n.buses[f"{name}_score"] = (weights @ n.buses_t[f"{name}_p"]) / (weights @ all_p)
 
@@ -1285,7 +1286,7 @@ def ember_res_target(n):
             df[
                 df[bus_col].isin(bus_list)
                 & ~df["carrier"].isin(grid_carriers)
-                & df["ci"].isin([np.NaN, ""])
+                & (df["ci"].isin([np.NaN, ""]) if "ci" in df.columns else True)
             ]
             .copy()
             .assign(country=lambda d: d[bus_col].map(n.buses["country"]))
@@ -1599,6 +1600,11 @@ def extra_functionality(
         custom_extra_functionality = getattr(module, module_name)
         custom_extra_functionality(n, snapshots, snakemake)  # pylint: disable=E0601
 
+    if (config["procurement"].get("res_target", False)
+        and str(n.params.procurement["year"]) == planning_horizons
+    ):
+        ember_res_target(n)
+
     if (
         n.params.procurement_enable
         and str(n.params.procurement["year"]) == planning_horizons
@@ -1608,9 +1614,6 @@ def extra_functionality(
         energy_matching = procurement["energy_matching"]
         emission_matching = procurement["emission_matching"]
         res_capacity_constraints(n)
-
-        if procurement["res_target"]:
-            ember_res_target(n)
 
         if strategy == "vol-match":
             logger.info(f"Setting annual volume matching of {energy_matching}%")

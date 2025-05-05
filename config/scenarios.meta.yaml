@@ -18,6 +18,13 @@ baseline-3H:
   enable:
     procurement: false
 
+baseline-3H-nores-target:
+  enable:
+    procurement: false
+
+  procurement:
+    res_target: false
+
 baseline-1H:
   enable:
     procurement: false
@@ -25,16 +32,6 @@ baseline-1H:
   clustering:
     temporal:
       resolution_sector: 1H
-
-baseline-3H-noline:
-  scenario:
-    ll:
-    - v1.0
-  enable:
-    procurement: false
-
-  transmission_projects:
-    enable: false
 
 baseline-3H-storage:
   enable:
