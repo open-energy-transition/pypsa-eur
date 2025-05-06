@@ -23,7 +23,7 @@ run:
   prefix: ""
   name: "baseline-3H"
   scenarios:
-    enable: true
+    enable: false
     file: config/scenarios.meta.yaml
   disable_progressbar: false
   shared_resources:
@@ -165,14 +165,15 @@ procurement:
   emission_matching: 100 # share of CI emissions to be compensated
 
   load:
-    load_path: data/CI-load.csv # path to CI load input data (from https://ec.europa.eu/eurostat/databrowser/view/nrg_cb_e__custom_16270810/default/table?lang=en (CSV 2.0))
+    load_path_1: data/CI-load.csv # path to Eurostat CI load input data (from https://ec.europa.eu/eurostat/databrowser/view/nrg_cb_e__custom_16270810/default/table?lang=en (CSV 2.0))
+    load_path_2: data/CI-load-missing.xlsx # path to IEA CI load input data (from https://www.iea.org/data-and-statistics/data-product/world-energy-balances-highlights)
     load_year: 2023
     profile: "industry" # type of load profile (e.g., "baseload", "industry")
     participation: 10 # share of CI load participating to the procurement
 
-  #ci:
-  #  Germany: # Set name here
-  #    location: "DE0 0"
+  ci:
+    Germany: # Set name here
+      location: "DE0 0"
 
   technology:
     generation_tech: ["onwind", "solar", "allam", "geothermal"]  # "nuclear"

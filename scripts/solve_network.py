@@ -1879,9 +1879,113 @@ def strip_network(n: pypsa.Network, config: dict) -> None:
         to_drop = c.df.index.symmetric_difference(to_keep)
         n.remove(c.name, to_drop)
 
+def retrieve_ci_load(config):
+    load = config["procurement"]["load"]
+
+    #1 EUROSTAT data in GWh
+    import requests
+
+    url = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/3.0/data/dataflow/ESTAT/nrg_cb_e/1.0/*.*.*.*.*?c[freq]=A&c[nrg_bal]=FC,FC_IND_E,FC_OTH_CP_E&c[siec]=E7000&c[unit]=GWH&c[geo]=EU27_2020,EA20,BE,BG,CZ,DK,DE,EE,IE,EL,ES,FR,HR,IT,CY,LV,LT,LU,HU,MT,NL,AT,PL,PT,RO,SI,SK,FI,SE,IS,LI,NO,UK,BA,ME,MD,MK,GE,AL,RS,TR,UA,XK&c[TIME_PERIOD]=2023,2022,2021,2020&compress=false&format=csvdata&formatVersion=2.0&lang=en&labels=name"
+    try:
+        response = requests.get(url)
+        with open(load["load_path_1"], "wb") as file:
+            file.write(response.content)
+        data = pd.read_csv(load["load_path_1"])
+    except requests.ConnectionError:
+        logger.warning("No internet connection. Reading data from the local file.")
+        data = pd.read_csv(load["load_path_1"])
+
+    # Ensure data for the specified year exists for all countries
+    data["reference_year"] = int(load["load_year"])
+    years = list(data["TIME_PERIOD"].unique())
+    years.reverse()
+    for geo in data["geo"].unique():
+        if not (
+            (data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == geo)
+        ).any():
+            for fallback_year in years[1:]:
+                if (
+                    (data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)
+                ).any():
+                    fallback_row = data[
+                        (data["TIME_PERIOD"] == fallback_year)
+                        & (data["geo"] == geo)
+                    ].copy()
+                    fallback_row["TIME_PERIOD"] = int(load["load_year"])
+                    data = pd.concat([data, fallback_row], ignore_index=True)
+                    data.loc[
+                        (data["TIME_PERIOD"] == int(load["load_year"]))
+                        & (data["geo"] == geo),
+                        "reference_year",
+                    ] = fallback_year
+                    break
+
+    filtered_data = data[
+        (data["TIME_PERIOD"] == int(load["load_year"]))
+    ]
+
+    demand_map = {
+    "FC": "total_demand",
+    "FC_IND_E": "industrial_demand",
+    "FC_OTH_CP_E": "commercial_demand"
+    }
+    dfs = []
+    for code, label in demand_map.items():
+        df_part = (
+            filtered_data[filtered_data["nrg_bal"] == code][["geo", "OBS_VALUE", "reference_year"]]
+            .rename(columns={"geo": "country", "OBS_VALUE": label})
+            .groupby("country")
+            .sum()
+        )
+        dfs.append(df_part)
+    
+    # Merge all load data into a single DataFrame
+    load_year_eurostat = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()] # remove reference_year duplicatated columns
+    load_year_eurostat.rename(index={"EL": "GR"}, inplace=True)  # Rename EL (Eurostat) to GR (PyPSA)
+    load_year_eurostat["ci_demand"] = load_year_eurostat["industrial_demand"] + load_year_eurostat["commercial_demand"]
+    load_year_eurostat["ci_share"] = load_year_eurostat["ci_demand"] / load_year_eurostat["total_demand"]
+
+    #2 IEA data for Switzerland (CH) and Great Britain (GB) in PJ
+    years = list(range(1971, 2023)) + [str(2023) + " Provisional"]
+    country_map = {"Switzerland": "CH", "United Kingdom": "GB"}
+    demand_map = {
+    "Total final consumption (PJ)": "total_demand",
+    "Industry (PJ)": "industrial_demand",
+    "Commercial and public services (PJ)": "commercial_demand"
+    }
+    data = pd.read_excel(load["load_path_2"], sheet_name="TimeSeries_1971-2023", skiprows=1) # 
+    filtered_data = data[(data["Product"] == "Electricity") & (data["Country"].isin(country_map.keys()))]
+
+    # Determine the most recent available year in the 'iea' DataFrame
+    for y in years[::-1]:
+        if y in filtered_data.columns and not (filtered_data[y] == "..").any():  # Check if at least one value is '..'
+            most_recent_year = y
+            break
+    filtered_data = filtered_data[["Country", "Flow", most_recent_year]]
+    dfs = []
+    for code, label in demand_map.items():
+        df_part = (
+            filtered_data[filtered_data["Flow"] == code][["Country",most_recent_year]]
+            .rename(columns={"Country": "country", most_recent_year: label})
+            .groupby("country")
+            .sum() * 1 / 0.0036 # Convert PJ to GWh
+        )
+        dfs.append(df_part)
+
+    # Merge all load data into a single DataFrame
+    load_year_missing = pd.concat(dfs, axis = 1).rename(index=country_map)
+    load_year_missing["reference_year"] = most_recent_year
+    load_year_missing["ci_demand"] = load_year_missing["industrial_demand"] + load_year_missing["commercial_demand"]
+    load_year_missing["ci_share"] = load_year_missing["ci_demand"] / load_year_missing["total_demand"]
+
+    #3 Merge Eurostat and IEA data
+    load_year_countries = pd.concat([load_year_eurostat, load_year_missing], axis=0)
+
+    return load_year_countries
 
 def load_profile(
     n: pypsa.Network,
+    load_year: pd.DataFrame,
     config,
     location: str,
 ) -> pd.Series:
@@ -1925,70 +2029,16 @@ def load_profile(
     if procurement["strategy"] == "ref":
         load = 0.0
     else:
-        country = n.buses.country[location]
-
-        import requests
-
-        url = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/3.0/data/dataflow/ESTAT/nrg_cb_e/1.0/*.*.*.*.*?c[freq]=A&c[nrg_bal]=FC,FC_IND_E,FC_OTH_CP_E&c[siec]=E7000&c[unit]=GWH&c[geo]=EU27_2020,EA20,BE,BG,CZ,DK,DE,EE,IE,EL,ES,FR,HR,IT,CY,LV,LT,LU,HU,MT,NL,AT,PL,PT,RO,SI,SK,FI,SE,IS,LI,NO,UK,BA,ME,MD,MK,GE,AL,RS,TR,UA,XK&c[TIME_PERIOD]=2023,2022,2021,2020&compress=false&format=csvdata&formatVersion=2.0&lang=en&labels=name"
-        try:
-            response = requests.get(url)
-            with open(load["load_path"], "wb") as file:
-                file.write(response.content)
-            data = pd.read_csv(load["load_path"])
-        except requests.ConnectionError:
-            logger.warning("No internet connection. Reading data from the local file.")
-            data = pd.read_csv(load["load_path"])
-
-        # Ensure data for the specified year exists for all countries
-        data["reference_year"] = int(load["load_year"])
-        years = list(data["TIME_PERIOD"].unique())
-        years.reverse()
-        for geo in data["geo"].unique():
-            if not (
-                (data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == geo)
-            ).any():
-                for fallback_year in years[1:]:
-                    if (
-                        (data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)
-                    ).any():
-                        fallback_row = data[
-                            (data["TIME_PERIOD"] == fallback_year)
-                            & (data["geo"] == geo)
-                        ].copy()
-                        fallback_row["TIME_PERIOD"] = int(load["load_year"])
-                        data = pd.concat([data, fallback_row], ignore_index=True)
-                        data.loc[
-                            (data["TIME_PERIOD"] == int(load["load_year"]))
-                            & (data["geo"] == geo),
-                            "reference_year",
-                        ] = fallback_year
-                        break
-
-        filtered_data = data[
-            (data["TIME_PERIOD"] == int(load["load_year"])) & (data["geo"] == country)
-        ]
-        industrial_consumption = filtered_data[filtered_data["nrg_bal"] == "FC_IND_E"][
-            "OBS_VALUE"
-        ].values[0]
-        commercial_consumption = filtered_data[
-            filtered_data["nrg_bal"] == "FC_OTH_CP_E"
-        ]["OBS_VALUE"].values[0]
-        total_consumption = filtered_data[filtered_data["nrg_bal"] == "FC"][
-            "OBS_VALUE"
-        ].values[0]
-        share = (
-            industrial_consumption + commercial_consumption
-        ) / total_consumption  # (-)
-        load_year = (
-            share * (n.loads_t.p_set[location] * n.snapshot_weightings.objective).sum()
+        load_year_val = (
+        load_year["ci_share"].values[0] * (n.loads_t.p_set[location] * n.snapshot_weightings.objective).sum()
         )  # MWh
         logger.info(
-            f"CI load in {country} (raw data from Eurostat):\nannual consumption: {round((industrial_consumption + commercial_consumption) / 1000)} TWh\nreference year: {filtered_data['reference_year'].values[0]}\nshare: {round(share * 100, 0)}%"
+        f"CI load in {load_year.index.values[0]} (raw data from Eurostat/IEA):\nannual consumption: {round((load_year["total_demand"].values[0]) / 1000)} TWh\nreference raw data year: {load_year["reference_year"].values[0]}\nshare: {round(load_year["ci_share"].values[0] * 100, 0)}%"
         )
         logger.info(
-            f"CI load in {country} (PyPSA data):\nannual consumption {round(load_year / 10**6)} TWh\nreference year: {load['load_year']}"
-        )
-        load = load_year / 8760 * load["participation"] / 100  # MW
+        f"CI load in {load_year.index.values[0]} (PyPSA data):\nannual consumption {round(load_year_val / 10**6)} TWh\nreference config year: {load['load_year']}"
+    )
+        load = load_year_val / 8760 * load["participation"] / 100  # MW
 
     load_day = load * 24
     load_profile_day = pd.Series(shape) * load_day
@@ -2028,8 +2078,13 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
     strategy = procurement["strategy"]
     scope = procurement["scope"]
 
+    load_year_countries = retrieve_ci_load(config) # retrieve CI load input data
+
     for name in ci.keys():
         location = ci[name]["location"]
+
+        country = n.buses.country[location]
+        load_year = load_year_countries[load_year_countries.index == country] # select only the country of interest
 
         n.add("Bus", name, country="")
 
@@ -2058,7 +2113,7 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
             f"{name}" + " load",
             carrier="electricity",
             bus=name,
-            p_set=load_profile(n, config, location),
+            p_set=load_profile(n, load_year, config, location), # GC
             ci=name,  # C&I markers used in constraints
         )
 
