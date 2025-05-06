@@ -183,6 +183,7 @@ procurement:
   min_iterations: 2
 
   res_target: "both" # [ "EU", "country", "both", false ]
+  res_additionality: true # select if the procured renewables are part of the RE target (false) or are in addition to it (true).
 
   grid_policy:
     renewable_carriers: ["offwind", "offwind-ac", "offwind-dc", "offwind-float", "onwind", "ror", "hydro", "urban central solid biomass CHP", "geothermal", "solar", "solar-hsat", "solar rooftop"]

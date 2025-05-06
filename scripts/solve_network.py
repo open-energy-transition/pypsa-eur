@@ -1231,11 +1231,15 @@ def res_capacity_constraints(n):
     Restrict the deployment of renewable capacities for the same carrier within the same buses.
     """
     rename = {"Generator-ext": "Generator"}
+    ci = n.config["procurement"]["ci"]
+    ci_location = {k: v["location"] for k, v in ci.items()}
 
     for carrier in ["solar", "onwind"]:
         ext_carrier = n.generators[
             (n.generators.carrier == carrier) & n.generators.p_nom_extendable
-        ]
+        ].copy()
+        ext_carrier.bus = ext_carrier.bus.replace(ci_location)
+
         p_nom_max = (
             ext_carrier[ext_carrier.p_nom_max != np.inf].groupby("bus").p_nom_max.sum()
         )
@@ -1278,15 +1282,25 @@ def ember_res_target(n):
     weights = n.snapshot_weightings["generators"]
 
     # --- Helper function to filter and assign country ---
-    def get_carriers(df, bus_col):
-        bus_list = n.buses[n.buses.carrier == "AC"].index
-        grid_carriers = ["electricity distribution grid", "AC", "DC"]
+    ci = procurement["ci"]
+    ci_location = {k: v["location"] for k, v in ci.items()}
+    bus_list = n.buses[n.buses.carrier == "AC"].index
+    grid_carriers = ["electricity distribution grid", "AC", "DC"]
+    res_additionality = procurement["res_additionality"]
+
+    def get_carriers(dataframe, bus_col):
+        df = dataframe.copy()
+        df[bus_col] = df[bus_col].replace(ci_location)
 
         return (
             df[
                 df[bus_col].isin(bus_list)
                 & ~df["carrier"].isin(grid_carriers)
-                & (df["ci"].isin([np.NaN, ""]) if "ci" in df.columns else True)
+                & (
+                    df["ci"].isin([np.NaN, ""])
+                    if "ci" in df.columns and res_additionality
+                    else True
+                )
             ]
             .copy()
             .assign(country=lambda d: d[bus_col].map(n.buses["country"]))
@@ -1600,7 +1614,8 @@ def extra_functionality(
         custom_extra_functionality = getattr(module, module_name)
         custom_extra_functionality(n, snapshots, snakemake)  # pylint: disable=E0601
 
-    if (config["procurement"].get("res_target", False)
+    if (
+        config["procurement"].get("res_target", False)
         and str(n.params.procurement["year"]) == planning_horizons
     ):
         ember_res_target(n)
