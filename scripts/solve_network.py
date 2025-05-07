@@ -1266,7 +1266,7 @@ def ember_res_target(n):
     # --- Load and prepare RES targets ---
     df_ember = pd.read_excel(
         "https://storage.googleapis.com/emb-prod-bkt-publicdata/public-downloads/res_tracker/outputs/targets_download.xlsx",
-        sheet_name="share_target_wide",
+        sheet_name="capacity_target_wide",
     )
 
     # Convert ISO3 to ISO2, keeping "EU" unchanged
@@ -1355,7 +1355,7 @@ def ember_res_target(n):
 
     # --- Country-level RES target constraint ---
     if res_target in ["country", "both"]:
-        logger.info(f"Set national RES share targets to {country_target}")
+        #logger.info(f"Set national RES share targets to {country_target}")
 
         # Filter carrier dataframes to relevant countries
         all_gen_carrier = get_carriers(n.generators, "bus").query(
@@ -1389,6 +1389,53 @@ def ember_res_target(n):
             res_country == (country_target / 100) * all_country,
             name="country_res_constraint",
         )
+
+
+    # --- Capacity based RES target constraint ---
+    logger.info("Set national RES capacity targets")
+    df_country_capacity = df_ember[df_ember.country.isin(countries)]
+    country_target_capacity = df_country_capacity.groupby("country").res_capacity_target.sum() * 1e3  # GW → MW
+
+    res_gen_carrier = get_carriers(n.generators, "bus").query(
+        "country in @country_target_capacity.index & carrier in @res_tech"
+    )
+    res_link_carrier = get_carriers(n.links, "bus1").query(
+        "country in @country_target_capacity.index & carrier in @res_tech"
+    )
+
+    # Split into existing and extendable
+    res_exist_gen = res_gen_carrier[~res_gen_carrier.p_nom_extendable]
+    res_exist_link = res_link_carrier[~res_link_carrier.p_nom_extendable]
+
+    res_ext_gen = res_gen_carrier[res_gen_carrier.p_nom_extendable]
+    res_ext_link = res_link_carrier[res_link_carrier.p_nom_extendable]
+
+    res_exist_country = (
+        res_exist_gen.groupby("country").p_nom.sum()
+        .add(res_exist_link.groupby("country").p_nom.sum(), fill_value=0)
+        .reindex(country_target_capacity.index, fill_value=0)
+    )
+
+    res_gen = n.model["Generator-p_nom"].rename({"Generator-ext": "Generator"}).loc[res_ext_gen.index]
+    res_country = res_gen.groupby(res_ext_gen.country).sum()
+
+    if not res_ext_link.index.empty:
+        res_link = n.model["Link-p_nom"].rename({"Link-ext": "Link"}).loc[res_ext_link.index]
+        res_country += res_link.groupby(res_ext_link.country).sum()
+
+    n.model.add_constraints(
+        res_country + res_exist_country == country_target_capacity,
+        name="country_res_cap_constraint"
+    )
+
+    df_display = (pd.concat([country_target_capacity, res_exist_country], axis=1) / 1e3).round(2)
+    df_display.columns = ["RES Capacity Target [GW]", "Existing RES Capacity [GW]"]
+
+    # Add RES share target if applicable
+    if res_target in ["country", "both"]:
+        df_display.insert(0, "RES Share Target [%]", country_target.round(2))
+                          
+    logger.info(df_display)
 
 
 def res_annual_matching_constraints(n):
