@@ -41,17 +41,18 @@ import pandas as pd
 import pypsa
 import xarray as xr
 import yaml
-from _benchmark import memory_logger
-from _helpers import (
+from pypsa.descriptors import get_activity_mask
+from pypsa.descriptors import get_switchable_as_dense as get_as_dense
+
+from scripts._benchmark import memory_logger
+from scripts._helpers import (
     configure_logging,
     get,
     set_scenario_config,
     update_config_from_wildcards,
     #    create_tuples,
 )
-from add_electricity import add_missing_carriers, load_costs
-from pypsa.descriptors import get_activity_mask
-from pypsa.descriptors import get_switchable_as_dense as get_as_dense
+from scripts.add_electricity import add_missing_carriers, load_costs
 
 cc = coco.CountryConverter()
 
@@ -2329,7 +2330,7 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
 # %%
 if __name__ == "__main__":
     if "snakemake" not in globals():
-        from _helpers import mock_snakemake
+        from scripts._helpers import mock_snakemake
 
         snakemake = mock_snakemake(
             "solve_sector_network_myopic",
