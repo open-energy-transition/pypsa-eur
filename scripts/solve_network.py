@@ -1449,6 +1449,9 @@ def ember_res_target(n):
             res_sus = n.model["StorageUnit-p_nom"].rename({"StorageUnit-ext": "StorageUnit"}).loc[res_ext_sus.index]
             res_country += res_sus.groupby(res_ext_sus.country).sum()
 
+        # If the existing capacities exceed the target capacities, set the target equal to the existing capacities
+        country_target_capacity = country_target_capacity.where(res_exist_country <= country_target_capacity, res_exist_country)
+
         n.model.add_constraints(
             res_country + res_exist_country == country_target_capacity,
             name="country_res_cap_constraint"
