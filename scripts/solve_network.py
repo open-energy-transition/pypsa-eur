@@ -592,11 +592,14 @@ def calculate_grid_score(
     df_link_clean, df_link_total = get_values(
         n, n.links, n.links_t.p1, "bus1", include_techs, include_ci=include_ci
     )
+    df_sus_clean, df_sus_total = get_values(
+        n, n.storage_units, n.storage_units_t.p_dispatch, "bus", include_techs, include_ci=include_ci
+    )
 
     n.buses_t[f"{name}_p"] = (
-        pd.concat([df_gen_clean, -df_link_clean], axis=1).T.groupby(level=0).sum().T
+        pd.concat([df_gen_clean, -df_link_clean, df_sus_clean], axis=1).T.groupby(level=0).sum().T
     )
-    all_p = pd.concat([df_gen_total, -df_link_total], axis=1).T.groupby(level=0).sum().T
+    all_p = pd.concat([df_gen_total, -df_link_total, df_sus_total], axis=1).T.groupby(level=0).sum().T
 
     n.buses_t[f"{name}_all_p"] = all_p
     n.buses_t[f"{name}_score"] = n.buses_t[f"{name}_p"] / all_p
@@ -1279,14 +1282,15 @@ def ember_res_target(n):
     # --- Define technologies and weights ---
     procurement = n.config["procurement"]
     res_target = procurement["res_target"]
+    res_cap_target = procurement["res_cap_target"]
     res_tech = procurement["grid_policy"]["renewable_carriers"]
     weights = n.snapshot_weightings["generators"]
 
     # --- Helper function to filter and assign country ---
-    ci = procurement["ci"]
+    ci = procurement.get("ci",{})
     ci_location = {k: v["location"] for k, v in ci.items()}
-    bus_list = n.buses[n.buses.carrier == "AC"].index
-    grid_carriers = ["electricity distribution grid", "AC", "DC"]
+    grid_carriers = ["electricity distribution grid", "AC", "DC", "low voltage"]
+    bus_list = n.buses[n.buses.carrier.isin(grid_carriers)].index
     res_additionality = procurement["res_additionality"]
 
     def get_carriers(dataframe, bus_col):
@@ -1318,7 +1322,7 @@ def ember_res_target(n):
     # Find EU and national targets
     eu_target = df_ember.loc[df_ember.country == "EU", "res_share_target"].values[0]
     countries = list(filter(None, n.buses.country.unique()))
-    df_country = df_ember[df_ember.country.isin(countries)]
+    df_country = df_ember[df_ember.country.isin(countries) & ~df_ember.res_share_target.isin([np.NaN, ""])]
     country_target = df_country.groupby("country").res_share_target.sum()
 
     if res_target == "both" and len(countries) == len(country_target):
@@ -1334,20 +1338,24 @@ def ember_res_target(n):
         # --- Apply for generators and links ---
         all_gen_carrier = get_carriers(n.generators, "bus")
         all_link_carrier = get_carriers(n.links, "bus1")
+        all_sus_carrier = get_carriers(n.storage_units, "bus")
 
         # Separate RES carriers
         res_gen_carrier = all_gen_carrier.query("carrier in @res_tech")
         res_link_carrier = all_link_carrier.query("carrier in @res_tech")
+        res_sus_carrier = all_sus_carrier.query("carrier in @res_tech")
 
         all_gen = n.model["Generator-p"].loc[:, all_gen_carrier.index] * weights
         all_link = get_link_model(n, all_link_carrier, weights)
+        all_sus = n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
 
-        all_eu = all_gen.sum() + all_link.sum()
+        all_eu = all_gen.sum() + all_link.sum() + all_sus.sum()
 
         res_gen = n.model["Generator-p"].loc[:, res_gen_carrier.index] * weights
         res_link = get_link_model(n, res_link_carrier, weights)
+        res_sus = n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
 
-        res_eu = res_gen.sum() + res_link.sum()
+        res_eu = res_gen.sum() + res_link.sum() + res_sus.sum()
 
         n.model.add_constraints(
             res_eu == (eu_target / 100) * all_eu, name="EU_res_constraint"
@@ -1355,7 +1363,7 @@ def ember_res_target(n):
 
     # --- Country-level RES target constraint ---
     if res_target in ["country", "both"]:
-        #logger.info(f"Set national RES share targets to {country_target}")
+        logger.info(f"Set national RES share targets to {country_target}")
 
         # Filter carrier dataframes to relevant countries
         all_gen_carrier = get_carriers(n.generators, "bus").query(
@@ -1364,25 +1372,33 @@ def ember_res_target(n):
         all_link_carrier = get_carriers(n.links, "bus1").query(
             "country in @country_target.index"
         )
+        all_sus_carrier = get_carriers(n.storage_units, "bus").query(
+            "country in @country_target.index"
+        )
 
         res_gen_carrier = all_gen_carrier.query("carrier in @res_tech")
         res_link_carrier = all_link_carrier.query("carrier in @res_tech")
+        res_sus_carrier = all_sus_carrier.query("carrier in @res_tech")
 
         # Compute RES and total by country
         all_gen = n.model["Generator-p"].loc[:, all_gen_carrier.index] * weights
         all_link = get_link_model(n, all_link_carrier, weights)
+        all_sus = n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
 
         all_country = (
             all_gen.sum(dim="snapshot").groupby(all_gen_carrier.country).sum()
             + all_link.sum(dim="snapshot").groupby(all_link_carrier.country).sum()
+            + all_sus.sum(dim="snapshot").groupby(all_sus_carrier.country).sum()
         )
 
         res_gen = n.model["Generator-p"].loc[:, res_gen_carrier.index] * weights
         res_link = get_link_model(n, res_link_carrier, weights)
+        res_sus = n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
 
         res_country = (
             res_gen.sum(dim="snapshot").groupby(res_gen_carrier.country).sum()
             + res_link.sum(dim="snapshot").groupby(res_link_carrier.country).sum()
+            + res_sus.sum(dim="snapshot").groupby(res_sus_carrier.country).sum()
         )
 
         n.model.add_constraints(
@@ -1390,52 +1406,57 @@ def ember_res_target(n):
             name="country_res_constraint",
         )
 
+    if res_cap_target:
+        # --- Capacity based RES target constraint ---
+        logger.info("Set national RES capacity targets")
+        df_country_capacity = df_ember[df_ember.country.isin(countries)]
+        country_target_capacity = df_country_capacity.groupby("country").res_capacity_target.sum() * 1e3  # GW → MW
 
-    # --- Capacity based RES target constraint ---
-    logger.info("Set national RES capacity targets")
-    df_country_capacity = df_ember[df_ember.country.isin(countries)]
-    country_target_capacity = df_country_capacity.groupby("country").res_capacity_target.sum() * 1e3  # GW → MW
+        res_gen_carrier = get_carriers(n.generators, "bus").query(
+            "country in @country_target_capacity.index & carrier in @res_tech"
+        )
+        res_link_carrier = get_carriers(n.links, "bus1").query(
+            "country in @country_target_capacity.index & carrier in @res_tech"
+        )
+        res_sus_carrier = get_carriers(n.storage_units, "bus").query(
+            "country in @country_target_capacity.index & carrier in @res_tech"
+        )
 
-    res_gen_carrier = get_carriers(n.generators, "bus").query(
-        "country in @country_target_capacity.index & carrier in @res_tech"
-    )
-    res_link_carrier = get_carriers(n.links, "bus1").query(
-        "country in @country_target_capacity.index & carrier in @res_tech"
-    )
+        # Split into existing and extendable
+        res_exist_gen = res_gen_carrier[~res_gen_carrier.p_nom_extendable]
+        res_exist_link = res_link_carrier[~res_link_carrier.p_nom_extendable]
+        res_exist_sus = res_sus_carrier[~res_sus_carrier.p_nom_extendable]
 
-    # Split into existing and extendable
-    res_exist_gen = res_gen_carrier[~res_gen_carrier.p_nom_extendable]
-    res_exist_link = res_link_carrier[~res_link_carrier.p_nom_extendable]
+        res_ext_gen = res_gen_carrier[res_gen_carrier.p_nom_extendable]
+        res_ext_link = res_link_carrier[res_link_carrier.p_nom_extendable]
+        res_ext_sus = res_sus_carrier[res_sus_carrier.p_nom_extendable]
 
-    res_ext_gen = res_gen_carrier[res_gen_carrier.p_nom_extendable]
-    res_ext_link = res_link_carrier[res_link_carrier.p_nom_extendable]
+        res_exist_country = (
+            res_exist_gen.groupby("country").p_nom.sum()
+            .add(res_exist_link.groupby("country").p_nom.sum(), fill_value=0)
+            .add(res_exist_sus.groupby("country").p_nom.sum(), fill_value=0)
+            .reindex(country_target_capacity.index, fill_value=0)
+        )
 
-    res_exist_country = (
-        res_exist_gen.groupby("country").p_nom.sum()
-        .add(res_exist_link.groupby("country").p_nom.sum(), fill_value=0)
-        .reindex(country_target_capacity.index, fill_value=0)
-    )
+        res_gen = n.model["Generator-p_nom"].rename({"Generator-ext": "Generator"}).loc[res_ext_gen.index]
+        res_country = res_gen.groupby(res_ext_gen.country).sum()
 
-    res_gen = n.model["Generator-p_nom"].rename({"Generator-ext": "Generator"}).loc[res_ext_gen.index]
-    res_country = res_gen.groupby(res_ext_gen.country).sum()
+        if not res_ext_link.index.empty:
+            res_link = n.model["Link-p_nom"].rename({"Link-ext": "Link"}).loc[res_ext_link.index]
+            res_country += res_link.groupby(res_ext_link.country).sum()
 
-    if not res_ext_link.index.empty:
-        res_link = n.model["Link-p_nom"].rename({"Link-ext": "Link"}).loc[res_ext_link.index]
-        res_country += res_link.groupby(res_ext_link.country).sum()
+        if not res_ext_sus.index.empty:
+            res_sus = n.model["StorageUnit-p_nom"].rename({"StorageUnit-ext": "StorageUnit"}).loc[res_ext_sus.index]
+            res_country += res_sus.groupby(res_ext_sus.country).sum()
 
-    n.model.add_constraints(
-        res_country + res_exist_country == country_target_capacity,
-        name="country_res_cap_constraint"
-    )
+        n.model.add_constraints(
+            res_country + res_exist_country == country_target_capacity,
+            name="country_res_cap_constraint"
+        )
 
-    df_display = (pd.concat([country_target_capacity, res_exist_country], axis=1) / 1e3).round(2)
-    df_display.columns = ["RES Capacity Target [GW]", "Existing RES Capacity [GW]"]
-
-    # Add RES share target if applicable
-    if res_target in ["country", "both"]:
-        df_display.insert(0, "RES Share Target [%]", country_target.round(2))
-                          
-    logger.info(df_display)
+        df_display = (pd.concat([country_target_capacity, res_exist_country], axis=1) / 1e3).round(2)
+        df_display.columns = ["RES Capacity Target [GW]", "Existing RES Capacity [GW]"]
+        logger.info(df_display)
 
 
 def res_annual_matching_constraints(n):
@@ -1663,7 +1684,8 @@ def extra_functionality(
         custom_extra_functionality(n, snapshots, snakemake)  # pylint: disable=E0601
 
     if (
-        config["procurement"].get("res_target", False)
+        (config["procurement"].get("res_target", False) 
+         or config["procurement"].get("res_cap_target", False))
         and str(n.params.procurement["year"]) == planning_horizons
     ):
         ember_res_target(n)

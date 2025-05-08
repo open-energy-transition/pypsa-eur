@@ -23,7 +23,7 @@ run:
   prefix: ""
   name: "baseline-3H"
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.meta.yaml
   disable_progressbar: false
   shared_resources:
@@ -171,9 +171,9 @@ procurement:
     profile: "industry" # type of load profile (e.g., "baseload", "industry")
     participation: 10 # share of CI load participating to the procurement
 
-  ci:
-    Germany: # Set name here
-      location: "DE0 0"
+  #ci:
+  #  Germany: # Set name here
+  #    location: "DE0 0"
 
   technology:
     generation_tech: ["onwind", "solar", "allam", "geothermal"]  # "nuclear"
@@ -184,6 +184,7 @@ procurement:
   min_iterations: 2
 
   res_target: "both" # [ "EU", "country", "both", false ]
+  res_cap_target: false
   res_additionality: true # select if the procured renewables are part of the RE target (false) or are in addition to it (true).
 
   grid_policy:
