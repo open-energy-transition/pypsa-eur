@@ -44,7 +44,6 @@ scenario:
   sector_opts:
   - ''
   planning_horizons:
-  #- 2025
   - 2030
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
@@ -183,8 +182,8 @@ procurement:
   excess_share: 0.  # share of excess CI generation that can be sold to the grid [percentage]
   min_iterations: 2
 
-  res_target: "both" # [ "EU", "country", "both", false ]
-  res_cap_target: false
+  res_target: "EU" # [ "EU", "country", "both", false ]
+  res_cap_target: true
   res_additionality: true # select if the procured renewables are part of the RE target (false) or are in addition to it (true).
 
   grid_policy:
