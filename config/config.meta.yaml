@@ -156,6 +156,17 @@ clustering:
     resolution_sector: 3H
 
 # ================ Procurment Metastudy ================
+res_target:
+  EU_share_target: true
+  country_share_target: false
+  country_cap_target: true
+  res_additionality: false # select if the procured renewables are part of the RE target (false) or are in addition to it (true).
+
+grid_policy:
+  renewable_carriers: ["offwind", "offwind-ac", "offwind-dc", "offwind-float", "onwind", "ror", "hydro", "urban central solid biomass CHP", "geothermal", "solar", "solar-hsat", "solar rooftop"]
+  clean_carriers: ["offwind", "offwind-ac", "offwind-dc", "offwind-float", "onwind", "ror", "hydro", "urban central solid biomass CHP", "geothermal", "solar", "solar-hsat", "solar rooftop", "nuclear", "allam"]
+  emitters: ["CCGT", "OCGT", "coal", "lignite", "oil"]
+
 procurement:
   year: 2030
   strategy: vol-match # name of procurement strategy: vol-match, emi-match, 247-cfe
@@ -181,12 +192,3 @@ procurement:
   strip_network: false # [ true, false ] If true, model only the countries with the CI loads and their neighbors
   excess_share: 0.  # share of excess CI generation that can be sold to the grid [percentage]
   min_iterations: 2
-
-  res_target: "EU" # [ "EU", "country", "both", false ]
-  res_cap_target: true
-  res_additionality: true # select if the procured renewables are part of the RE target (false) or are in addition to it (true).
-
-  grid_policy:
-    renewable_carriers: ["offwind", "offwind-ac", "offwind-dc", "offwind-float", "onwind", "ror", "hydro", "urban central solid biomass CHP", "geothermal", "solar", "solar-hsat", "solar rooftop"]
-    clean_carriers: ["offwind", "offwind-ac", "offwind-dc", "offwind-float", "onwind", "ror", "hydro", "urban central solid biomass CHP", "geothermal", "solar", "solar-hsat", "solar rooftop", "nuclear", "allam"]
-    emitters: ["CCGT", "OCGT", "coal", "lignite", "oil"]

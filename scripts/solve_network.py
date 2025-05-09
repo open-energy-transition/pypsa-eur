@@ -593,13 +593,26 @@ def calculate_grid_score(
         n, n.links, n.links_t.p1, "bus1", include_techs, include_ci=include_ci
     )
     df_sus_clean, df_sus_total = get_values(
-        n, n.storage_units, n.storage_units_t.p_dispatch, "bus", include_techs, include_ci=include_ci
+        n,
+        n.storage_units,
+        n.storage_units_t.p_dispatch,
+        "bus",
+        include_techs,
+        include_ci=include_ci,
     )
 
     n.buses_t[f"{name}_p"] = (
-        pd.concat([df_gen_clean, -df_link_clean, df_sus_clean], axis=1).T.groupby(level=0).sum().T
+        pd.concat([df_gen_clean, -df_link_clean, df_sus_clean], axis=1)
+        .T.groupby(level=0)
+        .sum()
+        .T
     )
-    all_p = pd.concat([df_gen_total, -df_link_total, df_sus_total], axis=1).T.groupby(level=0).sum().T
+    all_p = (
+        pd.concat([df_gen_total, -df_link_total, df_sus_total], axis=1)
+        .T.groupby(level=0)
+        .sum()
+        .T
+    )
 
     n.buses_t[f"{name}_all_p"] = all_p
     n.buses_t[f"{name}_score"] = n.buses_t[f"{name}_p"] / all_p
@@ -1281,17 +1294,15 @@ def ember_res_target(n):
 
     # --- Define technologies and weights ---
     procurement = n.config["procurement"]
-    res_target = procurement["res_target"]
-    res_cap_target = procurement["res_cap_target"]
-    res_tech = procurement["grid_policy"]["renewable_carriers"]
+    res_techs = n.config["grid_policy"]["renewable_carriers"]
+    res_target = n.config["res_target"]
     weights = n.snapshot_weightings["generators"]
 
     # --- Helper function to filter and assign country ---
-    ci = procurement.get("ci",{})
+    ci = procurement.get("ci", {})
     ci_location = {k: v["location"] for k, v in ci.items()}
     grid_carriers = ["electricity distribution grid", "AC", "DC", "low voltage"]
     bus_list = n.buses[n.buses.carrier.isin(grid_carriers)].index
-    res_additionality = procurement["res_additionality"]
 
     def get_carriers(dataframe, bus_col):
         df = dataframe.copy()
@@ -1303,7 +1314,7 @@ def ember_res_target(n):
                 & ~df["carrier"].isin(grid_carriers)
                 & (
                     df["ci"].isin([np.NaN, ""])
-                    if "ci" in df.columns and res_additionality
+                    if "ci" in df.columns and res_target["res_additionality"]
                     else True
                 )
             ]
@@ -1322,17 +1333,23 @@ def ember_res_target(n):
     # Find EU and national targets
     eu_target = df_ember.loc[df_ember.country == "EU", "res_share_target"].values[0]
     countries = list(filter(None, n.buses.country.unique()))
-    df_country = df_ember[df_ember.country.isin(countries) & ~df_ember.res_share_target.isin([np.NaN, ""])]
+    df_country = df_ember[
+        df_ember.country.isin(countries) & ~df_ember.res_share_target.isin([np.NaN, ""])
+    ]
     country_target = df_country.groupby("country").res_share_target.sum()
 
-    if res_target == "both" and len(countries) == len(country_target):
+    if (
+        res_target["EU_share_target"]
+        and res_target["country_share_target"]
+        and len(countries) == len(country_target)
+    ):
         logger.info(
             f"All {str(len(countries))} countries have national targets, disable EU-wide RES share target to prevent overconstraints."
         )
-        res_target = "country"
+        res_target["EU_share_target"] = False
 
     # --- EU-wide RES target constraint ---
-    if res_target in ["EU", "both"]:
+    if res_target["EU_share_target"]:
         logger.info(f"Set EU-wide RES share target to {eu_target}%")
 
         # --- Apply for generators and links ---
@@ -1341,19 +1358,23 @@ def ember_res_target(n):
         all_sus_carrier = get_carriers(n.storage_units, "bus")
 
         # Separate RES carriers
-        res_gen_carrier = all_gen_carrier.query("carrier in @res_tech")
-        res_link_carrier = all_link_carrier.query("carrier in @res_tech")
-        res_sus_carrier = all_sus_carrier.query("carrier in @res_tech")
+        res_gen_carrier = all_gen_carrier[all_gen_carrier.carrier.isin(res_techs)]
+        res_link_carrier = all_link_carrier.query("carrier in @res_techs")
+        res_sus_carrier = all_sus_carrier.query("carrier in @res_techs")
 
         all_gen = n.model["Generator-p"].loc[:, all_gen_carrier.index] * weights
         all_link = get_link_model(n, all_link_carrier, weights)
-        all_sus = n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
+        all_sus = (
+            n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
+        )
 
         all_eu = all_gen.sum() + all_link.sum() + all_sus.sum()
 
         res_gen = n.model["Generator-p"].loc[:, res_gen_carrier.index] * weights
         res_link = get_link_model(n, res_link_carrier, weights)
-        res_sus = n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
+        res_sus = (
+            n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
+        )
 
         res_eu = res_gen.sum() + res_link.sum() + res_sus.sum()
 
@@ -1362,7 +1383,7 @@ def ember_res_target(n):
         )
 
     # --- Country-level RES target constraint ---
-    if res_target in ["country", "both"]:
+    if res_target["country_share_target"]:
         logger.info(f"Set national RES share targets to {country_target}")
 
         # Filter carrier dataframes to relevant countries
@@ -1376,14 +1397,16 @@ def ember_res_target(n):
             "country in @country_target.index"
         )
 
-        res_gen_carrier = all_gen_carrier.query("carrier in @res_tech")
-        res_link_carrier = all_link_carrier.query("carrier in @res_tech")
-        res_sus_carrier = all_sus_carrier.query("carrier in @res_tech")
+        res_gen_carrier = all_gen_carrier.query("carrier in @res_techs")
+        res_link_carrier = all_link_carrier.query("carrier in @res_techs")
+        res_sus_carrier = all_sus_carrier.query("carrier in @res_techs")
 
         # Compute RES and total by country
         all_gen = n.model["Generator-p"].loc[:, all_gen_carrier.index] * weights
         all_link = get_link_model(n, all_link_carrier, weights)
-        all_sus = n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
+        all_sus = (
+            n.model["StorageUnit-p_dispatch"].loc[:, all_sus_carrier.index] * weights
+        )
 
         all_country = (
             all_gen.sum(dim="snapshot").groupby(all_gen_carrier.country).sum()
@@ -1393,7 +1416,9 @@ def ember_res_target(n):
 
         res_gen = n.model["Generator-p"].loc[:, res_gen_carrier.index] * weights
         res_link = get_link_model(n, res_link_carrier, weights)
-        res_sus = n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
+        res_sus = (
+            n.model["StorageUnit-p_dispatch"].loc[:, res_sus_carrier.index] * weights
+        )
 
         res_country = (
             res_gen.sum(dim="snapshot").groupby(res_gen_carrier.country).sum()
@@ -1406,20 +1431,22 @@ def ember_res_target(n):
             name="country_res_constraint",
         )
 
-    if res_cap_target:
+    if res_target["country_cap_target"]:
         # --- Capacity based RES target constraint ---
         logger.info("Set national RES capacity targets")
         df_country_capacity = df_ember[df_ember.country.isin(countries)]
-        country_target_capacity = df_country_capacity.groupby("country").res_capacity_target.sum() * 1e3  # GW → MW
+        country_target_capacity = (
+            df_country_capacity.groupby("country").res_capacity_target.sum() * 1e3
+        )  # GW → MW
 
         res_gen_carrier = get_carriers(n.generators, "bus").query(
-            "country in @country_target_capacity.index & carrier in @res_tech"
+            "country in @country_target_capacity.index & carrier in @res_techs"
         )
         res_link_carrier = get_carriers(n.links, "bus1").query(
-            "country in @country_target_capacity.index & carrier in @res_tech"
+            "country in @country_target_capacity.index & carrier in @res_techs"
         )
         res_sus_carrier = get_carriers(n.storage_units, "bus").query(
-            "country in @country_target_capacity.index & carrier in @res_tech"
+            "country in @country_target_capacity.index & carrier in @res_techs"
         )
 
         # Split into existing and extendable
@@ -1432,32 +1459,49 @@ def ember_res_target(n):
         res_ext_sus = res_sus_carrier[res_sus_carrier.p_nom_extendable]
 
         res_exist_country = (
-            res_exist_gen.groupby("country").p_nom.sum()
+            res_exist_gen.groupby("country")
+            .p_nom.sum()
             .add(res_exist_link.groupby("country").p_nom.sum(), fill_value=0)
             .add(res_exist_sus.groupby("country").p_nom.sum(), fill_value=0)
             .reindex(country_target_capacity.index, fill_value=0)
         )
 
-        res_gen = n.model["Generator-p_nom"].rename({"Generator-ext": "Generator"}).loc[res_ext_gen.index]
+        res_gen = (
+            n.model["Generator-p_nom"]
+            .rename({"Generator-ext": "Generator"})
+            .loc[res_ext_gen.index]
+        )
         res_country = res_gen.groupby(res_ext_gen.country).sum()
 
         if not res_ext_link.index.empty:
-            res_link = n.model["Link-p_nom"].rename({"Link-ext": "Link"}).loc[res_ext_link.index]
+            res_link = (
+                n.model["Link-p_nom"]
+                .rename({"Link-ext": "Link"})
+                .loc[res_ext_link.index]
+            )
             res_country += res_link.groupby(res_ext_link.country).sum()
 
         if not res_ext_sus.index.empty:
-            res_sus = n.model["StorageUnit-p_nom"].rename({"StorageUnit-ext": "StorageUnit"}).loc[res_ext_sus.index]
+            res_sus = (
+                n.model["StorageUnit-p_nom"]
+                .rename({"StorageUnit-ext": "StorageUnit"})
+                .loc[res_ext_sus.index]
+            )
             res_country += res_sus.groupby(res_ext_sus.country).sum()
 
         # If the existing capacities exceed the target capacities, set the target equal to the existing capacities
-        country_target_capacity = country_target_capacity.where(res_exist_country <= country_target_capacity, res_exist_country)
+        country_target_capacity = country_target_capacity.where(
+            res_exist_country <= country_target_capacity, res_exist_country
+        )
 
         n.model.add_constraints(
             res_country + res_exist_country == country_target_capacity,
-            name="country_res_cap_constraint"
+            name="country_res_cap_constraint",
         )
 
-        df_display = (pd.concat([country_target_capacity, res_exist_country], axis=1) / 1e3).round(2)
+        df_display = (
+            pd.concat([country_target_capacity, res_exist_country], axis=1) / 1e3
+        ).round(2)
         df_display.columns = ["RES Capacity Target [GW]", "Existing RES Capacity [GW]"]
         logger.info(df_display)
 
@@ -1501,7 +1545,7 @@ def cfe_constraints(n):
     weights = n.snapshot_weightings["generators"]
 
     procurement = n.config["procurement"]
-    clean_techs = procurement["grid_policy"]["clean_carriers"]
+    clean_techs = n.config["grid_policy"]["clean_carriers"]
     energy_matching = procurement["energy_matching"] / 100
 
     calculate_grid_score(n, clean_techs, "cfe")
@@ -1686,16 +1730,12 @@ def extra_functionality(
         custom_extra_functionality = getattr(module, module_name)
         custom_extra_functionality(n, snapshots, snakemake)  # pylint: disable=E0601
 
-    if (
-        (config["procurement"].get("res_target", False) 
-         or config["procurement"].get("res_cap_target", False))
-        and str(n.params.procurement["year"]) == planning_horizons
-    ):
+    if config.get("res_target", False) and planning_horizons == "2030":
         ember_res_target(n)
 
     if (
         n.params.procurement_enable
-        and str(n.params.procurement["year"]) == planning_horizons
+        and str(n.config.get("procurement", {}).get("year", False)) == planning_horizons
     ):
         procurement = config["procurement"]
         strategy = procurement["strategy"]
@@ -1870,8 +1910,8 @@ def solve_network(
         status, condition = "", ""
     elif (
         n.params.procurement_enable
-        and str(n.params.procurement["year"]) == planning_horizons
-        and n.params.procurement["strategy"] == "247-cfe"
+        and str(n.params.procurement.get("year", False)) == planning_horizons
+        and n.params.procurement.get("strategy", False) == "247-cfe"
     ):
         status, condition = optimize_model_iteratively(n, config, **kwargs)
     elif skip_iterations:
@@ -1952,10 +1992,11 @@ def strip_network(n: pypsa.Network, config: dict) -> None:
         to_drop = c.df.index.symmetric_difference(to_keep)
         n.remove(c.name, to_drop)
 
+
 def retrieve_ci_load(config):
     load = config["procurement"]["load"]
 
-    #1 EUROSTAT data in GWh
+    # 1 EUROSTAT data in GWh
     import requests
 
     url = "https://ec.europa.eu/eurostat/api/dissemination/sdmx/3.0/data/dataflow/ESTAT/nrg_cb_e/1.0/*.*.*.*.*?c[freq]=A&c[nrg_bal]=FC,FC_IND_E,FC_OTH_CP_E&c[siec]=E7000&c[unit]=GWH&c[geo]=EU27_2020,EA20,BE,BG,CZ,DK,DE,EE,IE,EL,ES,FR,HR,IT,CY,LV,LT,LU,HU,MT,NL,AT,PL,PT,RO,SI,SK,FI,SE,IS,LI,NO,UK,BA,ME,MD,MK,GE,AL,RS,TR,UA,XK&c[TIME_PERIOD]=2023,2022,2021,2020&compress=false&format=csvdata&formatVersion=2.0&lang=en&labels=name"
@@ -1981,8 +2022,7 @@ def retrieve_ci_load(config):
                     (data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)
                 ).any():
                     fallback_row = data[
-                        (data["TIME_PERIOD"] == fallback_year)
-                        & (data["geo"] == geo)
+                        (data["TIME_PERIOD"] == fallback_year) & (data["geo"] == geo)
                     ].copy()
                     fallback_row["TIME_PERIOD"] = int(load["load_year"])
                     data = pd.concat([data, fallback_row], ignore_index=True)
@@ -1993,68 +2033,90 @@ def retrieve_ci_load(config):
                     ] = fallback_year
                     break
 
-    filtered_data = data[
-        (data["TIME_PERIOD"] == int(load["load_year"]))
-    ]
+    filtered_data = data[(data["TIME_PERIOD"] == int(load["load_year"]))]
 
     demand_map = {
-    "FC": "total_demand",
-    "FC_IND_E": "industrial_demand",
-    "FC_OTH_CP_E": "commercial_demand"
+        "FC": "total_demand",
+        "FC_IND_E": "industrial_demand",
+        "FC_OTH_CP_E": "commercial_demand",
     }
     dfs = []
     for code, label in demand_map.items():
         df_part = (
-            filtered_data[filtered_data["nrg_bal"] == code][["geo", "OBS_VALUE", "reference_year"]]
+            filtered_data[filtered_data["nrg_bal"] == code][
+                ["geo", "OBS_VALUE", "reference_year"]
+            ]
             .rename(columns={"geo": "country", "OBS_VALUE": label})
             .groupby("country")
             .sum()
         )
         dfs.append(df_part)
-    
-    # Merge all load data into a single DataFrame
-    load_year_eurostat = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()] # remove reference_year duplicatated columns
-    load_year_eurostat.rename(index={"EL": "GR"}, inplace=True)  # Rename EL (Eurostat) to GR (PyPSA)
-    load_year_eurostat["ci_demand"] = load_year_eurostat["industrial_demand"] + load_year_eurostat["commercial_demand"]
-    load_year_eurostat["ci_share"] = load_year_eurostat["ci_demand"] / load_year_eurostat["total_demand"]
 
-    #2 IEA data for Switzerland (CH) and Great Britain (GB) in PJ
+    # Merge all load data into a single DataFrame
+    load_year_eurostat = pd.concat(dfs, axis=1).loc[
+        :, ~pd.concat(dfs, axis=1).columns.duplicated()
+    ]  # remove reference_year duplicatated columns
+    load_year_eurostat.rename(
+        index={"EL": "GR"}, inplace=True
+    )  # Rename EL (Eurostat) to GR (PyPSA)
+    load_year_eurostat["ci_demand"] = (
+        load_year_eurostat["industrial_demand"]
+        + load_year_eurostat["commercial_demand"]
+    )
+    load_year_eurostat["ci_share"] = (
+        load_year_eurostat["ci_demand"] / load_year_eurostat["total_demand"]
+    )
+
+    # 2 IEA data for Switzerland (CH) and Great Britain (GB) in PJ
     years = list(range(1971, 2023)) + [str(2023) + " Provisional"]
     country_map = {"Switzerland": "CH", "United Kingdom": "GB"}
     demand_map = {
-    "Total final consumption (PJ)": "total_demand",
-    "Industry (PJ)": "industrial_demand",
-    "Commercial and public services (PJ)": "commercial_demand"
+        "Total final consumption (PJ)": "total_demand",
+        "Industry (PJ)": "industrial_demand",
+        "Commercial and public services (PJ)": "commercial_demand",
     }
-    data = pd.read_excel(load["load_path_2"], sheet_name="TimeSeries_1971-2023", skiprows=1) # 
-    filtered_data = data[(data["Product"] == "Electricity") & (data["Country"].isin(country_map.keys()))]
+    data = pd.read_excel(
+        load["load_path_2"], sheet_name="TimeSeries_1971-2023", skiprows=1
+    )  #
+    filtered_data = data[
+        (data["Product"] == "Electricity") & (data["Country"].isin(country_map.keys()))
+    ]
 
     # Determine the most recent available year in the 'iea' DataFrame
     for y in years[::-1]:
-        if y in filtered_data.columns and not (filtered_data[y] == "..").any():  # Check if at least one value is '..'
+        if (
+            y in filtered_data.columns and not (filtered_data[y] == "..").any()
+        ):  # Check if at least one value is '..'
             most_recent_year = y
             break
     filtered_data = filtered_data[["Country", "Flow", most_recent_year]]
     dfs = []
     for code, label in demand_map.items():
         df_part = (
-            filtered_data[filtered_data["Flow"] == code][["Country",most_recent_year]]
+            filtered_data[filtered_data["Flow"] == code][["Country", most_recent_year]]
             .rename(columns={"Country": "country", most_recent_year: label})
             .groupby("country")
-            .sum() * 1 / 0.0036 # Convert PJ to GWh
+            .sum()
+            * 1
+            / 0.0036  # Convert PJ to GWh
         )
         dfs.append(df_part)
 
     # Merge all load data into a single DataFrame
-    load_year_missing = pd.concat(dfs, axis = 1).rename(index=country_map)
+    load_year_missing = pd.concat(dfs, axis=1).rename(index=country_map)
     load_year_missing["reference_year"] = most_recent_year
-    load_year_missing["ci_demand"] = load_year_missing["industrial_demand"] + load_year_missing["commercial_demand"]
-    load_year_missing["ci_share"] = load_year_missing["ci_demand"] / load_year_missing["total_demand"]
+    load_year_missing["ci_demand"] = (
+        load_year_missing["industrial_demand"] + load_year_missing["commercial_demand"]
+    )
+    load_year_missing["ci_share"] = (
+        load_year_missing["ci_demand"] / load_year_missing["total_demand"]
+    )
 
-    #3 Merge Eurostat and IEA data
+    # 3 Merge Eurostat and IEA data
     load_year_countries = pd.concat([load_year_eurostat, load_year_missing], axis=0)
 
     return load_year_countries
+
 
 def load_profile(
     n: pypsa.Network,
@@ -2103,14 +2165,15 @@ def load_profile(
         load = 0.0
     else:
         load_year_val = (
-        load_year["ci_share"].values[0] * (n.loads_t.p_set[location] * n.snapshot_weightings.objective).sum()
+            load_year["ci_share"].values[0]
+            * (n.loads_t.p_set[location] * n.snapshot_weightings.objective).sum()
         )  # MWh
         logger.info(
-        f"CI load in {load_year.index.values[0]} (raw data from Eurostat/IEA):\nannual consumption: {round((load_year["total_demand"].values[0]) / 1000)} TWh\nreference raw data year: {load_year["reference_year"].values[0]}\nshare: {round(load_year["ci_share"].values[0] * 100, 0)}%"
+            f"CI load in {load_year.index.values[0]} (raw data from Eurostat/IEA):\nannual consumption: {round((load_year['total_demand'].values[0]) / 1000)} TWh\nreference raw data year: {load_year['reference_year'].values[0]}\nshare: {round(load_year['ci_share'].values[0] * 100, 0)}%"
         )
         logger.info(
-        f"CI load in {load_year.index.values[0]} (PyPSA data):\nannual consumption {round(load_year_val / 10**6)} TWh\nreference config year: {load['load_year']}"
-    )
+            f"CI load in {load_year.index.values[0]} (PyPSA data):\nannual consumption {round(load_year_val / 10**6)} TWh\nreference config year: {load['load_year']}"
+        )
         load = load_year_val / 8760 * load["participation"] / 100  # MW
 
     load_day = load * 24
@@ -2151,13 +2214,15 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
     strategy = procurement["strategy"]
     scope = procurement["scope"]
 
-    load_year_countries = retrieve_ci_load(config) # retrieve CI load input data
+    load_year_countries = retrieve_ci_load(config)  # retrieve CI load input data
 
     for name in ci.keys():
         location = ci[name]["location"]
 
         country = n.buses.country[location]
-        load_year = load_year_countries[load_year_countries.index == country] # select only the country of interest
+        load_year = load_year_countries[
+            load_year_countries.index == country
+        ]  # select only the country of interest
 
         n.add("Bus", name, country="")
 
@@ -2186,7 +2251,7 @@ def add_ci(n: pypsa.Network, year: str, config: dict, costs: pd.DataFrame) -> No
             f"{name}" + " load",
             carrier="electricity",
             bus=name,
-            p_set=load_profile(n, load_year, config, location), # GC
+            p_set=load_profile(n, load_year, config, location),  # GC
             ci=name,  # C&I markers used in constraints
         )
 
@@ -2442,7 +2507,8 @@ if __name__ == "__main__":
     ) as mem:
         if (
             snakemake.params.procurement_enable
-            and str(snakemake.params.procurement["year"]) == planning_horizons
+            and str(snakemake.params.procurement.get("year", False))
+            == planning_horizons
         ):
             print("procurement_enable is activated")
             procurement = snakemake.params.procurement
@@ -2471,7 +2537,7 @@ if __name__ == "__main__":
 
     logger.info(f"Maximum memory usage: {mem.mem_usage}")
 
-    grid_policy = snakemake.params.procurement.get("grid_policy", False)
+    grid_policy = snakemake.config.get("grid_policy", False)
     if grid_policy:
         res_techs = grid_policy["renewable_carriers"]
         clean_techs = grid_policy["clean_carriers"]
