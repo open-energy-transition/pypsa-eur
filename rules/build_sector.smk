@@ -1456,7 +1456,7 @@ rule prepare_sector_network:
         ),
         ates_potentials=lambda w: (
             resources("ates_potentials_base_s_{clusters}_{planning_horizons}.csv")
-            if config_provider("sector", "ates", "enable")(w)
+            if config_provider("sector", "district_heating", "ates", "enable")(w)
             else []
         ),
         h2_grid_tyndp=lambda w: (
