@@ -321,16 +321,14 @@ if __name__ == "__main__":
         if snakemake.params.load["manual_adjustments"]:
             load = manual_adjustment(load, snakemake.input[0], countries)
 
-        if snakemake.params.load["fill_gaps"]["enable"]:
-            logger.info(
-                f"Linearly interpolate gaps of size {interpolate_limit} and less."
-            )
-            load = load.interpolate(method="linear", limit=interpolate_limit)
+    if snakemake.params.load["fill_gaps"]["enable"]:
+        logger.info(f"Linearly interpolate gaps of size {interpolate_limit} and less.")
+        load = load.interpolate(method="linear", limit=interpolate_limit)
 
-            logger.info(
-                f"Filling larger gaps by copying time-slices of period '{time_shift}'."
-            )
-            load = load.apply(fill_large_gaps, shift=time_shift)
+        logger.info(
+            f"Filling larger gaps by copying time-slices of period '{time_shift}'."
+        )
+        load = load.apply(fill_large_gaps, shift=time_shift)
 
     if snakemake.params.load["supplement_synthetic"]:
         logger.info("Supplement missing data with synthetic data.")
