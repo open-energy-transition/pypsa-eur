@@ -23,7 +23,10 @@ from scripts._helpers import (
     set_scenario_config,
     update_config_from_wildcards,
 )
-from scripts.add_electricity import load_costs, sanitize_carriers
+from scripts.add_electricity import (
+    load_costs,
+    sanitize_carriers,
+)
 from scripts.build_energy_totals import cartesian
 from scripts.definitions.heat_system import HeatSystem
 from scripts.prepare_sector_network import cluster_heat_buses, define_spatial
@@ -69,6 +72,7 @@ def add_existing_renewables(
     df_agg: pd.DataFrame,
     countries: list[str],
     renewable_carriers: list[str],
+    tyndp_renewable_carriers: list[str],
 ) -> None:
     """
     Add existing renewable capacities to conventional power plant data.
@@ -85,6 +89,8 @@ def add_existing_renewables(
         List of country codes to consider
     renewable_carriers: list
         List of renewable carriers in the network
+    tyndp_renewable_carriers: list
+        List of renewable technologies from TYNDP
 
     Returns
     -------
@@ -92,6 +98,12 @@ def add_existing_renewables(
         Modifies df_agg in-place
     """
     tech_map = {"solar": "PV", "onwind": "Onshore", "offwind-ac": "Offshore"}
+    # TODO: remove when TYNDP renewable generators are added
+    if len(tyndp_renewable_carriers) > 0:
+        logger.info(
+            f"Hotfix until TYNDP renewable carriers are added. Skipping renewable carriers '{', '.join(tyndp_renewable_carriers)}'."
+        )
+        renewable_carriers = set(renewable_carriers) - set(tyndp_renewable_carriers)
 
     irena = pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
     irena = irena.query("Country in @countries")
@@ -155,6 +167,7 @@ def add_power_capacities_installed_before_baseyear(
     capacity_threshold: float,
     lifetime_values: dict[str, float],
     renewable_carriers: list[str],
+    tyndp_renewable_carriers: list[str],
 ) -> None:
     """
     Add power generation capacities installed before base year.
@@ -179,6 +192,8 @@ def add_power_capacities_installed_before_baseyear(
         Default values for missing data
     renewable_carriers: list
         List of renewable carriers in the network
+    tyndp_renewable_carriers: list
+        List of renewable technologies from TYNDP
     """
     logger.debug(f"Adding power capacities installed before {baseyear}")
 
@@ -232,6 +247,7 @@ def add_power_capacities_installed_before_baseyear(
         n=n,
         countries=countries,
         renewable_carriers=renewable_carriers,
+        tyndp_renewable_carriers=tyndp_renewable_carriers,
     )
     # drop assets which are already phased out / decommissioned
     phased_out = df_agg[df_agg["DateOut"] < baseyear].index
@@ -744,6 +760,7 @@ if __name__ == "__main__":
     options = snakemake.params.sector
 
     renewable_carriers = snakemake.params.carriers
+    tyndp_renewable_carriers = snakemake.params.tyndp_renewable_carriers
 
     baseyear = snakemake.params.baseyear
 
@@ -772,6 +789,7 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.existing_capacities["threshold_capacity"],
         lifetime_values=snakemake.params.costs["fill_values"],
         renewable_carriers=renewable_carriers,
+        tyndp_renewable_carriers=tyndp_renewable_carriers,
     )
 
     if options["heating"]:

@@ -1215,7 +1215,12 @@ if __name__ == "__main__":
         params.link_length_factor,
     )
 
-    renewable_carriers = set(params.electricity["renewable_carriers"])
+    tyndp_renewable_carriers = params.electricity["tyndp_renewable_carriers"]
+    if len(tyndp_renewable_carriers) > 0:
+        logger.info(
+            f"Skipping TYNDP renewable carriers - they will be attached later with TYNDP data: {', '.join(tyndp_renewable_carriers)}"
+        )
+    renewable_carriers = params.electricity["renewable_carriers"]
     extendable_carriers = params.electricity["extendable_carriers"]
     conventional_carriers = params.electricity["conventional_carriers"]
     conventional_inputs = {
@@ -1279,7 +1284,11 @@ if __name__ == "__main__":
                 "in rule `add_existing_baseyear` with foresight mode 'myopic'."
             )
         else:
-            tech_map = estimate_renewable_caps["technology_mapping"]
+            tech_map = {
+                key: value
+                for key, value in estimate_renewable_caps["technology_mapping"].items()
+                if key in estimate_renewable_caps["technologies"]
+            }
             expansion_limit = estimate_renewable_caps["expansion_limit"]
             year = estimate_renewable_caps["year"]
 
