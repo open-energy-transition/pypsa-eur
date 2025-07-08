@@ -78,7 +78,7 @@ report/*.toc
 
 *.geojson
 
-*.ipynb
+#*.ipynb
 
 merger-todos.md
 
