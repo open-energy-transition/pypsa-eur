@@ -47,16 +47,34 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_databundle.py"
 
-    rule retrieve_eurostat_data:
+
+if (EUROSTAT_BALANCES_DATASET := dataset_version("eurostat_balances"))["source"] in [
+    "primary",
+    "archive",
+]:
+
+    rule retrieve_eurostat_balances:
+        params:
+            url=EUROSTAT_BALANCES_DATASET["url"],
         output:
-            directory("data/eurostat/Balances-April2023"),
-        log:
-            "logs/retrieve_eurostat_data.log",
-        retries: 2
-        conda:
-            "../envs/environment.yaml"
-        script:
-            "../scripts/retrieve_eurostat_data.py"
+            zip=f"{EUROSTAT_BALANCES_DATASET['folder']}/balances.zip",
+            directory=directory(f"{EUROSTAT_BALANCES_DATASET['folder']}"),
+        run:
+            import os
+            import requests
+            from zipfile import ZipFile
+            from pathlib import Path
+
+            response = requests.get(params["url"])
+            with open(output.zip, "wb") as f:
+                f.write(response.content)
+
+            output_folder = Path(output["zip"]).parent
+            unpack_archive(output.zip, output_folder)
+
+
+
+if config["enable"]["retrieve"] and config["enable"].get("retrieve_jrc_idees", True):
 
     rule retrieve_jrc_idees:
         output:
@@ -67,30 +85,44 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_jrc_idees.py"
 
-    rule retrieve_eurostat_household_data:
-        output:
-            "data/eurostat/eurostat-household_energy_balances-february_2024.csv",
-        log:
-            "logs/retrieve_eurostat_household_data.log",
-        retries: 2
-        conda:
-            "../envs/environment.yaml"
-        script:
-            "../scripts/retrieve_eurostat_household_data.py"
 
+if (
+    EUROSTAT_HOUSEHOLD_BALANCES_DATASET := dataset_version(
+        "eurostat_household_balances"
+    )
+)["source"] in [
+    "primary",
+    "archive",
+]:
 
-if config["enable"]["retrieve"]:
-
-    rule retrieve_nuts_2013_shapes:
-        input:
-            shapes=storage(
-                "https://gisco-services.ec.europa.eu/distribution/v2/nuts/download/ref-nuts-2013-03m.geojson.zip"
-            ),
-        output:
-            shapes_level_3="data/nuts/NUTS_RG_03M_2013_4326_LEVL_3.geojson",
-            shapes_level_2="data/nuts/NUTS_RG_03M_2013_4326_LEVL_2.geojson",
+    rule retrieve_eurostat_household_balances:
         params:
-            zip_file="data/nuts/ref-nuts-2013-03m.geojson.zip",
+            url=EUROSTAT_HOUSEHOLD_BALANCES_DATASET["url"],
+        output:
+            csv=f"{EUROSTAT_HOUSEHOLD_BALANCES_DATASET['folder']}/nrg_d_hhq.csv",
+        run:
+            import requests
+
+            # Retrieve the data into a gzipped file
+            response = requests.get(params["url"])
+            with open(output["csv"], "wb") as f:
+                f.write(response.content)
+
+
+
+if (EU_NUTS2013_DATASET := dataset_version("eu_nuts2013"))["source"] in [
+    "primary",
+    "archive",
+]:
+
+    rule retrieve_eu_nuts_2013:
+        input:
+            shapes=storage(EU_NUTS2013_DATASET["url"]),
+        output:
+            shapes_level_3=f"{EU_NUTS2013_DATASET["folder"]}/NUTS_RG_03M_2013_4326_LEVL_3.geojson",
+            shapes_level_2=f"{EU_NUTS2013_DATASET["folder"]}/NUTS_RG_03M_2013_4326_LEVL_2.geojson",
+        params:
+            zip_file=f"{EU_NUTS2013_DATASET['folder']}/ref-nuts-2013-03m.geojson.zip",
         run:
             os.rename(input.shapes, params.zip_file)
             with ZipFile(params.zip_file, "r") as zip_ref:
@@ -101,24 +133,26 @@ if config["enable"]["retrieve"]:
                     extracted_file.rename(
                         getattr(output, f"shapes_level_{level[-1]}")
                     )
-            os.remove(params.zip_file)
 
 
 
-if config["enable"]["retrieve"]:
+if (EU_NUTS2021_DATASET := dataset_version("eu_nuts2021"))["source"] in [
+    "primary",
+    "archive",
+]:
 
-    rule retrieve_nuts_2021_shapes:
+    rule retrieve_eu_nuts_2021:
         input:
             shapes=storage(
-                "https://gisco-services.ec.europa.eu/distribution/v2/nuts/download/ref-nuts-2021-01m.geojson.zip"
+                EU_NUTS2021_DATASET["url"],
             ),
         output:
-            shapes_level_3="data/nuts/NUTS_RG_01M_2021_4326_LEVL_3.geojson",
-            shapes_level_2="data/nuts/NUTS_RG_01M_2021_4326_LEVL_2.geojson",
-            shapes_level_1="data/nuts/NUTS_RG_01M_2021_4326_LEVL_1.geojson",
-            shapes_level_0="data/nuts/NUTS_RG_01M_2021_4326_LEVL_0.geojson",
+            shapes_level_3=f"{EU_NUTS2021_DATASET["folder"]}/NUTS_RG_01M_2021_4326_LEVL_3.geojson",
+            shapes_level_2=f"{EU_NUTS2021_DATASET["folder"]}/NUTS_RG_01M_2021_4326_LEVL_2.geojson",
+            shapes_level_1=f"{EU_NUTS2021_DATASET["folder"]}/NUTS_RG_01M_2021_4326_LEVL_1.geojson",
+            shapes_level_0=f"{EU_NUTS2021_DATASET["folder"]}/NUTS_RG_01M_2021_4326_LEVL_0.geojson",
         params:
-            zip_file="data/nuts/ref-nuts-2021-01m.geojson.zip",
+            zip_file=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson.zip",
         run:
             os.rename(input.shapes, params.zip_file)
             with ZipFile(params.zip_file, "r") as zip_ref:
@@ -129,7 +163,6 @@ if config["enable"]["retrieve"]:
                     extracted_file.rename(
                         getattr(output, f"shapes_level_{level[-1]}")
                     )
-            os.remove(params.zip_file)
 
 
 
@@ -264,7 +297,9 @@ if config["enable"]["retrieve"]:
             validate_checksum(output[0], input[0])
 
 
-if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("enspreso_biomass"))["source"] in [
+if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))[
+    "source"
+] in [
     "primary",
     "archive",
 ]:
@@ -282,30 +317,40 @@ if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("enspreso_biomass"))["source
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"]:
+if (HOTMAPS_INDUSTRIAL_SITES := dataset_version("hotmaps_industrial_sites"))[
+    "source"
+] in [
+    "primary",
+    "archive",
+]:
 
     rule retrieve_hotmaps_industrial_sites:
         input:
             storage(
-                "https://gitlab.com/hotmaps/industrial_sites/industrial_sites_Industrial_Database/-/raw/master/data/Industrial_Database.csv",
+                HOTMAPS_INDUSTRIAL_SITES["url"],
                 keep_local=True,
             ),
         output:
-            "data/Industrial_Database.csv",
+            f"{HOTMAPS_INDUSTRIAL_SITES["folder"]}/Industrial_Database.csv",
         retries: 1
         run:
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"]:
+if (NITROGEN_STATISTICS_DATASET := dataset_version("nitrogen_statistics"))[
+    "source"
+] in [
+    "primary",
+    "archive",
+]:
 
-    rule retrieve_usgs_ammonia_production:
+    rule retrieve_nitrogen_statistics:
         input:
             storage(
-                "https://d9-wret.s3.us-west-2.amazonaws.com/assets/palladium/production/s3fs-public/media/files/myb1-2022-nitro-ert.xlsx"
+                NITROGEN_STATISTICS_DATASET["url"],
             ),
         output:
-            "data/myb1-2022-nitro-ert.xlsx",
+            f"{NITROGEN_STATISTICS_DATASET['folder']}/nitro-ert.xlsx",
         retries: 1
         run:
             move(input[0], output[0])
@@ -412,28 +457,31 @@ if (WB_URB_POP_DATASET := dataset_version("worldbank_urban_population"))["source
 
 
 
-if config["enable"]["retrieve"]:
+if (CO2STOP_DATASET := dataset_version("co2stop"))["source"] in [
+    "primary",
+    "archive",
+]:
 
     rule retrieve_co2stop:
-        params:
-            zip="data/co2jrc_openformats.zip",
         output:
-            "data/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Storage_Units.csv",
-            "data/CO2JRC_OpenFormats/CO2Stop_Polygons Data/StorageUnits_March13.kml",
-            "data/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps.csv",
-            "data/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps_Temp.csv",
-            "data/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps1.csv",
-            "data/CO2JRC_OpenFormats/CO2Stop_Polygons Data/DaughterUnits_March13.kml",
+            storage_table=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Storage_Units.csv",
+            storage_map=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_Polygons Data/StorageUnits_March13.kml",
+            traps_table1=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps.csv",
+            traps_table2=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps_Temp.csv",
+            traps_table3=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_DataInterrogationSystem/Hydrocarbon_Traps1.csv",
+            traps_map=f"{CO2STOP_DATASET['folder']}/CO2JRC_OpenFormats/CO2Stop_Polygons Data/DaughterUnits_March13.kml",
         run:
             import requests
 
             response = requests.get(
-                "https://setis.ec.europa.eu/document/download/786a884f-0b33-4789-b744-28004b16bd1a_en?filename=co2jrc_openformats.zip",
+                CO2STOP_DATASET["url"],
             )
-            with open(params["zip"], "wb") as f:
+            zip_file = f"{CO2STOP_DATASET['folder']}/co2jrc_openformats.zip"
+            output_folder = CO2STOP_DATASET["folder"]
+
+            with open(zip_file, "wb") as f:
                 f.write(response.content)
-            output_folder = Path(params["zip"]).parent
-            unpack_archive(params["zip"], output_folder)
+            unpack_archive(zip_file, output_folder)
 
 
 
