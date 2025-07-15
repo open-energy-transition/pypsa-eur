@@ -69,16 +69,18 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_eurostat_household_data.py"
 
+
 if (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
     "primary",
     "archive",
 ]:
+
     rule retrieve_jrc_idees:
         params:
-            url = f"{JRC_IDEES_DATASET["url"]}",
+            url=f"{JRC_IDEES_DATASET["url"]}",
         output:
-            zip = f"{JRC_IDEES_DATASET["folder"]}/jrc_idees.zip",
-            directory = directory(f"{JRC_IDEES_DATASET["folder"]}"),
+            zip=f"{JRC_IDEES_DATASET["folder"]}/jrc_idees.zip",
+            directory=directory(f"{JRC_IDEES_DATASET["folder"]}"),
         run:
             import os
             import requests
@@ -91,6 +93,7 @@ if (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
 
             output_folder = Path(output["zip"]).parent
             unpack_archive(output.zip, output_folder)
+
 
 
 if config["enable"]["retrieve"]:
@@ -278,7 +281,9 @@ if config["enable"]["retrieve"]:
             validate_checksum(output[0], input[0])
 
 
-if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))["source"] in [
+if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))[
+    "source"
+] in [
     "primary",
     "archive",
 ]:
@@ -339,12 +344,13 @@ if config["enable"]["retrieve"]:
         run:
             move(input[0], output[0])
             validate_checksum(output[0], input[0])
-            
+
 
 if (LUISA_LAND_COVER_DATASET := dataset_version("luisa_land_cover"))["source"] in [
     "primary",
     "archive",
 ]:
+
     # Downloading LUISA Base Map for land cover and land use:
     # Website: https://ec.europa.eu/jrc/en/luisa
     rule retrieve_luisa_land_cover:
