@@ -78,8 +78,6 @@ report/*.toc
 
 *.geojson
 
-*.ipynb
-
 merger-todos.md
 
 *.html
