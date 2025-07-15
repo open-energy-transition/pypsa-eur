@@ -88,7 +88,7 @@ rule build_simplified_population_layouts:
 
 rule build_gas_network:
     input:
-        gas_network="data/gas_network/scigrid-gas/data/IGGIELGN_PipeSegments.geojson",
+        gas_network=f"{rules.retrieve_gas_infrastructure_data.output["directory"]}/data/IGGIELGN_PipeSegments.geojson",
     output:
         cleaned_gas_network=resources("gas_network.csv"),
     resources:
@@ -106,8 +106,8 @@ rule build_gas_network:
 rule build_gas_input_locations:
     input:
         gem="data/gem/Europe-Gas-Tracker-2024-05.xlsx",
-        entry="data/gas_network/scigrid-gas/data/IGGIELGN_BorderPoints.geojson",
-        storage="data/gas_network/scigrid-gas/data/IGGIELGN_Storages.geojson",
+        entry=f"{rules.retrieve_gas_infrastructure_data.output["directory"]}/data/IGGIELGN_BorderPoints.geojson",
+        storage=f"{rules.retrieve_gas_infrastructure_data.output["directory"]}/data/IGGIELGN_Storages.geojson",
         regions_onshore=resources("regions_onshore_base_s_{clusters}.geojson"),
         regions_offshore=resources("regions_offshore_base_s_{clusters}.geojson"),
     output:
@@ -590,7 +590,7 @@ rule build_energy_totals:
         co2="data/bundle/eea/UNFCCC_v23.csv",
         swiss="data/switzerland-new_format-all_years.csv",
         swiss_transport="data/gr-e-11.03.02.01.01-cc.csv",
-        idees="data/jrc-idees-2021",
+        idees=rules.retrieve_jrc_idees.output["directory"],
         district_heat_share="data/district_heat_share.csv",
         eurostat="data/eurostat/Balances-April2023",
         eurostat_households="data/eurostat/eurostat-household_energy_balances-february_2024.csv",
@@ -777,7 +777,7 @@ rule build_industry_sector_ratios:
         ammonia=config_provider("sector", "ammonia", default=False),
     input:
         ammonia_production=resources("ammonia_production.csv"),
-        idees="data/jrc-idees-2021",
+        idees=rules.retrieve_jrc_idees.output["directory"],
     output:
         industry_sector_ratios=resources("industry_sector_ratios.csv"),
     threads: 1
@@ -828,7 +828,7 @@ rule build_industrial_production_per_country:
     input:
         ch_industrial_production="data/ch_industrial_production_per_subsector.csv",
         ammonia_production=resources("ammonia_production.csv"),
-        jrc="data/jrc-idees-2021",
+        jrc=rules.retrieve_jrc_idees.output["directory"],
         eurostat="data/eurostat/Balances-April2023",
     output:
         industrial_production_per_country=resources(
@@ -976,7 +976,7 @@ rule build_industrial_energy_demand_per_country_today:
         ammonia=config_provider("sector", "ammonia", default=False),
     input:
         transformation_output_coke=resources("transformation_output_coke.csv"),
-        jrc="data/jrc-idees-2021",
+        jrc=rules.retrieve_jrc_idees.output["directory"],
         industrial_production_per_country=resources(
             "industrial_production_per_country.csv"
         ),
