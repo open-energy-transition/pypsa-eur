@@ -5,25 +5,18 @@ scenario:
   clusters:
   - 39
   opts:
-  - ''
+  - 'Co2L'
   sector_opts:
-  - ''
+  - 'Co2L'
   planning_horizons:
-  - 2023
-
-# Download data and plot validation for power generation and flows
-year: 2023
-download_ember_data: true
-plot_validation_generation_and_flows_graphs: true
-plot_capacity_demand: true
-plot_validation_ember: false
+  - 2025
 
 
 snapshots:
   start: "2023-01-01"
   end:   "2024-01-01"
 
-countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK']
+countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK'] #, 'XK']
 
 
 atlite:
@@ -89,5 +82,14 @@ load:
     gdp: 0.6
     population: 0.4
 
+sector:
+  transport: true
+  heating: true
+  biomass: false
+  industry: false
+  shipping: false
+  aviation: false
+  agriculture: false
+
 costs:
-  year: 2020
+  year: 2025
