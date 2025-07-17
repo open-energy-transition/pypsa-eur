@@ -461,19 +461,21 @@ def analyze_power_flows():
     
     power_flow_outputs = []
     for connection in valid_connections:
-        output_path = snakemake.output.power_flows[valid_connections.index(connection)] if 'snakemake' in globals() else f"results/validation_{year}/plots/power_flow_{connection.replace('-', '_')}.png"
+        connection = connection.replace("-", "_")
+        output_path = f"results/validation_{year}/plots/power_flow_{connection}.png"
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
+
         conn_data = comparison_df[comparison_df['Connection'] == connection]
         months = conn_data['Month']
         flow_2023 = conn_data['Avg_Abs_Flow_2023_MW']
         flow_pypsa = conn_data['Avg_Abs_Flow_PyPSA_MW']
-        
+
         plt.figure(figsize=(12, 6))
         bar_width = 0.35
         x = np.arange(len(months))
-        plt.bar(x - bar_width/2, flow_2023, bar_width, label='ENTSO-E 2023', color='skyblue')
-        plt.bar(x + bar_width/2, flow_pypsa, bar_width, label='PyPSA-Eur 2023', color='salmon')
+        plt.bar(x - bar_width / 2, flow_2023, bar_width, label='ENTSO-E 2023', color='skyblue')
+        plt.bar(x + bar_width / 2, flow_pypsa, bar_width, label='PyPSA-Eur 2023', color='salmon')
         plt.xlabel('Month')
         plt.ylabel('Average Absolute Power Flow (MW)')
         plt.title(f'Average Absolute Power Flow: {connection}')
@@ -481,9 +483,10 @@ def analyze_power_flows():
         plt.legend()
         plt.grid(True, axis='y')
         plt.tight_layout()
-        
+
         plt.savefig(output_path, bbox_inches='tight', dpi=300)
         plt.close()
+
         power_flow_outputs.append(output_path)
     
     def get_net_export(n, country, snapshots):
@@ -504,8 +507,10 @@ def analyze_power_flows():
             print(f'Average net export for {country}: {avg_net_export:.2f} MW')
         except (KeyError, ValueError) as e:
             print(f"Error calculating net export for {country}: {e}")
-    
-    output_list_path = snakemake.output.power_flows_list if 'snakemake' in globals() else f"results/validation_{year}/plots/power_flows_list.txt"
+
+    output_list_path = snakemake.output.power_flows_list if 'snakemake' in globals() \
+        else f"results/validation_{year}/plots/power_flows_list.txt"
+
     os.makedirs(os.path.dirname(output_list_path), exist_ok=True)
     with open(output_list_path, 'w') as f:
         for output_path in power_flow_outputs:
