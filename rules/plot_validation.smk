@@ -32,15 +32,15 @@ rule validate_ember_networks:
 
 rule plot_capacity_demand:
     input:
-        network="results/validation_{year}/networks/base_s_39_elec_.nc",
+        network="results/validation_{year}/networks/base_s_{clusters}_elec_{opts}.nc",
         ember_capacity="validation/ember_data/yearly_full_release_long_format.csv",
         ember_demand="validation/ember_data/europe_monthly_full_release_long_format.csv",
         regions_onshore=f"resources/validation_{{year}}/country_shapes.geojson"
     output:
-        network_plot="results/validation_{year}/plots/network_plot.png",
-        total_capacity_plot="results/validation_{year}/plots/total_capacity_plot.png",
-        country_capacity_plot="results/validation_{year}/plots/country_capacity_plot.png",
-        demand_plot="results/validation_{year}/plots/demand_plot.png"
+        network_plot="results/validation_{year}/plots/network_plot_s_{clusters}_elec_{opts}.png",
+        total_capacity_plot="results/validation_{year}/plots/total_capacity_plot_s_{clusters}_elec_{opts}.png",
+        country_capacity_plot="results/validation_{year}/plots/country_capacity_plot_s_{clusters}_elec_{opts}.png",
+        demand_plot="results/validation_{year}/plots/demand_plot_s_{clusters}_elec_{opts}.png"
     params:
         script="scripts/capacities_and_demand.py",
         plot_flag=config.get("Plot_Capacity_Demand", True)
