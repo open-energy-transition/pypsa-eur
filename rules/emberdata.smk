@@ -49,4 +49,4 @@ rule download_ember_data:
                     time.sleep(1)
 
                 else:
-                    print(f"Already exists: {filepath}")
+                    logger.info(f"Already exists: {filepath}")
