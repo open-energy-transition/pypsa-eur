@@ -96,9 +96,9 @@ jobs:
       run: |
         pylint --disable=all --enable=E0601,E0606 --output-format=parseable scripts/add_* scripts/prepare_* scripts/solve_*
 
-    - name: Run snakemake test workflows
+    - name: Run snakemake ember-test workflow
       run: |
-        make test
+        make ember-test
 
     - name: Run unit tests
       run: |
