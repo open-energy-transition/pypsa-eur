@@ -1,0 +1,95 @@
+run:
+  name: validation_2023
+
+scenario:
+  clusters:
+  - 39
+  opts:
+  - 'Co2L-168H'
+  sector_opts:
+  - 'Co2L-168H'
+  planning_horizons:
+  - 2025
+
+
+snapshots:
+  start: "2023-01-01"
+  end:   "2024-01-01"
+
+countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK'] #, 'XK']
+
+
+atlite:
+  cutout_directory: cutouts
+  default_cutout: europe-2023-sarah3-era5
+  nprocesses: 4
+  show_progress: true
+  cutouts:
+    # use 'base' to determine geographical bounds and time span from config
+    # base:
+      # module: era5
+    europe-2023-sarah3-era5:
+      module: [sarah, era5] # in priority order
+      x: [-12., 42.]
+      y: [33., 72.]
+      dx: 0.3
+      dy: 0.3
+      time: ['2023', '2023']
+      
+
+lines:
+  under_construction: remove
+  max_extension: 0
+
+links:
+  under_construction: remove
+  max_extension: 0
+
+transmission_projects:
+  enable: false
+
+electricity:
+  conventional_generation:
+    from_entsoe: true
+    year: 2023
+
+  extendable_carriers:      # forbid new generation & storage
+    Generator: []
+    StorageUnit: []
+  transmission_limit: v1.0  # keep today’s NTCs (default)
+
+
+  estimate_renewable_capacities:
+    enable: true
+    from_gem: true
+    year: 2023
+    expansion_limit: false
+    technology_mapping:
+      Offshore: offwind-ac
+      Onshore: onwind
+      PV: solar
+      
+load:
+  fill_gaps:
+    enable: true
+    interpolate_limit: 3
+    time_shift_for_large_gaps: 1w
+  manual_adjustments: false # false
+  scaling_factor: 1.0
+  fixed_year: false # false or year (e.g. 2013)
+  supplement_synthetic: true
+  distribution_key:
+    gdp: 0.6
+    population: 0.4
+
+sector:
+  transport: true
+  heating: true
+  biomass: false
+  industry: false
+  shipping: false
+  aviation: false
+  agriculture: false
+
+costs:
+  year: 2025

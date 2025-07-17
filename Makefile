@@ -92,7 +92,7 @@ unit-test:
 # Run default tests
 ember-test:
 	set -e
-	snakemake -call validate_ember_networks --configfile config/validation_config_2023.yaml
+	snakemake -call validate_ember_networks --configfile config/test/config.validationember.yaml
 	echo "All tests completed successfully."
 
 # Cleans all output files from tests
