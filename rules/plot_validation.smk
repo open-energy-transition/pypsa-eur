@@ -19,6 +19,17 @@ rule plot_validation:
     script:
         "../scripts/generation_and_flows.py"
 
+
+rule validate_ember_networks:
+    input:
+        expand(
+            RESULTS + "plots/base_s_{clusters}_elec_{opts}_donut_subplots.png",
+            year=2023,
+            **config["scenario"],
+            run=config["run"]["name"],
+        ),
+
+
 rule plot_capacity_demand:
     input:
         network="results/validation_{year}/networks/base_s_39_elec_.nc",
