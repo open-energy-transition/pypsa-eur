@@ -132,6 +132,13 @@ In [PyPSA-Eur](https://github.com/PyPSA/pypsa-eur), some of the most important r
 
 These rules are typically defined in separate `.smk` files (e.g., `rules/retrieve.smk`, `rules/build_electricity.smk`) and are orchestrated by the main `Snakefile`.
 
+## How to run the workflow
+This section builds upon the detailed description of the available PyPSA-Eur [configurations](https://pypsa-eur.readthedocs.io/en/latest/configuration.html) and [wildcards](https://pypsa-eur.readthedocs.io/en/latest/wildcards.html), and the tutorials for the [electricy-only](https://pypsa-eur.readthedocs.io/en/latest/tutorial.html) and for the [sector-coupled](https://pypsa-eur.readthedocs.io/en/latest/tutorial_sector.html) models.
+
+You can use the `config/validation_config_2023.yaml` to run the workflow with different configurations. The `validate_ember_networks` rule will run the validation and trigger the plotting routines for the Ember Flexibility Study. The command is as follows:
+
+`snakemake validate_ember_networks --configfile config/validation_config_2023.yaml`
+
 ---
 
 # Contributing and Support
