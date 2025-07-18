@@ -1,5 +1,14 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+tutorial: true
+
 run:
   name: validation_2023
+  shared_resources:
+    policy: false
+  shared_cutouts: true
 
 scenario:
   clusters:
@@ -13,28 +22,20 @@ scenario:
 
 
 snapshots:
-  start: "2023-01-01"
-  end:   "2024-01-01"
+  start: "2013-03-01"
+  end: "2013-03-08"
 
-countries: ['IT', 'AT', 'CH', 'DE']
+countries: ['BE']
 
 
 atlite:
-  cutout_directory: cutouts
-  default_cutout: europe-2023-sarah3-era5
-  nprocesses: 4
-  show_progress: true
+  default_cutout: be-03-2013-era5
   cutouts:
-    # use 'base' to determine geographical bounds and time span from config
-    # base:
-      # module: era5
-    europe-2023-sarah3-era5:
-      module: [sarah, era5] # in priority order
-      x: [-12., 42.]
-      y: [33., 72.]
-      dx: 0.3
-      dy: 0.3
-      time: ['2023', '2023']
+    be-03-2013-era5:
+      module: era5
+      x: [4., 15.]
+      y: [46., 56.]
+      time: ["2013-03-01", "2013-03-08"]
       
 
 lines:
@@ -54,11 +55,14 @@ electricity:
     year: 2023
 
   extendable_carriers:      # forbid new generation & storage
-    Generator: []
-    StorageUnit: []
+    Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, OCGT, CCGT, nuclear]
+    StorageUnit: [battery]
+    Store: [H2]
+    Link: [H2 pipeline]
   transmission_limit: v1.0  # keep today’s NTCs (default)
 
 
+  renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float]
   estimate_renewable_capacities:
     enable: true
     from_gem: true
@@ -90,6 +94,11 @@ sector:
   shipping: false
   aviation: false
   agriculture: false
+
+solving:
+  solver:
+    name: highs
+    options: highs-simplex
 
 costs:
   year: 2025
