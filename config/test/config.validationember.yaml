@@ -100,5 +100,10 @@ sector:
   aviation: false
   agriculture: false
 
+solving:
+  solver:
+    name: highs
+    options: highs-simplex
+
 costs:
   year: 2025
