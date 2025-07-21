@@ -5,7 +5,7 @@
 tutorial: true
 
 run:
-  name: validation_2023
+  name: validation_2023_CI
   shared_resources:
     policy: false
   shared_cutouts: true
