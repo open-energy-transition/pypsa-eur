@@ -1,10 +1,12 @@
 # SPDX-FileCopyrightText: Open Energy Transition gGmbH, Ember, and contributors to the Ember Flexibility Study
 #
 # SPDX-License-Identifier: MIT
-
+import time
 # rules/emberdata.smk
 
 from pathlib import Path
+
+import requests
 
 DOWNLOADS = {
     Path("validation", "ember_data", "yearly_full_release_long_format.csv"):
@@ -30,16 +32,21 @@ rule download_ember_data:
             with config_path.open("r") as f:
                 cfg = yaml.safe_load(f)
 
-        if cfg.get("download_ember_data", False):
-            for filepath, url in DOWNLOADS.items():
-                # Create directory if it doesn't exist
-                filepath.parent.mkdir(parents=True, exist_ok=True)
+        for filepath, url in DOWNLOADS.items():
+            # Create directory if it doesn't exist
+            filepath.parent.mkdir(parents=True, exist_ok=True)
 
-                # Download file if it doesn't already exist
-                if not filepath.exists():
-                    print(f"Downloading {url} -> {filepath}")
-                    urllib.request.urlretrieve(url, str(filepath))
+            # Download file if it doesn't already exist
+            if not filepath.exists():
+                logger.info(f"Downloading {url} -> {filepath}")
+                response = requests.get(url)
+                with open(filepath,"wb") as f:
+                    f.write(response.content)
+
+                # Confirm file creation
+                while not filepath.exists():
+                    logger.info(f"Waiting for {filepath} to appear...")
+                    time.sleep(1)
+
                 else:
-                    print(f"Already exists: {filepath}")
-        else:
-            print("Skipping ember data download (flag is false or not set).")
+                    logger.info(f"Already exists: {filepath}")

@@ -89,6 +89,12 @@ test:
 unit-test:
 	pytest test
 
+# Run default tests
+ember-test:
+	set -e
+	snakemake -call validate_ember_networks --configfile config/test/config.validationember.yaml
+	echo "All tests completed successfully."
+
 # Cleans all output files from tests
 clean-tests:
 	snakemake -call solve_elec_networks --configfile config/test/config.electricity.yaml --delete-all-output

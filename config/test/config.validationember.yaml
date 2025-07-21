@@ -2,16 +2,21 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
+tutorial: true
+
 run:
-  name: validation_2023
+  name: validation_2023_CI
+  shared_resources:
+    policy: false
+  shared_cutouts: true
 
 scenario:
   clusters:
-  - 39
+  - 10
   opts:
-  - ''
+  - 'Co2L-168H'
   sector_opts:
-  - ''
+  - 'Co2L-168H'
   planning_horizons:
   - 2025
 
@@ -20,7 +25,7 @@ snapshots:
   start: "2023-01-01"
   end:   "2024-01-01"
 
-countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK'] #, 'XK']
+countries: ['IT', 'AT', 'CH', 'DE']
 
 
 atlite:
@@ -56,8 +61,6 @@ electricity:
   conventional_generation:
     from_entsoe: true
     year: 2023
-  co2limit_enable: true
-  co2limit: 7.22e+8 # 2023 value from https://ember-energy.org/data/electricity-data-explorer/?chart=trend&data=emissions
 
   extendable_carriers:      # forbid new generation & storage
     Generator: []
@@ -96,6 +99,11 @@ sector:
   shipping: false
   aviation: false
   agriculture: false
+
+solving:
+  solver:
+    name: highs
+    options: highs-simplex
 
 costs:
   year: 2025
