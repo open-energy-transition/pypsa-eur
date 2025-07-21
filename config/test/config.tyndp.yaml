@@ -1,9 +1,9 @@
-# SPDX-FileCopyrightText: Open Energy Transition gGmbH
+# SPDX-FileCopyrightText: Open Energy Transition gGmbH and contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: CC0-1.0
 
 run:
-  prefix: "test-sector-tyndp"
+  name: "test-sector-tyndp"
   disable_progressbar: true
   shared_resources:
     policy: false
@@ -27,9 +27,6 @@ countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'CY', 'DE', 'DK', 'EE', 'E
 snapshots:
   start: "2013-03-01"
   end: "2013-03-08"
-
-enable:
-  retrieve_tyndp_bundle: true
 
 co2_budget:
   # TODO define carbon budget compliant with EU 2030 and 2050 targets
