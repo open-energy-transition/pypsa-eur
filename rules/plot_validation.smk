@@ -37,30 +37,19 @@ rule plot_capacity_demand:
         ember_demand="validation/ember_data/europe_monthly_full_release_long_format.csv",
         regions_onshore=f"resources/validation_{{year}}/country_shapes.geojson"
     output:
-        network_plot="results/validation_{year}/plots/network_plot_s_{clusters}_elec_{opts}.png",
-        total_capacity_plot="results/validation_{year}/plots/total_capacity_plot_s_{clusters}_elec_{opts}.png",
-        country_capacity_plot="results/validation_{year}/plots/country_capacity_plot_s_{clusters}_elec_{opts}.png",
-        demand_plot="results/validation_{year}/plots/demand_plot_s_{clusters}_elec_{opts}.png"
-    params:
-        script="scripts/capacities_and_demand.py",
-        plot_flag=config.get("Plot_Capacity_Demand", True)
-    run:
-        from pathlib import Path
-        import subprocess
-        
-        output_dir = f"results/validation_{wildcards.year}/plots"
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        
-        if params.plot_flag:
-            print(f"Running script: {params.script}")
-            result = subprocess.run(["python", params.script], capture_output=True, text=True)
-            if result.returncode != 0:
-                print(f"Script error: {result.stderr}")
-                raise RuntimeError("Script execution failed")
-            print(f"Script output: {result.stdout}")
-        else:
-            print("Plotting disabled via config. Creating placeholder outputs.")
-            Path(output.network_plot).touch()
-            Path(output.total_capacity_plot).touch()
-            Path(output.country_capacity_plot).touch()
-            Path(output.demand_plot).touch()
+        network_plot="results/validation_{year}/plots/network_plot_base_s_{clusters}_elec_{opts}.png",
+        total_capacity_plot="results/validation_{year}/plots/total_capacity_plot_base_s_{clusters}_elec_{opts}.png",
+        country_capacity_plot="results/validation_{year}/plots/country_capacity_plot_base_s_{clusters}_elec_{opts}.png",
+        demand_plot="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_demand_plot.png"
+    script:
+        "../scripts/capacities_and_demand.py"
+
+
+rule plot_all_capacity_demand:
+    input:
+        expand(
+            RESULTS + "plots/network_plot_base_s_{clusters}_elec_{opts}.png",
+            year=2023,
+            **config["scenario"],
+            run=config["run"]["name"],
+        ),
