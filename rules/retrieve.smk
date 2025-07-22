@@ -58,15 +58,6 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_eurostat_data.py"
 
-    rule retrieve_jrc_idees:
-        output:
-            directory("data/jrc-idees-2021"),
-        log:
-            "logs/retrieve_jrc_idees.log",
-        retries: 2
-        script:
-            "../scripts/retrieve_jrc_idees.py"
-
     rule retrieve_eurostat_household_data:
         output:
             "data/eurostat/eurostat-household_energy_balances-february_2024.csv",
@@ -77,6 +68,32 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
             "../envs/environment.yaml"
         script:
             "../scripts/retrieve_eurostat_household_data.py"
+
+
+if (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
+    "primary",
+    "archive",
+]:
+
+    rule retrieve_jrc_idees:
+        params:
+            url=f"{JRC_IDEES_DATASET["url"]}",
+        output:
+            zip=f"{JRC_IDEES_DATASET["folder"]}/jrc_idees.zip",
+            directory=directory(f"{JRC_IDEES_DATASET["folder"]}"),
+        run:
+            import os
+            import requests
+            from zipfile import ZipFile
+            from pathlib import Path
+
+            response = requests.get(params["url"])
+            with open(output.zip, "wb") as f:
+                f.write(response.content)
+
+            output_folder = Path(output["zip"]).parent
+            unpack_archive(output.zip, output_folder)
+
 
 
 if config["enable"]["retrieve"]:
@@ -187,25 +204,32 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_cost_data", T
             "../scripts/retrieve_cost_data.py"
 
 
-if config["enable"]["retrieve"]:
-    datafiles = [
-        "IGGIELGN_LNGs.geojson",
-        "IGGIELGN_BorderPoints.geojson",
-        "IGGIELGN_Productions.geojson",
-        "IGGIELGN_Storages.geojson",
-        "IGGIELGN_PipeSegments.geojson",
-    ]
+if config["enable"]["retrieve"] and (
+    SCIGRID_GAS_DATASET := dataset_version("scigrid_gas")
+)["source"] in [
+    "primary",
+    "archive",
+]:
 
     rule retrieve_gas_infrastructure_data:
+        params:
+            url=f"{SCIGRID_GAS_DATASET['url']}",
         output:
-            expand("data/gas_network/scigrid-gas/data/{files}", files=datafiles),
-        log:
-            "logs/retrieve_gas_infrastructure_data.log",
-        retries: 2
-        conda:
-            "../envs/environment.yaml"
-        script:
-            "../scripts/retrieve_gas_infrastructure_data.py"
+            zip=f"{SCIGRID_GAS_DATASET["folder"]}/jrc_idees.zip",
+            directory=directory(f"{SCIGRID_GAS_DATASET["folder"]}"),
+        run:
+            import os
+            import requests
+            from zipfile import ZipFile
+            from pathlib import Path
+
+            response = requests.get(params["url"])
+            with open(output.zip, "wb") as f:
+                f.write(response.content)
+
+            output_folder = Path(output["zip"]).parent
+            unpack_archive(output.zip, output_folder)
+
 
 
 if config["enable"]["retrieve"]:
@@ -264,7 +288,9 @@ if config["enable"]["retrieve"]:
             validate_checksum(output[0], input[0])
 
 
-if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("enspreso_biomass"))["source"] in [
+if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))[
+    "source"
+] in [
     "primary",
     "archive",
 ]:
@@ -327,17 +353,20 @@ if config["enable"]["retrieve"]:
             validate_checksum(output[0], input[0])
 
 
-if config["enable"]["retrieve"]:
+if (LUISA_LAND_COVER_DATASET := dataset_version("luisa_land_cover"))["source"] in [
+    "primary",
+    "archive",
+]:
 
     # Downloading LUISA Base Map for land cover and land use:
     # Website: https://ec.europa.eu/jrc/en/luisa
     rule retrieve_luisa_land_cover:
         input:
             storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/LUISA/EUROPE/Basemaps/LandUse/2018/LATEST/LUISA_basemap_020321_50m.tif",
+                f"{LUISA_LAND_COVER_DATASET["url"]}",
             ),
         output:
-            "data/LUISA_basemap_020321_50m.tif",
+            f"{LUISA_LAND_COVER_DATASET["folder"]}/LUISA_basemap_020321_50m.tif",
         run:
             move(input[0], output[0])
 
