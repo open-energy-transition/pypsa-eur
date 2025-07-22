@@ -57,11 +57,12 @@ electricity:
     from_entsoe: true
     year: 2023
   co2limit_enable: true
-  co2limit: 7.22e+8 # 2023 value from https://ember-energy.org/data/electricity-data-explorer/?chart=trend&data=emissions
+  co2limit: 9.0e+8 # 2023 value from https://ember-energy.org/data/electricity-data-explorer/?chart=trend&data=emissions
 
   extendable_carriers:      # forbid new generation & storage
     Generator: []
     StorageUnit: []
+    Store: []
   transmission_limit: v1.0  # keep today’s NTCs (default)
 
 
@@ -96,6 +97,12 @@ sector:
   shipping: false
   aviation: false
   agriculture: false
+  conventional_generation:
+    OCGT: gas
+    coal: coal
+    lignite: lignite
+    nuclear: uranium
+  keep_existing_capacities: true
 
 costs:
   year: 2025

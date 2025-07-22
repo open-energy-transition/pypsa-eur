@@ -22,17 +22,17 @@ countries = ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CY', 'CZ', 'DE', 'DK', 'EE', '
              'MK', 'MT', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK']
 
 color_dict = {
-    "Bioenergy": "#0f9970",
-    "Gas": "#87530b",
-    "Hard coal": "#0000006E",
-    "Hydro": "#80b1d3",
-    "Lignite": "#61340c",
-    "Nuclear": "#f1dd02",
-    "Offshore wind": "#0c0a48",
-    "Onshore wind": "#2D9FAB",
-    "Other fossil": "#545454",
-    "Other renewables": "#9e1414",
-    "Solar": "#ffaa00"
+    "Bioenergy": "#baa741",
+    "Gas": "#e05b09",
+    "Hard coal": "#545454",
+    "Hydro": "#298c81",
+    "Lignite": "#826837",
+    "Nuclear": "#ff8c00",
+    "Offshore wind": "#6895dd",
+    "Onshore wind": "#235ebc",
+    "Other fossil": "#000000",
+    "Other renewables": "#e3d37d",
+    "Solar": "#f9d002"
 }
 
 # Load data from ember
@@ -162,7 +162,7 @@ def process_pypsa_generation():
 
     gen_meta = n.generators[["bus", "carrier"]].copy()
     gen_meta.loc[:, "country"] = gen_meta["bus"].str[:2]
-    gen_energy = n.generators_t.p.sum(axis=0) / 1e6  # MWh to TWh
+    gen_energy = n.generators_t.p.T.multiply(n.snapshot_weightings.generators).T.sum(axis=0) / 1e6  # MWh to TWh
     gen_energy.index.name = "generator"
     gen_energy = gen_energy.reset_index().rename(columns={0: "Value"})
     gen_energy = gen_energy.merge(gen_meta, left_on="generator", right_index=True)
@@ -173,7 +173,7 @@ def process_pypsa_generation():
 
     sto_meta = n.storage_units[["bus", "carrier"]].copy()
     sto_meta.loc[:, "country"] = sto_meta["bus"].str[:2]
-    sto_energy = n.storage_units_t.p.sum(axis=0) / 1e6  # MWh to TWh
+    sto_energy = n.storage_units_t.p.T.multiply(n.snapshot_weightings.stores).T.sum(axis=0) / 1e6  # MWh to TWh
     sto_energy.index.name = "storage_unit"
     sto_energy = sto_energy.reset_index().rename(columns={0: "Value"})
     sto_energy = sto_energy.merge(sto_meta, left_on="storage_unit", right_index=True)
@@ -186,6 +186,77 @@ def process_pypsa_generation():
     gen_and_sto = gen_and_sto.groupby(["ISO", "Variable"], as_index=False)["Value"].sum().round()
     print(f"PyPSA generation sample:\n{gen_and_sto.head().to_string()}")
     return gen_and_sto.set_index(["ISO", "Variable"])
+
+
+def process_pypsa_generation_sector():
+    pypsa_to_ember = {
+        "biomass": "Bioenergy", "Bioenergy": "Bioenergy",
+        "gas": "Gas", "Gas": "Gas", "CCGT": "Gas", "OCGT": "Gas",
+        "coal": "Hard coal", "Hard coal": "Hard coal",
+        "lignite": "Lignite", "Lignite": "Lignite",
+        "hydro": "Hydro", "Hydro": "Hydro", "PHS": "Hydro", "ror": "Hydro",
+        "Nuclear": "Nuclear", "nuclear": "Nuclear",
+        "offwind-ac": "Offshore wind", "offwind-dc": "Offshore wind",
+        "offwind-float": "Offshore wind", "Offshore wind": "Offshore wind",
+        "onwind": "Onshore wind", "Onshore wind": "Onshore wind",
+        "oil": "Other fossil", "Other fossil": "Other fossil",
+        "geothermal": "Other renewables", "Other renewables": "Other renewables",
+        "solar": "Solar", "solar-hsat": "Solar", "Solar": "Solar",
+        "solar rooftop": "Solar",
+        "urban central gas CHP": "Gas", "urban central gas CHP CC": "Gas"
+    }
+
+    gen_meta = n.generators[["bus", "carrier"]].copy()
+    gen_meta.loc[:, "country"] = gen_meta["bus"].str[:2]
+    # start by aggregating vres
+    vres_carriers = ['offwind-dc', 'offwind-ac', 'solar', 'solar-hsat', 'offwind-float', 'onwind', 'ror', 'solar rooftop', 'nuclear'] # ideally this is not hardcoded !
+    vres =  n.generators.query("carrier in @vres_carriers").index
+    gen_energy = n.generators_t.p.T.multiply(n.snapshot_weightings.generators).loc[vres].T.sum(axis=0) / 1e6  # MWh to TWh
+    gen_energy.index.name = "generator"
+    gen_energy = gen_energy.reset_index().rename(columns={0: "Value"})
+    gen_energy = gen_energy.merge(gen_meta, left_on="generator", right_index=True)
+    gen_grouped = gen_energy.groupby(["country", "carrier"], as_index=False)["Value"].sum()
+    gen_grouped["Ember_Variable"] = gen_grouped["carrier"].map(pypsa_to_ember).fillna(gen_grouped["carrier"])
+    gen_renamed = gen_grouped.groupby(["country", "Ember_Variable"], as_index=False)["Value"].sum()
+    gen_renamed = gen_renamed.rename(columns={"country": "ISO", "Ember_Variable": "Variable"}).round()
+
+    # then by aggregating thermal generation
+    conv_buses = list(n.generators.query("carrier in ['gas', 'coal', 'nuclear', 'lignite']").bus)
+    AC_buses = n.buses.query("carrier == 'AC'").index
+    link_meta = n.links[["bus1", "carrier"]].copy()
+    link_meta.loc[:, "country"] = link_meta["bus1"].str[:2]
+
+    gen_links = n.links.query("(bus0 in @conv_buses or bus1 in @conv_buses) and bus1 in @AC_buses").index
+    gen_energy_links = -n.links_t.p1[gen_links].T.multiply(n.snapshot_weightings.generators).T.sum(axis=0) / 1e6
+    gen_energy_links.index.name = "links"
+
+    gen_energy_links = gen_energy_links.reset_index().rename(columns={0: "Value"})
+    gen_energy_links = gen_energy_links.merge(link_meta, left_on="links", right_index=True)
+    print("1", gen_energy_links)
+    gen_grouped_links = gen_energy_links.groupby(["country", "carrier"], as_index=False)["Value"].sum()
+    gen_grouped_links["Ember_Variable"] = gen_grouped_links["carrier"].map(pypsa_to_ember).fillna(gen_grouped["carrier"])
+    print("2", gen_grouped_links)
+    gen_grouped_links.to_csv("martha.csv")
+    gen_renamed_links = gen_grouped_links.groupby(["country", "Ember_Variable"], as_index=False)["Value"].sum()
+    gen_renamed_links = gen_renamed_links.rename(columns={"country": "ISO", "Ember_Variable": "Variable"}).round()
+
+    # and finally aggregating storage values
+    sto_meta = n.storage_units[["bus", "carrier"]].copy()
+    sto_meta.loc[:, "country"] = sto_meta["bus"].str[:2]
+    sto_energy = n.storage_units_t.p.T.multiply(n.snapshot_weightings.stores).T.sum(axis=0) / 1e6  # MWh to TWh
+    sto_energy.index.name = "storage_unit"
+    sto_energy = sto_energy.reset_index().rename(columns={0: "Value"})
+    sto_energy = sto_energy.merge(sto_meta, left_on="storage_unit", right_index=True)
+    sto_grouped = sto_energy.groupby(["country", "carrier"], as_index=False)["Value"].sum()
+    sto_grouped["Ember_Variable"] = sto_grouped["carrier"].map(pypsa_to_ember).fillna(sto_grouped["carrier"])
+    sto_renamed = sto_grouped.groupby(["country", "Ember_Variable"], as_index=False)["Value"].sum()
+    sto_renamed = sto_renamed.rename(columns={"country": "ISO", "Ember_Variable": "Variable"}).round()
+
+    gen_and_sto = pd.concat([gen_renamed, gen_renamed_links, sto_renamed], ignore_index=True)
+    gen_and_sto = gen_and_sto.groupby(["ISO", "Variable"], as_index=False)["Value"].sum().round()
+    print(f"PyPSA generation sample:\n{gen_and_sto.head().to_string()}")
+    return gen_and_sto.set_index(["ISO", "Variable"])
+
 
 # Compare Ember processing methods
 def compare_ember_processing(df_yearly, df_monthly, country_iso="DE"):
@@ -525,7 +596,7 @@ if __name__ == "__main__":
 
     compare_ember_processing(ember_generation_yearly_alt, ember_generation_yearly, country_iso="DE")
 
-    pypsa_generation = process_pypsa_generation()
+    pypsa_generation = process_pypsa_generation_sector()
 
     plot_country_generation_mix_donut_subplots(
         ember_generation_yearly, 
