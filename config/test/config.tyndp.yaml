@@ -33,7 +33,7 @@ co2_budget:
   2040: 0.25  # Temporary increase to allow CI to pass while load configurations are incomplete.
 
 electricity:
-  base_network: tyndp-raw
+  base_network: tyndp
 
   extendable_carriers:
     Generator: [OCGT]

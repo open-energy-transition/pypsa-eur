@@ -1512,7 +1512,7 @@ rule prepare_sector_network:
             else []
         ),
         buses_h2=lambda w: (
-            resources("tyndp-raw/build/geojson/buses_h2.geojson")
+            resources("tyndp/build/geojson/buses_h2.geojson")
             if config_provider("sector", "h2_topology_tyndp")(w)
             else []
         ),
