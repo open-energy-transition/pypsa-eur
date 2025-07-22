@@ -237,13 +237,6 @@ Data in this section is retrieved and extracted in rules specified in ``rules/re
 - **License:** GPL-3.0
 - **Description:** Contains matched dataset of powerplants in Europe.
 
-``data/tyndp_2024_bundle``
-
-- **Source:** European Network of Transmission System Operators for Electricity (ENTSO-E) and European Network of Transmission System Operators for Gas (ENTSOG)
-- **Link:** https://2024.entsos-tyndp-scenarios.eu/download/
-- **License:** CC-BY 4.0
-- **Description:** Contains the node list and the reference grids from the Ten-Year Network Development Plan (TYNDP) 2024.
-
 ``resources/countries_centroids.geojson``
 
 - **Source:** Copyright (c) 2021 Gavin Rehkemper, https://github.com/gavinr/world-countries-centroids/tree/v1.0.0

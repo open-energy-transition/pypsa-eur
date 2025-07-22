@@ -92,7 +92,6 @@ snapshots:
 enable:
   retrieve: auto
   retrieve_databundle: true
-  retrieve_tyndp_bundle: false
   retrieve_cost_data: true
   build_cutout: false
   retrieve_cutout: true
@@ -400,6 +399,7 @@ load:
   distribution_key:
     gdp: 0.6
     population: 0.4
+
 # docs
 # TODO: PyPSA-Eur merge issue in prepare_sector_network.py
 # regulate what components with which carriers are kept from PyPSA-Eur;

@@ -97,6 +97,7 @@ load:
     enable: false
   manual_adjustments: false
   supplement_synthetic: false
+
 pypsa_eur:
   Bus:
   - AC
@@ -155,7 +156,10 @@ sector:
   h2_topology_tyndp: true
   ATR: false
   hydrogen_fuel_cell: false
-  hydrogen_turbine: true
+  methanol:
+    methanol_to_power:
+      ocgt: true
+    biomass_to_methanol: true
   transmission_efficiency:
     enable:
     - gas pipeline

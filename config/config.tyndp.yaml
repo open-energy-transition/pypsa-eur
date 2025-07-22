@@ -24,9 +24,6 @@ snapshots:
   start: "2013-01-01"
   end: "2014-01-01"
 
-enable:
-  retrieve_tyndp_bundle: true
-
 co2_budget:
   # TODO define carbon budget compliant with EU 2030 and 2050 targets
   2020: 0.720 # average emissions of 2019 to 2021 relative to 1990, CO2 excl LULUCF, EEA data, European Environment Agency. (2023a). Annual European Union greenhouse gas inventory 1990–2021 and inventory report 2023 - CRF Table. https://unfccc.int/documents/627830
@@ -140,7 +137,10 @@ sector:
   h2_topology_tyndp: true
   ATR: false
   hydrogen_fuel_cell: false
-  hydrogen_turbine: true
+  methanol:
+    methanol_to_power:
+      ocgt: true
+    biomass_to_methanol: true
   transmission_efficiency:
     enable:
     - gas pipeline
