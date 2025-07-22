@@ -1354,6 +1354,13 @@ def add_generation(
             cf_industry=cf_industry,
         )
 
+        p_nom = pd.Series(0, index=nodes + " " + generator)
+        efficiency = pd.Series(costs.at[generator, "efficiency"], index=nodes + " " + generator)
+        if existing_capacities is not None:
+            # NB: existing capacities are MWel
+            p_nom[existing_capacities[generator].index] = existing_capacities[generator] / existing_efficiencies[generator]
+            efficiency[existing_efficiencies[generator].index] = existing_efficiencies[generator]
+
         n.add(
             "Link",
             nodes + " " + generator,
@@ -1365,23 +1372,13 @@ def add_generation(
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
             p_nom_extendable=bool(generator in ext_carriers.get("Generator", [])),
-            p_nom=(
-                existing_capacities[generator] / existing_efficiencies[generator]
-                if existing_capacities is not None
-                else 0
-            ),  # NB: existing capacities are MWel
+            p_nom=p_nom,
             p_max_pu=0.7
             if carrier == "uranium"
             else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
-            p_nom_min=(
-                existing_capacities[generator] if existing_capacities is not None else 0
-            ),
+            p_nom_min=p_nom,
             carrier=generator,
-            efficiency=(
-                existing_efficiencies[generator]
-                if existing_efficiencies is not None
-                else costs.at[generator, "efficiency"]
-            ),
+            efficiency=efficiency,
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
