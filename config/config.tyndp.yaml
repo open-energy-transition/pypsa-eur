@@ -139,8 +139,8 @@ sector:
   hydrogen_fuel_cell: false
   methanol:
     methanol_to_power:
-      ocgt: true
-    biomass_to_methanol: true
+      ocgt: false
+    biomass_to_methanol: false
   transmission_efficiency:
     enable:
     - gas pipeline
