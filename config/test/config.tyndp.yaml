@@ -160,14 +160,16 @@ sector:
     2050: 0
   oil_boilers: false
   biomass_boiler: false
-  h2_topology_tyndp: true
-  gas_network: false
-  ATR: false
   hydrogen_fuel_cell: false
+  ATR: false
   methanol:
     methanol_to_power:
       ocgt: false
     biomass_to_methanol: false
+  co2_spatial: false
+  co2_network: false
+  h2_topology_tyndp: true
+  gas_network: false
   transmission_efficiency:
     enable:
     - gas pipeline
