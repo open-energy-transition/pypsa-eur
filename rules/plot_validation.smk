@@ -55,6 +55,13 @@ rule cross_country_capacity_comparison:
         "../scripts/cross_country_capacities.py"
 
 
+rule sector_demand:
+    input:
+        network = "../oet-ember/results/validation_2023/networks/base_s_39___2025.nc"
+    output:
+        plot = "results/validation_2023/plots/sector_demand.png"
+    shell:
+        "python scripts/sector_demand.py {input.network} {output.plot}"
 
 
 
