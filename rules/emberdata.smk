@@ -40,6 +40,7 @@ rule download_ember_data:
             if not filepath.exists():
                 logger.info(f"Downloading {url} -> {filepath}")
                 response = requests.get(url)
+                response.raise_for_status()  # Raise an error for non-200 responses
                 with open(filepath,"wb") as f:
                     f.write(response.content)
 
@@ -50,3 +51,45 @@ rule download_ember_data:
 
                 else:
                     logger.info(f"Already exists: {filepath}")
+
+rule download_ember_NTC_data:
+    output:
+        file="validation/ember_data/Reg_NTC"
+    shell:
+        """
+        gdown https://drive.google.com/uc?id=1GTo4UrI_X9ZCsgtM4KobO_pw-TTrEoDy -O {output.file}
+        """
+
+rule download_eurostat:
+    output:
+        "validation/eurostatdata/eurostat_nrg_bal_c_2023.csv"
+    shell:
+        """
+        curl -L "https://ec.europa.eu/eurostat/api/dissemination/sdmx/2.1/data/nrg_bal_c?format=SDMX-CSV&startPeriod=2023&endPeriod=2023&lang=en&geo=EU27_2020&unit=KTOE" -o {output}
+        """
+
+rule download_jrc_idees:
+    output:
+        "validation/eurostatdata/JRC-IDEES-2021_EU27.zip"
+    shell:
+        """
+        curl -L "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/JRC-IDEES/JRC-IDEES-2021_v1/JRC-IDEES-2021_EU27.zip" -o {output}
+        """
+
+rule download_hotmaps:
+    output:
+        "validation/eurostatdata/Industrial_Database.csv"
+    shell:
+        """
+        curl -L "https://gitlab.com/hotmaps/industrial_sites/industrial_sites_Industrial_Database/-/raw/master/data/Industrial_Database.csv" -o {output}
+        """
+
+rule extract_jrc_idees:
+    input:
+        "validation/eurostatdata/JRC-IDEES-2021_EU27.zip"
+    output:
+        directory("validation/eurostatdata/jrc_idees/")
+    shell:
+        """
+        unzip {input} -d {output}
+        """

@@ -44,6 +44,19 @@ rule plot_capacity_demand:
     script:
         "../scripts/capacities_and_demand.py"
 
+rule cross_country_capacity_comparison:
+    input:
+        network = "results/validation_2023/networks/base_s_39_elec_.nc",
+        ember_csv = "validation/ember_data/REF_NTC.csv"
+    output:
+        comparison_csv = "results/validation_2023/plots/focus_countries_comparison.csv",
+        bar_plot = "results/validation_2023/plots/focus_countries_comparison.png"
+    script:
+        "../scripts/cross_country_capacities.py"
+
+
+
+
 
 rule plot_all_capacity_demand:
     input:
