@@ -5,15 +5,15 @@
 # Snakemake rule to generate validation graphs for power generation and flows
 rule plot_validation:
     input:
-        network="results/validation_{year}/networks/base_s_{clusters}_elec_{opts}.nc",
+        network="results/validation_{year}/networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
         ember_monthly="validation/ember_data/europe_monthly_full_release_long_format.csv",
         ember_yearly="validation/ember_data/yearly_full_release_long_format.csv",
         power_flows="validation/entsoe_data/physical_energy_power_flows_2023.csv"
     output:
-        donut_subplots="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_donut_subplots.png",
-        donut_comparison="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_donut_comparison.png",
-        ember_comparison="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_ember_comparison_de.png",
-        power_flows_list="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_power_flows_list.txt"
+        donut_subplots="results/validation_{year}/plots/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_donut_subplots.png",
+        donut_comparison="results/validation_{year}/plots/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_donut_comparison.png",
+        ember_comparison="results/validation_{year}/plots/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_ember_comparison_de.png",
+        power_flows_list="results/validation_{year}/plots/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_power_flows_list.txt"
     params:
         script="",
     script:
@@ -23,7 +23,7 @@ rule plot_validation:
 rule validate_ember_networks:
     input:
         expand(
-            RESULTS + "plots/base_s_{clusters}_elec_{opts}_donut_subplots.png",
+            RESULTS + "plots/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_donut_subplots.png",
             year=2023,
             **config["scenario"],
             run=config["run"]["name"],
@@ -43,26 +43,6 @@ rule plot_capacity_demand:
         demand_plot="results/validation_{year}/plots/base_s_{clusters}_elec_{opts}_demand_plot.png"
     script:
         "../scripts/capacities_and_demand.py"
-
-rule cross_country_capacity_comparison:
-    input:
-        network = "results/validation_2023/networks/base_s_39_elec_.nc",
-        ember_csv = "validation/ember_data/REF_NTC.csv"
-    output:
-        comparison_csv = "results/validation_2023/plots/focus_countries_comparison.csv",
-        bar_plot = "results/validation_2023/plots/focus_countries_comparison.png"
-    script:
-        "../scripts/cross_country_capacities.py"
-
-
-rule sector_demand:
-    input:
-        network = "../oet-ember/results/validation_2023/networks/base_s_39___2025.nc"
-    output:
-        plot = "results/validation_2023/plots/sector_demand.png"
-    shell:
-        "python scripts/sector_demand.py {input.network} {output.plot}"
-
 
 
 rule plot_all_capacity_demand:

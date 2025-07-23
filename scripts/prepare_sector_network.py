@@ -1354,6 +1354,13 @@ def add_generation(
             cf_industry=cf_industry,
         )
 
+        p_nom = pd.Series(0, index=nodes + " " + generator)
+        efficiency = pd.Series(costs.at[generator, "efficiency"], index=nodes + " " + generator)
+        if existing_capacities is not None:
+            # NB: existing capacities are MWel
+            p_nom[existing_capacities[generator].index] = existing_capacities[generator] / existing_efficiencies[generator]
+            efficiency[existing_efficiencies[generator].index] = existing_efficiencies[generator]
+
         n.add(
             "Link",
             nodes + " " + generator,
@@ -1365,23 +1372,13 @@ def add_generation(
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
             p_nom_extendable=bool(generator in ext_carriers.get("Generator", [])),
-            p_nom=(
-                existing_capacities[generator] / existing_efficiencies[generator]
-                if existing_capacities is not None
-                else 0
-            ),  # NB: existing capacities are MWel
+            p_nom=p_nom,
             p_max_pu=0.7
             if carrier == "uranium"
             else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
-            p_nom_min=(
-                existing_capacities[generator] if existing_capacities is not None else 0
-            ),
+            p_nom_min=p_nom,
             carrier=generator,
-            efficiency=(
-                existing_efficiencies[generator]
-                if existing_efficiencies is not None
-                else costs.at[generator, "efficiency"]
-            ),
+            efficiency=efficiency,
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
@@ -2055,6 +2052,8 @@ def add_storage_and_grids(
         h2_pipes = create_network_topology(
             n, "H2 pipeline ", carriers=["DC", "gas pipeline"]
         )
+        h2_buses_loc = n.buses.query("carrier == 'H2'").location  # noqa: F841
+        h2_pipes = h2_pipes.query("bus0 in @h2_buses_loc and bus1 in @h2_buses_loc")
 
         # TODO Add efficiency losses
         n.add(
@@ -3970,21 +3969,22 @@ def add_biomass(
             marginal_cost=costs.at["BtL", "VOM"],
         )
 
-    n.add(
-        "Link",
-        spatial.gas.biogas_to_gas,
-        bus0=spatial.gas.biogas,
-        bus1=spatial.gas.nodes,
-        bus2="co2 atmosphere",
-        carrier="biogas to gas",
-        capital_cost=costs.at["biogas", "capital_cost"]
-        + costs.at["biogas upgrading", "capital_cost"],
-        marginal_cost=costs.at["biogas upgrading", "VOM"],
-        efficiency=costs.at["biogas", "efficiency"],
-        efficiency2=-costs.at["gas", "CO2 intensity"],
-        p_nom_extendable=True,
-        lifetime=costs.at["biogas", "lifetime"],
-    )
+    if options["biogas_upgrading"]:
+        n.add(
+            "Link",
+            spatial.gas.biogas_to_gas,
+            bus0=spatial.gas.biogas,
+            bus1=spatial.gas.nodes,
+            bus2="co2 atmosphere",
+            carrier="biogas to gas",
+            capital_cost=costs.at["biogas", "capital_cost"]
+            + costs.at["biogas upgrading", "capital_cost"],
+            marginal_cost=costs.at["biogas upgrading", "VOM"],
+            efficiency=costs.at["biogas", "efficiency"],
+            efficiency2=-costs.at["gas", "CO2 intensity"],
+            p_nom_extendable=True,
+            lifetime=costs.at["biogas", "lifetime"],
+        )
 
     if options["biogas_upgrading_cc"]:
         # Assuming for costs that the CO2 from upgrading is pure, such as in amine scrubbing. I.e., with and without CC is
