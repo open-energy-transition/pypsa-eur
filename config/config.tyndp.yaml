@@ -136,16 +136,18 @@ sector:
   biomass_boiler: false
   hydrogen_fuel_cell: false
   ATR: false
-  methanol:
-    methanol_to_power:
-      ocgt: false
-    biomass_to_methanol: false
   regional_co2_sequestration_potential:
     enable: false
   co2_spatial: false
   co2_network: false
+  methanol:
+    methanol_to_power:
+      ocgt: false
+    biomass_to_methanol: false
+  ammonia: false
   h2_topology_tyndp: true
   gas_network: false
+  electrobiofuels: false
   transmission_efficiency:
     enable:
     - gas pipeline
