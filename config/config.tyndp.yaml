@@ -135,6 +135,7 @@ sector:
   oil_boilers: false
   biomass_boiler: false
   h2_topology_tyndp: true
+  gas_network: false
   ATR: false
   hydrogen_fuel_cell: false
   methanol:
