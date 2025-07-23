@@ -8,7 +8,7 @@ path = [
     "data/**",
     "doc/configtables/*",
     "doc/data.csv",
-    "doc/img/*",
+    "doc/img/**",
     "test/test_data/*",
 ]
 SPDX-FileCopyrightText = "The PyPSA-Eur Authors"
