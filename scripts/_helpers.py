@@ -1126,6 +1126,6 @@ def extract_grid_data_tyndp(
     # Combine into unidirectional links and return
     links = pd.concat([forward_links, reverse_links])
 
-    links.index = links.apply(make_index, axis=1, args=(carrier,))
+    links.index = links.apply(make_index, axis=1, prefix=carrier)
 
     return links
