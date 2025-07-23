@@ -166,6 +166,8 @@ sector:
     methanol_to_power:
       ocgt: false
     biomass_to_methanol: false
+  regional_co2_sequestration_potential:
+    enable: false
   co2_spatial: false
   co2_network: false
   h2_topology_tyndp: true
