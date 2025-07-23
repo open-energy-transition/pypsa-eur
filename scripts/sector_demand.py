@@ -161,4 +161,3 @@ for carrier, pypsa_demand, public_demand in zip(comparison_df['Carrier'][:-2], c
 print(f"- Total PyPSA-Eur: {total_pypsa:.2f} TWh")
 print(f"- Total Public Data: {total_public:.2f} TWh")
 
-print("\nDiscrepancy Note: Differences between PyPSA-Eur and public data may arise from broader regional coverage in PyPSA-Eur, varying data sources, or different time periods/assumptions.")

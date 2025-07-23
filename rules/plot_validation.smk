@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-# Snakemake rule to generate validation graphs for power generation and flows
+# Snakemake rule to generate validation graphs for power generation and flows, cross_country_capacities, sector_demand
 rule plot_validation:
     input:
         network="results/validation_{year}/networks/base_s_{clusters}_elec_{opts}.nc",
