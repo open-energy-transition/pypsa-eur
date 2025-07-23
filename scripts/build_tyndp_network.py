@@ -202,6 +202,7 @@ def build_buses(
     """
     buses = (
         pd.read_excel(buses_fn)
+        .replace("UK", "GB", regex=True)
         .merge(
             bidding_shapes[["country", "node", "x", "y"]],
             how="outer",
