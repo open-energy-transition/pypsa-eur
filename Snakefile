@@ -24,6 +24,11 @@ configfile: "config/plotting.default.yaml"
 configfile: "config/config.private.yaml"
 
 
+if Path("config/config.yaml").exists():
+
+    configfile: "config/config.yaml"
+
+
 run = config["run"]
 scenarios = get_scenarios(run)
 RDIR = get_rdir(run)

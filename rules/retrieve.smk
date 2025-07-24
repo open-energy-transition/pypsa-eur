@@ -169,7 +169,7 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_cutout", True
             validate_checksum(output[0], input[0])
 
 
-if config["enable"]["retrieve"] and config["enable"].get("retrieve_tyndp_bundle", True):
+if config["enable"]["retrieve"]:
 
     rule retrieve_tyndp_bundle:
         output:

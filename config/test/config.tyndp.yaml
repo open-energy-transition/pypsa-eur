@@ -1,9 +1,9 @@
-# SPDX-FileCopyrightText: Open Energy Transition gGmbH
+# SPDX-FileCopyrightText: Open Energy Transition gGmbH and contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: CC0-1.0
 
 run:
-  prefix: "test-sector-tyndp"
+  name: "test-sector-tyndp"
   disable_progressbar: true
   shared_resources:
     policy: false
@@ -28,9 +28,6 @@ snapshots:
   start: "2013-03-01"
   end: "2013-03-08"
 
-enable:
-  retrieve_tyndp_bundle: true
-
 co2_budget:
   # TODO define carbon budget compliant with EU 2030 and 2050 targets
   2020: 0.720 # average emissions of 2019 to 2021 relative to 1990, CO2 excl LULUCF, EEA data, European Environment Agency. (2023a). Annual European Union greenhouse gas inventory 1990–2021 and inventory report 2023 - CRF Table. https://unfccc.int/documents/627830
@@ -43,7 +40,7 @@ co2_budget:
 
 
 electricity:
-  base_network: tyndp-raw
+  base_network: tyndp
 
   extendable_carriers:
     Generator: [OCGT]
@@ -163,10 +160,20 @@ sector:
     2050: 0
   oil_boilers: false
   biomass_boiler: false
-  h2_topology_tyndp: true
-  ATR: false
   hydrogen_fuel_cell: false
-  hydrogen_turbine: true
+  ATR: false
+  regional_co2_sequestration_potential:
+    enable: false
+  co2_spatial: false
+  co2_network: false
+  methanol:
+    methanol_to_power:
+      ocgt: false
+    biomass_to_methanol: false
+  ammonia: false
+  h2_topology_tyndp: true
+  gas_network: false
+  electrobiofuels: false
   transmission_efficiency:
     enable:
     - gas pipeline

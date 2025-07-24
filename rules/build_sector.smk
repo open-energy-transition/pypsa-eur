@@ -470,19 +470,6 @@ rule build_ptes_operations:
             "ptes",
             "min_bottom_temperature",
         ),
-        # enable_supplemental_heating=config_provider(
-        #     "sector",
-        #     "district_heating",
-        #     "ptes",
-        #     "supplemental_heating",
-        #     "enable",
-        # ),
-        # enable_dynamic_capacity=config_provider(
-        #     "sector",
-        #     "district_heating",
-        #     "ptes",
-        #     "dynamic_capacity",
-        # ),
         snapshots=config_provider("snapshots"),
     input:
         central_heating_forward_temperature_profiles=resources(
@@ -1571,7 +1558,7 @@ rule prepare_sector_network:
             else []
         ),
         buses_h2=lambda w: (
-            resources("tyndp-raw/build/geojson/buses_h2.geojson")
+            resources("tyndp/build/geojson/buses_h2.geojson")
             if config_provider("sector", "h2_topology_tyndp")(w)
             else []
         ),
