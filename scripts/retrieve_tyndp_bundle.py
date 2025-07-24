@@ -20,9 +20,7 @@ subdirectory, such that all files of the bundle are stored in the
 
 import logging
 import os
-import shutil
 import zipfile
-from pathlib import Path
 
 from _helpers import configure_logging, progress_retrieve, set_scenario_config
 
@@ -56,8 +54,7 @@ if __name__ == "__main__":
     with zipfile.ZipFile(to_fn_zp, "r") as zip_ref:
         zip_ref.extractall(to_fn)
 
-    # remove .zip file and __MACOSX
+    # remove .zip file
     os.remove(to_fn_zp)
-    shutil.rmtree(Path(to_fn, "__MACOSX"), ignore_errors=True)
 
     logger.info(f"TYNDP data bundle available in '{to_fn}'.")
