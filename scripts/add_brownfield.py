@@ -111,7 +111,8 @@ def add_brownfield(
             "series"
         ) & n.component_attrs[c.name].status.str.contains("Input")
         for tattr in n.component_attrs[c.name].index[selection]:
-            n.import_series_from_dataframe(c.pnl[tattr], c.name, tattr)
+            # TODO: Needs to be rewritten to
+            n._import_series_from_df(c.pnl[tattr], c.name, tattr)
 
     # adjust TYNDP offshore expansion by subtracting existing capacity from previous years
     # from current year total capacity and potential
