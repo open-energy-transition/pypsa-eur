@@ -69,8 +69,23 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_eurostat_household_data.py"
 
+if config["enable"]["retrieve"] and (NUTS3_POPULATION_DATASET := dataset_version("nuts3_population"))["source"] in [
+    "primary",
+    "archive"
+]:
+    rule retrieve_nuts3_population:
+        input: 
+            storage(
+                f"{NUTS3_POPULATION_DATASET["url"]}",
+            ),
+        output:
+            f"{NUTS3_POPULATION_DATASET["folder"]}/nama_10r_3popgdp.tsv.gz",
+        retries: 2,
+        run:
+            move(input[0], output[0])
 
-if (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
+
+if config["enable"]["retrieve"] and (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
     "primary",
     "archive",
 ]:
