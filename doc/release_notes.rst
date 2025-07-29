@@ -23,6 +23,7 @@ Upcoming PyPSA-Eur Release
 
 * Changed error handling for non-extendable heat storage in energy-to-power ratio constraints to warning.
 
+
 PyPSA-Eur v2025.07.0 (11th July 2025, merged 24th July 2025)
 =====================================
 
