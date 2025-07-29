@@ -84,6 +84,21 @@ if config["enable"]["retrieve"] and (NUTS3_POPULATION_DATASET := dataset_version
         run:
             move(input[0], output[0])
 
+if config["enable"]["retrieve"] and (GDP_PER_CAPITA_DATASET := dataset_version("gdp_per_capita"))["source"] in [
+    "archive"
+]:
+    rule retrieve_gdp_per_capita:
+        input: 
+            storage(
+                f"{GDP_PER_CAPITA_DATASET["url"]}",
+            ),
+        output:
+            f"{GDP_PER_CAPITA_DATASET["folder"]}/GDP_per_capita_PPP_1990_2015_v2.nc",
+        retries: 2,
+        run:
+            move(input[0], output[0])
+
+
 
 if config["enable"]["retrieve"] and (JRC_IDEES_DATASET := dataset_version("jrc_idees"))["source"] in [
     "primary",
