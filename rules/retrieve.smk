@@ -69,18 +69,19 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_eurostat_household_data.py"
 
-if config["enable"]["retrieve"] and (NUTS3_POPULATION_DATASET := dataset_version("nuts3_population"))["source"] in [
-    "primary",
-    "archive"
-]:
+
+if config["enable"]["retrieve"] and (
+    NUTS3_POPULATION_DATASET := dataset_version("nuts3_population")
+)["source"] in ["primary", "archive"]:
+
     rule retrieve_nuts3_population:
-        input: 
+        input:
             storage(
                 f"{NUTS3_POPULATION_DATASET["url"]}",
             ),
         output:
             f"{NUTS3_POPULATION_DATASET["folder"]}/nama_10r_3popgdp.tsv.gz",
-        retries: 2,
+        retries: 2
         run:
             move(input[0], output[0])
 
@@ -311,12 +312,15 @@ if config["enable"]["retrieve"]:
             "../scripts/retrieve_electricity_demand.py"
 
 
-if config["enable"]["retrieve"] and (SYNTHETIC_ELECTRICITY_DEMAND_DATASET := dataset_version("synthetic_electricity_demand"))[
-    "source"
-] in [
+if config["enable"]["retrieve"] and (
+    SYNTHETIC_ELECTRICITY_DEMAND_DATASET := dataset_version(
+        "synthetic_electricity_demand"
+    )
+)["source"] in [
     "primary",
     "archive",
 ]:
+
     rule retrieve_synthetic_electricity_demand:
         input:
             storage(
@@ -330,9 +334,9 @@ if config["enable"]["retrieve"] and (SYNTHETIC_ELECTRICITY_DEMAND_DATASET := dat
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"] and (SHIP_RASTER_DATASET := dataset_version("ship_raster"))["source"] in [
-    "archive"
-]:
+if config["enable"]["retrieve"] and (
+    SHIP_RASTER_DATASET := dataset_version("ship_raster")
+)["source"] in ["archive"]:
 
     rule retrieve_ship_raster:
         input:
@@ -401,10 +405,9 @@ if config["enable"]["retrieve"]:
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"] and (COPERNICUS_LAND_COVER_DATASET:= dataset_version("copernicus_land_cover"))["source"] in [
-    "primary",
-    "archive"
-]:
+if config["enable"]["retrieve"] and (
+    COPERNICUS_LAND_COVER_DATASET := dataset_version("copernicus_land_cover")
+)["source"] in ["primary", "archive"]:
 
     # Downloading Copernicus Global Land Cover for land cover and land use:
     # Website: https://land.copernicus.eu/global/products/lc
@@ -438,11 +441,9 @@ if (LUISA_LAND_COVER_DATASET := dataset_version("luisa_land_cover"))["source"] i
             move(input[0], output[0])
 
 
-
-if config["enable"]["retrieve"] and (EEZ_DATASET := dataset_version("eez"))["source"] in [
-    "primary",
-    "archive"
-]:
+if config["enable"]["retrieve"] and (EEZ_DATASET := dataset_version("eez"))[
+    "source"
+] in ["primary", "archive"]:
 
     rule retrieve_eez:
         params:
