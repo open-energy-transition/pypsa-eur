@@ -12,7 +12,7 @@ rule build_electricity_demand:
     input:
         reported=ancient("data/electricity_demand_raw.csv"),
         synthetic=lambda w: (
-            ancient("data/load_synthetic_raw.csv")
+            ancient(rules.retrieve_synthetic_electricity_demand.output[0])
             if config_provider("load", "supplement_synthetic")(w)
             else []
         ),
@@ -104,7 +104,7 @@ rule base_network:
 rule build_osm_boundaries:
     input:
         json="data/osm-boundaries/json/{country}_adm1.json",
-        eez=ancient("data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg"),
+        eez=ancient(rules.retrieve_eez.output[0]),
     output:
         boundary="data/osm-boundaries/build/{country}_adm1.geojson",
     log:
@@ -148,7 +148,7 @@ rule build_shapes:
         config_provider("clustering", "mode"),
         countries=config_provider("countries"),
     input:
-        eez=ancient("data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg"),
+        eez=ancient(rules.retrieve_eez.output[0]),
         nuts3_2021="data/nuts/NUTS_RG_01M_2021_4326_LEVL_3.geojson",
         ba_adm1="data/osm-boundaries/build/BA_adm1.geojson",
         md_adm1="data/osm-boundaries/build/MD_adm1.geojson",
@@ -161,8 +161,8 @@ rule build_shapes:
             if config_provider("clustering", "mode")(w) == "administrative"
             else []
         ),
-        other_gdp="data/bundle/GDP_per_capita_PPP_1990_2015_v2.nc",
-        other_pop="data/bundle/ppp_2019_1km_Aggregated.tif",
+        other_gdp=rules.retrieve_gdp_per_capita.output[0],
+        other_pop=rules.retrieve_population_count.output[0],
     output:
         country_shapes=resources("country_shapes.geojson"),
         offshore_shapes=resources("offshore_shapes.geojson"),
@@ -206,7 +206,7 @@ if config["enable"].get("build_cutout", False):
 
 rule build_ship_raster:
     input:
-        ship_density="data/shipdensity_global.zip",
+        ship_density=rules.retrieve_ship_raster.output[0],
         cutout=lambda w: input_cutout(w),
     output:
         resources("shipdensity_raster.tif"),
@@ -226,7 +226,7 @@ rule determine_availability_matrix_MD_UA:
     params:
         renewable=config_provider("renewable"),
     input:
-        copernicus="data/Copernicus_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif",
+        copernicus=rules.download_copernicus_land_cover.output[0],
         wdpa="data/WDPA.gpkg",
         wdpa_marine="data/WDPA_WDOECM_marine.gpkg",
         gebco=lambda w: (
@@ -289,11 +289,7 @@ rule determine_availability_matrix:
             if config_provider("renewable", w.technology, "natura")(w)
             else []
         ),
-        luisa=lambda w: (
-            "data/LUISA_basemap_020321_50m.tif"
-            if config_provider("renewable", w.technology, "luisa")(w)
-            else []
-        ),
+        luisa=rules.retrieve_luisa_land_cover.output[0],
         gebco=ancient(
             lambda w: (
                 "data/bundle/gebco/GEBCO_2014_2D.nc"

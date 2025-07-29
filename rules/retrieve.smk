@@ -58,15 +58,6 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
         script:
             "../scripts/retrieve_eurostat_data.py"
 
-    rule retrieve_jrc_idees:
-        output:
-            directory("data/jrc-idees-2021"),
-        log:
-            "logs/retrieve_jrc_idees.log",
-        retries: 2
-        script:
-            "../scripts/retrieve_jrc_idees.py"
-
     rule retrieve_eurostat_household_data:
         output:
             "data/eurostat/eurostat-household_energy_balances-february_2024.csv",
@@ -77,6 +68,98 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_databundle", 
             "../envs/environment.yaml"
         script:
             "../scripts/retrieve_eurostat_household_data.py"
+
+
+if config["enable"]["retrieve"] and (
+    NUTS3_POPULATION_DATASET := dataset_version("nuts3_population")
+)["source"] in ["primary", "archive"]:
+
+    rule retrieve_nuts3_population:
+        input:
+            storage(
+                f"{NUTS3_POPULATION_DATASET["url"]}",
+            ),
+        output:
+            f"{NUTS3_POPULATION_DATASET["folder"]}/nama_10r_3popgdp.tsv.gz",
+        retries: 2
+        run:
+            move(input[0], output[0])
+
+
+if config["enable"]["retrieve"] and (
+    GDP_PER_CAPITA_DATASET := dataset_version("gdp_per_capita")
+)["source"] in ["archive"]:
+
+    rule retrieve_gdp_per_capita:
+        input:
+            storage(
+                f"{GDP_PER_CAPITA_DATASET["url"]}",
+            ),
+        output:
+            f"{GDP_PER_CAPITA_DATASET["folder"]}/GDP_per_capita_PPP_1990_2015_v2.nc",
+        retries: 2
+        run:
+            move(input[0], output[0])
+
+
+if config["enable"]["retrieve"] and (
+    POPULATION_COUNT_DATASET := dataset_version("population_count")
+)["source"] in ["archive"]:
+
+    rule retrieve_population_count:
+        input:
+            storage(
+                f"{POPULATION_COUNT_DATASET["url"]}",
+            ),
+        output:
+            f"{POPULATION_COUNT_DATASET["folder"]}/ppp_2019_1km_Aggregated.tif",
+        retries: 2
+        run:
+            move(input[0], output[0])
+
+
+if config["enable"]["retrieve"] and (
+    GHG_EMISSIONS_DATASET := dataset_version("ghg_emissions")
+)["source"] in ["archive"]:
+
+    rule retrieve_ghg_emissions:
+        input:
+            storage(
+                f"{GHG_EMISSIONS_DATASET["url"]}",
+            ),
+        output:
+            f"{GHG_EMISSIONS_DATASET["folder"]}/UNFCCC_v23.csv",
+        retries: 2
+        run:
+            move(input[0], output[0])
+
+
+if config["enable"]["retrieve"] and (JRC_IDEES_DATASET := dataset_version("jrc_idees"))[
+    "source"
+] in [
+    "primary",
+    "archive",
+]:
+
+    rule retrieve_jrc_idees:
+        params:
+            url=f"{JRC_IDEES_DATASET["url"]}",
+        output:
+            zip=f"{JRC_IDEES_DATASET["folder"]}/jrc_idees.zip",
+            directory=directory(f"{JRC_IDEES_DATASET["folder"]}"),
+        run:
+            import os
+            import requests
+            from zipfile import ZipFile
+            from pathlib import Path
+
+            response = requests.get(params["url"])
+            with open(output.zip, "wb") as f:
+                f.write(response.content)
+
+            output_folder = Path(output["zip"]).parent
+            unpack_archive(output.zip, output_folder)
+
 
 
 if config["enable"]["retrieve"]:
@@ -187,25 +270,32 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_cost_data", T
             "../scripts/retrieve_cost_data.py"
 
 
-if config["enable"]["retrieve"]:
-    datafiles = [
-        "IGGIELGN_LNGs.geojson",
-        "IGGIELGN_BorderPoints.geojson",
-        "IGGIELGN_Productions.geojson",
-        "IGGIELGN_Storages.geojson",
-        "IGGIELGN_PipeSegments.geojson",
-    ]
+if config["enable"]["retrieve"] and (
+    SCIGRID_GAS_DATASET := dataset_version("scigrid_gas")
+)["source"] in [
+    "primary",
+    "archive",
+]:
 
     rule retrieve_gas_infrastructure_data:
+        params:
+            url=f"{SCIGRID_GAS_DATASET['url']}",
         output:
-            expand("data/gas_network/scigrid-gas/data/{files}", files=datafiles),
-        log:
-            "logs/retrieve_gas_infrastructure_data.log",
-        retries: 2
-        conda:
-            "../envs/environment.yaml"
-        script:
-            "../scripts/retrieve_gas_infrastructure_data.py"
+            zip=f"{SCIGRID_GAS_DATASET["folder"]}/jrc_idees.zip",
+            directory=directory(f"{SCIGRID_GAS_DATASET["folder"]}"),
+        run:
+            import os
+            import requests
+            from zipfile import ZipFile
+            from pathlib import Path
+
+            response = requests.get(params["url"])
+            with open(output.zip, "wb") as f:
+                f.write(response.content)
+
+            output_folder = Path(output["zip"]).parent
+            unpack_archive(output.zip, output_folder)
+
 
 
 if config["enable"]["retrieve"]:
@@ -226,34 +316,40 @@ if config["enable"]["retrieve"]:
             "../scripts/retrieve_electricity_demand.py"
 
 
-if config["enable"]["retrieve"]:
+if config["enable"]["retrieve"] and (
+    SYNTHETIC_ELECTRICITY_DEMAND_DATASET := dataset_version(
+        "synthetic_electricity_demand"
+    )
+)["source"] in [
+    "primary",
+    "archive",
+]:
 
     rule retrieve_synthetic_electricity_demand:
         input:
             storage(
-                "https://zenodo.org/records/10820928/files/demand_hourly.csv",
+                f"{SYNTHETIC_ELECTRICITY_DEMAND_DATASET["url"]}",
+                keep_local=True,
             ),
         output:
-            "data/load_synthetic_raw.csv",
-        log:
-            "logs/retrieve_synthetic_electricity_demand.log",
-        resources:
-            mem_mb=5000,
+            f"{SYNTHETIC_ELECTRICITY_DEMAND_DATASET["folder"]}/load_synthetic_raw.csv",
         retries: 2
         run:
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"]:
+if config["enable"]["retrieve"] and (
+    SHIP_RASTER_DATASET := dataset_version("ship_raster")
+)["source"] in ["archive"]:
 
     rule retrieve_ship_raster:
         input:
             storage(
-                "https://zenodo.org/records/13757228/files/shipdensity_global.zip",
+                f"{SHIP_RASTER_DATASET["url"]}",
                 keep_local=True,
             ),
         output:
-            "data/shipdensity_global.zip",
+            f"{SHIP_RASTER_DATASET["folder"]}/shipdensity_global.zip",
         log:
             "logs/retrieve_ship_raster.log",
         resources:
@@ -264,7 +360,9 @@ if config["enable"]["retrieve"]:
             validate_checksum(output[0], input[0])
 
 
-if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("enspreso_biomass"))["source"] in [
+if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))[
+    "source"
+] in [
     "primary",
     "archive",
 ]:
@@ -311,65 +409,77 @@ if config["enable"]["retrieve"]:
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"]:
+if config["enable"]["retrieve"] and (
+    COPERNICUS_LAND_COVER_DATASET := dataset_version("copernicus_land_cover")
+)["source"] in ["primary", "archive"]:
 
     # Downloading Copernicus Global Land Cover for land cover and land use:
     # Website: https://land.copernicus.eu/global/products/lc
     rule download_copernicus_land_cover:
         input:
             storage(
-                "https://zenodo.org/records/3939050/files/PROBAV_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif",
+                f"{COPERNICUS_LAND_COVER_DATASET["url"]}",
             ),
         output:
-            "data/Copernicus_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif",
+            f"{COPERNICUS_LAND_COVER_DATASET["folder"]}/Copernicus_LC100_global_v3.0.1_2019-nrt_Discrete-Classification-map_EPSG-4326.tif",
         run:
             move(input[0], output[0])
             validate_checksum(output[0], input[0])
 
 
-if config["enable"]["retrieve"]:
+if (LUISA_LAND_COVER_DATASET := dataset_version("luisa_land_cover"))["source"] in [
+    "primary",
+    "archive",
+]:
 
     # Downloading LUISA Base Map for land cover and land use:
     # Website: https://ec.europa.eu/jrc/en/luisa
     rule retrieve_luisa_land_cover:
         input:
             storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/LUISA/EUROPE/Basemaps/LandUse/2018/LATEST/LUISA_basemap_020321_50m.tif",
+                f"{LUISA_LAND_COVER_DATASET["url"]}",
             ),
         output:
-            "data/LUISA_basemap_020321_50m.tif",
+            f"{LUISA_LAND_COVER_DATASET["folder"]}/LUISA_basemap_020321_50m.tif",
         run:
             move(input[0], output[0])
 
 
-if config["enable"]["retrieve"]:
+if config["enable"]["retrieve"] and (EEZ_DATASET := dataset_version("eez"))[
+    "source"
+] in ["primary", "archive"]:
 
     rule retrieve_eez:
         params:
-            zip="data/eez/World_EEZ_v12_20231025_LR.zip",
+            zip=f"{EEZ_DATASET["folder"]}/World_EEZ_{EEZ_DATASET["version"]}_LR.zip",
         output:
-            gpkg="data/eez/World_EEZ_v12_20231025_LR/eez_v12_lowres.gpkg",
+            gpkg=f"{EEZ_DATASET["folder"]}/World_EEZ_{EEZ_DATASET["version"]}_LR/eez_{EEZ_DATASET["version"].split("_")[0]}_lowres.gpkg",
         run:
             import os
             import requests
             from uuid import uuid4
 
-            name = str(uuid4())[:8]
-            org = str(uuid4())[:8]
+            if EEZ_DATASET["source"] == "primary":
 
-            response = requests.post(
-                "https://www.marineregions.org/download_file.php",
-                params={"name": "World_EEZ_v12_20231025_LR.zip"},
-                data={
-                    "name": name,
-                    "organisation": org,
-                    "email": f"{name}@{org}.org",
-                    "country": "Germany",
-                    "user_category": "academia",
-                    "purpose_category": "Research",
-                    "agree": "1",
-                },
-            )
+                name = str(uuid4())[:8]
+                org = str(uuid4())[:8]
+
+                response = requests.post(
+                    f"{EEZ_DATASET["url"]}",
+                    params={"name": f"World_EEZ_{EEZ_DATASET["version"]}_LR.zip"},
+                    data={
+                        "name": name,
+                        "organisation": org,
+                        "email": f"{name}@{org}.org",
+                        "country": "Germany",
+                        "user_category": "academia",
+                        "purpose_category": "Research",
+                        "agree": "1",
+                    },
+                )
+
+            elif EEZ_DATASET["source"] == "archive":
+                response = requests.get(f"{EEZ_DATASET["url"]}")
 
             with open(params["zip"], "wb") as f:
                 f.write(response.content)
