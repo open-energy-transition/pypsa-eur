@@ -40,7 +40,7 @@ import pandas as pd
 import pypsa
 import xarray as xr
 import yaml
-from linopy.oetc import OetcSettings, OetcCredentials
+from linopy.oetc import OetcCredentials, OetcSettings
 from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 
@@ -1339,8 +1339,7 @@ def solve_network(
     oetc = solving.get("oetc", None)
     if oetc:
         oetc["credentials"] = OetcCredentials(
-            email=os.environ['OETC_EMAIL'],
-            password=os.environ['OETC_PASSWORD']
+            email=os.environ["OETC_EMAIL"], password=os.environ["OETC_PASSWORD"]
         )
         oetc["solver"] = kwargs["solver_name"]
         oetc["solver_options"] = kwargs["solver_options"]
