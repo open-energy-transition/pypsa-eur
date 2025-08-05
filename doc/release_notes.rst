@@ -17,6 +17,8 @@ Upcoming Release
 
 * Changed error handling for non-extendable heat storage in energy-to-power ratio constraints to warning.
 
+* Added integration with the OETC platform
+
 PyPSA-Eur v2025.07.0 (11th July 2025)
 =====================================
 
