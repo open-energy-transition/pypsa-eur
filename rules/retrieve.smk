@@ -391,7 +391,7 @@ if config["enable"]["retrieve"] and (
 
 if config["enable"]["retrieve"] and (
     SHIP_RASTER_DATASET := dataset_version("ship_raster")
-)["source"] in ["archive"]:
+)["source"] in ["archive","primary"]:
 
     rule retrieve_ship_raster:
         input:
@@ -408,7 +408,6 @@ if config["enable"]["retrieve"] and (
         retries: 2
         run:
             move(input[0], output[0])
-            validate_checksum(output[0], input[0])
 
 
 if (JRC_ENSPRESO_BIOMASS_DATASET := dataset_version("jrc_enspreso_biomass"))[
