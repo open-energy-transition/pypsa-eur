@@ -108,6 +108,20 @@ if config["enable"]["retrieve"] and (CORINE_DATASET := dataset_version("corine")
             output_folder = Path(output["zip"]).parent
             unpack_archive(output.zip, output_folder)
 
+
+if config["enable"]["retrieve"] and (EMOBILITY_DATASET := dataset_version("emobility"))["source"] in [
+    "archive"
+]:
+    rule retrieve_emobility:
+        params:
+            url = f"{EMOBILITY_DATASET["url"]}",
+        output:
+            zip=f"{EMOBILITY_DATASET["folder"]}/emobility.zip",
+            directory=directory(f"{EMOBILITY_DATASET["folder"]}"),
+        run:
+            unzip_folder(params,output)
+
+
 if config["enable"]["retrieve"] and (GDP_PER_CAPITA_DATASET := dataset_version("gdp_per_capita"))["source"] in [
     "archive"
 ]:
