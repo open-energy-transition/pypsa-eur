@@ -997,7 +997,7 @@ data:
     source: "archive"
     version_or_latest: "latest"
   ghg_emissions:
-    source: "archive"
+    source: "primary"
     version_or_latest: "latest"
   gebco:
     source: "archive"

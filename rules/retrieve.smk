@@ -171,18 +171,24 @@ if config["enable"]["retrieve"] and (
 
 if config["enable"]["retrieve"] and (
     GHG_EMISSIONS_DATASET := dataset_version("ghg_emissions")
-)["source"] in ["archive"]:
+)["source"] in ["archive", "primary"]:
 
     rule retrieve_ghg_emissions:
+        params:
+            url = f"{GHG_EMISSIONS_DATASET["url"]}",
         input:
             storage(
                 f"{GHG_EMISSIONS_DATASET["url"]}",
             ),
         output:
             f"{GHG_EMISSIONS_DATASET["folder"]}/UNFCCC_v23.csv",
+            zip=f"{GHG_EMISSIONS_DATASET["folder"]}/UNFCCC_v23.csv.zip" if GHG_EMISSIONS_DATASET["source"] == "primary" else [],
+            directory=directory(f"{GHG_EMISSIONS_DATASET["folder"]}") if GHG_EMISSIONS_DATASET["source"] == "primary" else [],
         retries: 2
         run:
             move(input[0], output[0])
+            if GHG_EMISSIONS_DATASET["source"] == "primary":
+                unzip_folder(params, output)
 
 
 if config["enable"]["retrieve"] and (GEBCO_DATASET := dataset_version("gebco"))["source"] in [
