@@ -1,11 +1,11 @@
-import os
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional
 
 import typer
 import yaml
+from tqdm import tqdm
+
 from pypsa_eur.cli_helpers import (
     check_in_project_root,
     comma_separated_list,
@@ -13,8 +13,6 @@ from pypsa_eur.cli_helpers import (
     recursive_merge,
 )
 from pypsa_eur.progress_tracker import ProgressTracker
-from snakemake.utils import validate
-from tqdm import tqdm
 
 app = typer.Typer(
     help="PyPSA-Eur CLI: Command Line Interface for European Power System Analysis",
@@ -24,65 +22,65 @@ app = typer.Typer(
 
 @app.command(name="run")
 def run(
-        name: str = typer.Option(
-            None,
-            "--name",
-            "-n",
-            help="Name for this run (will be used as job ID).",
-        ),
-        configfile: Path = typer.Option(
-            None,
-            "--configfile",
-            "-c",
-            help="Path to configuration file (default: config/config.default.yaml).",
-        ),
-        verbose: bool = typer.Option(
-            False,
-            "--verbose",
-            "-v",
-            help="Show live Snakemake output during workflow execution.",
-        ),
-        cores: int = typer.Option(
-            None,
-            "--cores",
-            help="Number of cores to use for Snakemake. If not specified, all available cores will be used.",
-        ),
-        snapshots: str = typer.Option(
-            None,
-            "--snapshots",
-            "-s",
-            help="Override snapshots configuration (format: 'start,end' e.g., '2013-01-01,2014-01-01').",
-        ),
-        planning_horizons: str = typer.Option(
-            None,
-            "--planning-horizons",
-            help="Override planning horizons as comma-separated list (e.g., 2030,2040,2050).",
-        ),
-        clusters: str = typer.Option(
-            None,
-            "--clusters",
-            help="Override network clusters as comma-separated list (e.g., 39,128,256).",
-        ),
-        opts: str = typer.Option(
-            None,
-            "--opts",
-            help="Override opts configuration as comma-separated list.",
-        ),
-        sector_opts: str = typer.Option(
-            None,
-            "--sector-opts",
-            help="Override sector_opts configuration as comma-separated list.",
-        ),
-        foresight: str = typer.Option(
-            None,
-            "--foresight",
-            help="Override foresight configuration (overnight, myopic, or perfect).",
-        ),
-        countries: str = typer.Option(
-            None,
-            "--countries",
-            help="Override countries configuration as comma-separated list (e.g., DE,FR,ES).",
-        ),
+    name: str = typer.Option(
+        None,
+        "--name",
+        "-n",
+        help="Name for this run (will be used as job ID).",
+    ),
+    configfile: Path = typer.Option(
+        None,
+        "--configfile",
+        "-c",
+        help="Path to configuration file (default: config/config.default.yaml).",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show live Snakemake output during workflow execution.",
+    ),
+    cores: int = typer.Option(
+        None,
+        "--cores",
+        help="Number of cores to use for Snakemake. If not specified, all available cores will be used.",
+    ),
+    snapshots: str = typer.Option(
+        None,
+        "--snapshots",
+        "-s",
+        help="Override snapshots configuration (format: 'start,end' e.g., '2013-01-01,2014-01-01').",
+    ),
+    planning_horizons: str = typer.Option(
+        None,
+        "--planning-horizons",
+        help="Override planning horizons as comma-separated list (e.g., 2030,2040,2050).",
+    ),
+    clusters: str = typer.Option(
+        None,
+        "--clusters",
+        help="Override network clusters as comma-separated list (e.g., 39,128,256).",
+    ),
+    opts: str = typer.Option(
+        None,
+        "--opts",
+        help="Override opts configuration as comma-separated list.",
+    ),
+    sector_opts: str = typer.Option(
+        None,
+        "--sector-opts",
+        help="Override sector_opts configuration as comma-separated list.",
+    ),
+    foresight: str = typer.Option(
+        None,
+        "--foresight",
+        help="Override foresight configuration (overnight, myopic, or perfect).",
+    ),
+    countries: str = typer.Option(
+        None,
+        "--countries",
+        help="Override countries configuration as comma-separated list (e.g., DE,FR,ES).",
+    ),
 ):
     """
     Run the PyPSA-Eur workflow with specified configuration.
@@ -106,11 +104,9 @@ def run(
         "retrieve_ship_raster": "Retrieving shipping raster data",
         "retrieve_databundle": "Retrieving data bundle",
         "retrieve_egrigcs3_pm_production": "Retrieving EGRIGCS3 power production data",
-
         # Shape and geography building
         "build_shapes": "Building geographical shapes",
         "build_ship_raster": "Building shipping density raster",
-
         # Network building and preparation
         "base_network": "Building base network structure",
         "build_osm_network": "Building network from OpenStreetMap data",
@@ -120,7 +116,6 @@ def run(
         "cluster_network": "Clustering network nodes",
         "add_transmission_projects_and_dlr": "Adding transmission projects and dynamic line rating",
         "build_transmission_projects": "Building transmission projects",
-
         # Electricity system components
         "build_electricity_demand": "Building electricity demand time series",
         "build_electricity_demand_base": "Building base electricity demand",
@@ -128,7 +123,6 @@ def run(
         "build_line_rating": "Building dynamic line ratings",
         "add_electricity": "Adding electrical parameters",
         "prepare_network": "Preparing network for optimization",
-
         # Renewable energy
         "build_renewable_profiles": "Building renewable generation profiles",
         "determine_availability_matrix": "Determining renewable availability matrix",
@@ -137,13 +131,11 @@ def run(
         "build_temperature_profiles": "Building temperature profiles",
         "build_cop_profiles": "Building heat pump COP profiles",
         "build_solar_thermal_profiles": "Building solar thermal profiles",
-
         # Solving and optimization
         "solve_network": "Solving network optimization",
         "solve_operations_network": "Solving operational dispatch",
         "solve_elec_networks": "Solving electricity network",
         "solve_sector_network": "Solving sector-coupled network",
-
         # Sector coupling
         "prepare_sector_network": "Preparing sector-coupled network",
         "build_industrial_demand": "Building industrial demand",
@@ -153,13 +145,11 @@ def run(
         "build_industry_sector": "Building industry sector model",
         "build_heating_sector": "Building heating sector model",
         "build_transport_sector": "Building transport sector model",
-
         # Post-processing and validation
         "make_summary": "Creating results summary",
         "plot_network": "Plotting network",
         "plot_summary": "Plotting summary statistics",
         "validate_network": "Validating network consistency",
-
         # Other rules
         "copy_config": "Copying configuration",
         "build_cutout": "Building weather cutout",
@@ -221,7 +211,9 @@ def run(
             config_data.setdefault("costs", {})["year"] = ph_list[0]
 
     if clusters:
-        config_data.setdefault("scenario", {})["clusters"] = comma_separated_list(clusters)
+        config_data.setdefault("scenario", {})["clusters"] = comma_separated_list(
+            clusters
+        )
 
     if opts:
         config_data.setdefault("scenario", {})["opts"] = comma_separated_list(opts)

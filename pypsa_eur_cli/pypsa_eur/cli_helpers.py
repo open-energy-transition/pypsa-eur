@@ -1,5 +1,4 @@
 import hashlib
-import json
 import time
 from datetime import datetime
 from pathlib import Path
@@ -13,27 +12,27 @@ def generate_job_id(configfile: Path | None = None, name: str | None = None) -> 
     if name:
         # If name is provided via CLI, use it directly
         return name
-    
+
     if configfile and configfile.exists():
         # Load the configuration file
         with open(configfile) as f:
             config_data = yaml.safe_load(f)
-        
+
         # Extract the original run name from the config
         original_run_name = config_data.get("run", {}).get("name", "pypsa_eur")
     else:
         original_run_name = "pypsa_eur"
-    
+
     # Generate timestamp-based unique ID
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     # Create a short hash for uniqueness
     hash_input = f"{original_run_name}{timestamp}{time.time()}"
     short_hash = hashlib.sha256(hash_input.encode()).hexdigest()[:6]
-    
+
     # Combine everything
     final_job_id = f"{timestamp}_{original_run_name}_{short_hash}"
-    
+
     return final_job_id
 
 

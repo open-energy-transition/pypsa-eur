@@ -1,6 +1,5 @@
 import re
 import sys
-from pathlib import Path
 
 from colorama import Fore, Style
 from tqdm import tqdm
@@ -117,7 +116,12 @@ class ProgressTracker:
         if "rule " in line and ":" in line:
             parts = line.split()
             for i, part in enumerate(parts):
-                if part in ["rule", "localrule", "checkpoint", "localcheckpoint"] and i + 1 < len(parts):
+                if part in [
+                    "rule",
+                    "localrule",
+                    "checkpoint",
+                    "localcheckpoint",
+                ] and i + 1 < len(parts):
                     rule_name = parts[i + 1].strip(":")
                     statement_identifier = f"{rule_name}_detected"
                     if statement_identifier not in self.printed_statements:
@@ -150,7 +154,9 @@ class ProgressTracker:
 
                 if statement_identifier not in self.printed_statements:
                     # Print wildcard details as additional info
-                    tqdm.write(f"  {Fore.YELLOW}└─ with {wildcards_str}{Style.RESET_ALL}")
+                    tqdm.write(
+                        f"  {Fore.YELLOW}└─ with {wildcards_str}{Style.RESET_ALL}"
+                    )
                     self.printed_statements.add(statement_identifier)
 
             return True
@@ -171,4 +177,4 @@ class ProgressTracker:
 
     def __repr__(self):
         """Return a string representation of the progress tracker state."""
-        return f"ProgressTracker()"
+        return "ProgressTracker()"
