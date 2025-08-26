@@ -909,6 +909,7 @@ if config["enable"]["retrieve"]:
 
     if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
         "primary",
+        "archive"
     ]:
         rule retrieve_lau_regions:
             input:

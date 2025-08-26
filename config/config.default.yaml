@@ -1015,7 +1015,7 @@ data:
     source: "archive"
     version_or_latest: "latest"
   lau_regions:
-    source: "primary"
+    source: "archive"
     version_or_latest: "latest"
   aquifer_data:
     source: "archive"
