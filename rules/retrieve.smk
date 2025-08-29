@@ -141,7 +141,7 @@ if config["enable"]["retrieve"] and (EMOBILITY_DATASET := dataset_version("emobi
             zip=f"{EMOBILITY_DATASET["folder"]}/emobility.zip",
             directory=directory(f"{EMOBILITY_DATASET["folder"]}"),
         run:
-            unzip_folder(params,output)
+            handle_data_requests(params,output)
 
 
 if config["enable"]["retrieve"] and (H2_SALT_CAVERNS_DATASET := dataset_version("h2_salt_caverns"))["source"] in [
@@ -219,7 +219,7 @@ if config["enable"]["retrieve"] and (
         run:
             move(input[0], output[0])
             if GHG_EMISSIONS_DATASET["source"] == "primary":
-                unzip_folder(params, output)
+                handle_data_requests(params, output)
 
 
 if config["enable"]["retrieve"] and (GEBCO_DATASET := dataset_version("gebco"))["source"] in [
