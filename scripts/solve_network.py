@@ -40,7 +40,7 @@ import pandas as pd
 import pypsa
 import xarray as xr
 import yaml
-from linopy.oetc import OetcCredentials, OetcSettings
+from linopy.oetc import OetcCredentials, OetcSettings, OetcHandler
 from pypsa.descriptors import get_activity_mask
 from pypsa.descriptors import get_switchable_as_dense as get_as_dense
 
@@ -1344,7 +1344,8 @@ def solve_network(
         oetc["solver"] = kwargs["solver_name"]
         oetc["solver_options"] = kwargs["solver_options"]
         oetc_settings = OetcSettings(**oetc)
-        kwargs["oetc_settings"] = oetc_settings
+        oetc_handler = OetcHandler(oetc_settings)
+        kwargs["remote"] = oetc_handler
 
     kwargs["model_kwargs"] = cf_solving.get("model_kwargs", {})
     kwargs["keep_files"] = cf_solving.get("keep_files", False)
