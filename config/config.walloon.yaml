@@ -43,6 +43,10 @@ scenario:
   planning_horizons:
   - 2025
   - 2030
+  - 2035
+  - 2040
+  - 2045
+  - 2050
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
 # Walloon model: Belgium and electrical neighbors
