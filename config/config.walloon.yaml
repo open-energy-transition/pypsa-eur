@@ -937,10 +937,7 @@ costs:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#clustering
 clustering:
-  mode: administrative
-  administrative:
-    level: 0  # Default: country level for all countries
-    BE: 1     # Belgium: NUTS-1 level (3 regions: Brussels, Flanders, Wallonia)
+  mode: custom_busmap_BE
   focus_weights: false
   copperplate_regions: []
   build_bidding_zones:
