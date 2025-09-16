@@ -25,10 +25,10 @@ import cartopy.crs as ccrs
 def map_buses_to_be_regions(n, be_regions):
 
     bus_pts = gpd.GeoDataFrame(
-        n.buses.index.to_series().rename("bus_id"),
+        n.buses.index.to_series().rename("Bus"),
         geometry=gpd.points_from_xy(n.buses["x"], n.buses["y"]),
         crs="EPSG:4326"  # adjust if bus coords are not lon/lat WGS84
-    ).set_index("bus_id")
+    ).set_index("Bus")
 
     # created this to avoid warning, but it doesn't seem to help:
     # geometry is in a geographic CRS. Results from 'distance' are likely incorrect.
@@ -65,11 +65,6 @@ def map_buses_to_be_regions(n, be_regions):
     bus_pts_and_regions["region_id"] = (
         bus_pts_and_regions["id"].fillna(n.buses["country"]).astype("string")
     )
-
-
-
-
-
     
     return bus_pts_and_regions["region_id"]
 
