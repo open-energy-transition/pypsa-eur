@@ -39,6 +39,12 @@ This repository is maintained using [OET's soft-fork strategy](https://open-ener
 
 # Installation and Usage
 
+:warning: Current run time as of 18/09/2025 (PR #3) :warning:
+
+| Elapsed (wall clock) time | 18:37.24 |
+|---|---|
+| Max RSS (KB) | 8631624 (8.24 GB RAM) |
+
 ## 1. Installation
 
 Clone the repository:
