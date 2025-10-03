@@ -17,6 +17,7 @@ from tqdm import tqdm
 from scripts._helpers import (
     configure_logging,
     convert_units,
+    get_snapshots,
     get_version,
     set_scenario_config,
 )
@@ -56,15 +57,23 @@ def _plot_scenario_comparison(
     scenario: str,
     cyear: int,
     model_col: str,
-    rfc_col: str,
+    rfc_col: list[str],
     source_unit: str,
 ):
     fig, ax = plt.subplots(figsize=(12, 8))
 
     table_title = table.replace("_", " ").title()
-    df.set_index("carrier")[[model_col, rfc_col]].plot.bar(
+    idx = [model_col] + [c for c in rfc_col if c in df.columns]
+
+    tyndp_str = "TYNDP 2024"
+    if "TYNDP 2024 Vis Pltfm" in idx and tyndp_str in idx:
+        tyndp_str_ext = "TYNDP 2024 Scenarios"
+        idx = [tyndp_str_ext if i == tyndp_str else i for i in idx]
+        df = df.rename(columns={tyndp_str: tyndp_str_ext})
+
+    df.set_index("carrier")[idx].plot.bar(
         ax=ax,
-        color=["#1f77b4", "#ff7f0e"],
+        color=["#1f77b4", "#ff7f0e", "#aeff39"],
         width=0.7,
         xlabel="",
         ylabel=f"{table_title} [{source_unit}]",
@@ -177,11 +186,11 @@ def plot_benchmark(
     benchmarks_raw: pd.DataFrame,
     output_dir: str,
     scenario: str,
-    cyear: int,
+    snapshots: dict[str, str],
     options: dict,
     colors: dict,
     model_col: str = "Open-TYNDP",
-    rfc_col: str = "TYNDP 2024",
+    rfc_col: list[str] = ["TYNDP 2024", "TYNDP 2024 Vis Pltfm"],
 ):
     """
     Create benchmark comparison figures and export one file per year.
@@ -196,22 +205,23 @@ def plot_benchmark(
         Output directory.
     scenario: str
         Scenario name.
-    cyear : int
-        Climate year.
+    snapshots : dict[str, str]
+        Dictionary defining the temporal range with 'start' and 'end' keys.
     options : dict
         Full benchmarking configuration containing table units and conversions.
     colors : dict,
         Dictionary of colors to be used for each technology.
     model_col : str, default "Open-TYNDP"
         Column name for model values.
-    rfc_col : str, default "TYNDP 2024"
-        Column name for reference values.
+    rfc_col : list[str], default ["TYNDP 2024", "TYNDP 2024 Vis Pltfm"]
+        Column names for reference values.
     """
 
     # Parameters
     opt = options["tables"][table]
     table_type = opt["table_type"]
     source_unit = opt["unit"]
+    cyear = get_snapshots(snapshots)[0].year
 
     # Filter data and Convert back to source unit
     logger.info(f"Making benchmark for {table} using {rfc_col} and {model_col}")
@@ -230,8 +240,8 @@ def plot_benchmark(
     )
 
     # Check if at least two sources are available to compare
-    if len(bench_wide.columns) != 2:
-        logger.info(f"Skipping table {table}, need exactly two sources to compare.")
+    if len(bench_wide.columns) < 2:
+        logger.info(f"Skipping table {table}, need at least two sources to compare.")
         return
 
     for year in bench_wide.index.get_level_values("year").unique():
@@ -250,8 +260,9 @@ def plot_benchmark(
                 source_unit,
             )
         elif table_type == "time_series":
+            rfc_col_str = [c for c in rfc_col if c in bench_year.columns][0]
             bench_agg = match_temporal_resolution(
-                bench_year, model_col, rfc_col
+                bench_year, snapshots, model_col, rfc_col_str
             ).reset_index()
             _plot_time_series(
                 bench_agg,
@@ -261,14 +272,18 @@ def plot_benchmark(
                 scenario,
                 cyear,
                 model_col,
-                rfc_col,
+                rfc_col_str,
                 source_unit,
                 colors,
             )
 
 
 def plot_overview(
-    indicators: pd.DataFrame, fn: str, scenario: str, metric: str = "sMAPE"
+    indicators: pd.DataFrame,
+    fn: str,
+    scenario: str,
+    snapshots: dict[str, str],
+    metric: str = "sMAPE",
 ):
     """
     Plot benchmark overview figure.
@@ -281,10 +296,13 @@ def plot_overview(
         Output filename.
     scenario : str
         Scenario name.
+    snapshots : dict[str, str]
+        Dictionary defining the temporal range with 'start' and 'end' keys.
     metric : str, default "sMAPE"
         Metric to plot.
     """
     fig, ax = plt.subplots(figsize=(12, 8))
+    cyear = get_snapshots(snapshots)[0].year
 
     # Keep relevant indicators and rows
     df_clean = indicators[[metric, "Missing"]].dropna()
@@ -356,8 +374,9 @@ if __name__ == "__main__":
     options = snakemake.params["benchmarking"]
     colors = snakemake.params["colors"]
     scenario = snakemake.params["scenario"]
-    cyear = int(snakemake.params.snapshots["start"][:4])
+    snapshots = snakemake.params.snapshots
     benchmarks_fn = snakemake.input.benchmarks
+    vp_data_fn = snakemake.input.vp_data
     results_fn = snakemake.input.results
     output_dir = Path(snakemake.output.dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -365,7 +384,9 @@ if __name__ == "__main__":
     kpis_out = snakemake.output.kpis
 
     # Load data
-    benchmarks_raw = load_data(benchmarks_fn, results_fn, "TYNDP " + scenario)
+    benchmarks_raw = load_data(
+        benchmarks_fn, results_fn, "TYNDP " + scenario, vp_data_fn
+    )
 
     # Produce benchmark figures
     logger.info("Producing benchmark figures")
@@ -382,7 +403,7 @@ if __name__ == "__main__":
         benchmarks_raw=benchmarks_raw,
         output_dir=output_dir,
         scenario=scenario,
-        cyear=cyear,
+        snapshots=snapshots,
         options=options,
         colors=colors,
     )
@@ -392,6 +413,6 @@ if __name__ == "__main__":
 
     # Plot overview
     indicators = pd.read_csv(kpis_in, index_col=0)
-    plot_overview(indicators, kpis_out, scenario)
+    plot_overview(indicators, kpis_out, scenario, snapshots)
 
     logger.info("Benchmark plotting completed successfully")

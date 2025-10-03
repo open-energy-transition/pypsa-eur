@@ -26,7 +26,9 @@ from scripts._helpers import configure_logging, get_version, set_scenario_config
 logger = logging.getLogger(__name__)
 
 
-def load_data(benchmarks_fn: str, results_fn: str, scenario: str) -> pd.DataFrame:
+def load_data(
+    benchmarks_fn: str, results_fn: str, scenario: str, vp_data_fn: str = ""
+) -> pd.DataFrame:
     """
     Load Open-TYNDP and TYNDP 2024 results.
 
@@ -36,8 +38,10 @@ def load_data(benchmarks_fn: str, results_fn: str, scenario: str) -> pd.DataFram
         Path to the TYNDP 2024 benchmark data file.
     results_fn : str
         Path to the Open-TYNDP results data file.
-    scenario: str
+    scenario : str
         Name of scenario to compare.
+    vp_data_fn : str (optional)
+        Path to the Visualisation data file.
 
     Returns
     -------
@@ -59,6 +63,18 @@ def load_data(benchmarks_fn: str, results_fn: str, scenario: str) -> pd.DataFram
 
     # Filter to keep only years available in the TYNDP 2024 Scenarios data
     available_years = set(benchmarks_tyndp.year).intersection(benchmarks_n.year)  # noqa: F841
+
+    # Add Visualisation Platform (optional)
+    if vp_data_fn:
+        vp_data = pd.read_csv(vp_data_fn)
+        if not vp_data.empty:
+            available_years = set(vp_data.year).intersection(available_years)
+            benchmarks_raw = pd.concat([benchmarks_raw, vp_data])
+        else:
+            logger.info(
+                "Skipping comparison with Visualisation Platform data, as only available in TYNDP 2024 for the climate years 1995, 2008 and 2009."
+            )
+
     benchmarks_raw = benchmarks_raw.query("year in @available_years")
 
     return benchmarks_raw
