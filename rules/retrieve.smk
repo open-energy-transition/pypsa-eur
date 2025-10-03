@@ -248,6 +248,17 @@ if config["enable"]["retrieve"]:
             log:
                 "logs/retrieve_tyndp_pecd_data_raw_{pecd_prebuilt_version}.log",
 
+    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_benchmark with:
+        params:
+            # TODO Integrate into Zenodo tyndp data bundle
+            url="https://storage.googleapis.com/open-tyndp-data-store/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
+            source="Benchmarks",
+        output:
+            dir=directory("data/tyndp_2024_bundle/TYNDP-2024-Scenarios-Package"),
+            file="data/tyndp_2024_bundle/TYNDP-2024-Scenarios-Package/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
+        log:
+            "logs/retrieve_tyndp_benchmark.log",
+
     rule retrieve_countries_centroids:
         output:
             "data/countries_centroids.geojson",
