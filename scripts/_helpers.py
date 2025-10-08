@@ -19,6 +19,7 @@ from typing import Callable, Union
 import atlite
 import fiona
 import git
+import numpy as np
 import pandas as pd
 import pypsa
 import pytz
@@ -1154,9 +1155,10 @@ def safe_pyear(
     available_years: list = [2030, 2040, 2050],
     source: str = "TYNDP",
     verbose: bool = True,
-):
+) -> int:
     """
-    Checks and adjusts whether a given pyear is in the available years of a given data source. If not, it falls back to the previous available year.
+    Checks and adjusts whether a given pyear is in the available years of a given data source. If not, it
+    falls back to the previous available year.
 
     Parameters
     ----------
@@ -1193,6 +1195,85 @@ def safe_pyear(
         year_new = year
 
     return year_new
+
+
+def map_tyndp_carrier_names(
+    df: pd.DataFrame,
+    carrier_mapping_fn: str,
+    on_columns: list[str],
+    drop_on_columns=False,
+):
+    """
+    Map external carriers to available tyndp_carrier names based on an input mapping. Optionally drop merged on columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with external carriers to map
+    carrier_mapping_fn : str
+        Path to file with mapping from external carriers to available tyndp_carrier names.
+    on_columns : list[str]
+        Columns to merge on between the external carriers and tyndp_carriers.
+    drop_on_columns : bool, optional
+        Whether to drop merge columns and rename `open_tyndp_carrier` and `open_tyndp_index` to `carrier`
+        and `index_carrier`. Defaults to False.
+
+    Returns
+    -------
+    pd.DataFrame
+        Input DataFrame with external carriers mapped to available tyndp_carriers and index_carriers.
+    """
+
+    # Read TYNDP carrier mapping
+    carrier_mapping = (
+        pd.read_csv(carrier_mapping_fn)[
+            on_columns + ["open_tyndp_carrier", "open_tyndp_index"]
+        ]
+    ).dropna()
+
+    # Map the carriers
+    df = df.merge(carrier_mapping, on=on_columns, how="left")
+
+    # If the carrier is DSR or Other Non-RES, the different price bands are too diverse for a robust external
+    # mapping. Instead, we will combine the carrier and type information.
+    if "pemmdb_carrier" in on_columns:
+
+        def normalize_carrier(s):
+            return s.lower().replace(" ", "-").replace("other-non-res", "chp")
+
+        # Other Non-RES are assumed to represent CHP plants (according to TYNDP 2024 Methodology report p.37)
+        df = df.assign(
+            open_tyndp_carrier=lambda x: np.where(
+                x["pemmdb_carrier"].isin(["DSR", "Other Non-RES"]),
+                x["pemmdb_carrier"].apply(normalize_carrier),
+                x["open_tyndp_carrier"],
+            ),
+            open_tyndp_index=lambda x: np.where(
+                x["pemmdb_carrier"].isin(["DSR", "Other Non-RES"]),
+                x["open_tyndp_carrier"]
+                + "-"
+                + x["pemmdb_type"].apply(normalize_carrier),
+                x["open_tyndp_index"],
+            ),
+        )
+
+    if not drop_on_columns:
+        return df
+
+    # Otherwise drop merge columns and rename to new "carrier" and "index_carrier" column
+    df = df.drop(on_columns, axis="columns").rename(
+        columns={
+            "open_tyndp_carrier": "carrier",
+            "open_tyndp_index": "index_carrier",
+        }
+    )
+
+    # Move "carrier" and "index_carrier" to the front
+    cols = ["carrier", "index_carrier"] + [
+        col for col in df.columns if col not in ["carrier", "index_carrier"]
+    ]
+
+    return df[cols]
 
 
 def get_version(hash_len: int = 9) -> str:

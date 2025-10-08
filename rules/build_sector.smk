@@ -1387,6 +1387,23 @@ def input_offshore_hubs(w):
     return {}
 
 
+def input_pemmdb_data(w):
+    if not config_provider("electricity", "pemmdb_capacities", "enable")(w):
+        return {}
+
+    available_years = config_provider(
+        "electricity", "pemmdb_capacities", "available_years"
+    )(w)
+    pemmdb_year = safe_pyear(w.planning_horizons, available_years, verbose=False)
+
+    return {
+        "pemmdb_capacities": resources(
+            "pemmdb_capacities_" + str(pemmdb_year) + ".csv"
+        ),
+        "pemmdb_profiles": resources("pemmdb_profiles_" + str(pemmdb_year) + ".nc"),
+    }
+
+
 rule prepare_sector_network:
     params:
         time_resolution=config_provider("clustering", "temporal", "resolution_sector"),
@@ -1429,6 +1446,7 @@ rule prepare_sector_network:
         unpack(input_profile_pecd),
         unpack(input_heat_source_power),
         unpack(input_offshore_hubs),
+        unpack(input_pemmdb_data),
         **rules.cluster_gas_network.output,
         **rules.build_gas_input_locations.output,
         snapshot_weightings=resources(
@@ -1579,6 +1597,11 @@ rule prepare_sector_network:
             resources("profile_pemmdb_hydro.nc"),
             [],
         ),
+        tyndp_trajectories=branch(
+            config_provider("electricity", "tyndp_renewable_carriers"),
+            resources("tyndp_trajectories.csv"),
+        ),
+        carrier_mapping="data/tyndp_technology_map.csv",
     output:
         resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
