@@ -68,7 +68,6 @@ include: "rules/solve_electricity.smk"
 include: "rules/postprocess.smk"
 include: "rules/development.smk"
 include: "rules/report.smk"
-
 include: "rules/cba/main.smk"
 
 
