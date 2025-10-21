@@ -1,8 +1,13 @@
+# SPDX-FileCopyrightText: Contributors to Open-TYNDP <https://github.com/open-energy-transition/open-tyndp>
+#
+# SPDX-License-Identifier: MIT
+#
+
 import pandas as pd
 
 
 wildcard_constraints:
-    cba_project=r"(stor|trans)\d+",
+    cba_project=r"(s|t)\d+",
 
 
 rule retrieve_tyndp_cba_projects:
@@ -21,17 +26,15 @@ rule retrieve_tyndp_cba_projects:
         "../../scripts/retrieve_additional_tyndp_data.py"
 
 
-# read in transmission and storage projects from excel sheets they should get a
-# project_name column with trans{num} or stor{num} i'd start with transmission projects
-# only and then if we see we need to extract different information for storage projects
-# we split those out into another file instead and change the workflow accordingly
-checkpoint read_projects:
+# read in transmission and storage projects from excel sheets
+checkpoint clean_projects:
     input:
         dir="data/tyndp_2024_bundle/cba_projects",
     output:
-        projects=resources("cba/projects.csv"),
+        transmission_projects=resources("cba/transmission_projects.csv"),
+        storage_projects=resources("cba/storage_projects.csv"),
     script:
-        "../../scripts/cba/read_projects.py"
+        "../../scripts/cba/clean_projects.py"
 
 
 def input_sb_network(w):
@@ -53,7 +56,7 @@ def input_sb_network(w):
         RESULTS
         + "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
         **expanded_wildcards,
-        ignore_missing=True,
+        allow_missing=True,
     )
 
 
@@ -61,8 +64,8 @@ def input_sb_network(w):
 # necessary to get to the general CBA reference network
 rule simplify_sb_network:
     input:
+        # TODO add additional data that is needed
         network=input_sb_network,
-        # TODO whatever additional data is needed
     output:
         network=resources("cba/networks/simple_{planning_horizons}.nc"),
     script:
@@ -74,7 +77,8 @@ rule simplify_sb_network:
 rule prepare_toot_reference:
     input:
         network=rules.simplify_sb_network.output.network,
-        projects=rules.read_projects.output.projects,
+        transmission_projects=rules.clean_projects.output.transmission_projects,
+        storage_projects=rules.clean_projects.output.storage_projects,
     output:
         network=resources("cba/toot/networks/reference_{planning_horizons}.nc"),
     script:
@@ -86,7 +90,8 @@ rule prepare_toot_reference:
 rule prepare_pint_reference:
     input:
         network=rules.simplify_sb_network.output.network,
-        projects=rules.read_projects.output.projects,
+        transmission_projects=rules.clean_projects.output.transmission_projects,
+        storage_projects=rules.clean_projects.output.storage_projects,
     output:
         network=resources("cba/pint/networks/reference_{planning_horizons}.nc"),
     script:
@@ -98,7 +103,8 @@ rule prepare_pint_reference:
 rule prepare_toot_project:
     input:
         network=rules.prepare_toot_reference.output.network,
-        projects=rules.read_projects.output.projects,
+        transmission_projects=rules.clean_projects.output.transmission_projects,
+        storage_projects=rules.clean_projects.output.storage_projects,
     output:
         network=resources(
             "cba/toot/networks/project_{cba_project}_{planning_horizons}.nc"
@@ -112,7 +118,8 @@ rule prepare_toot_project:
 rule prepare_pint_project:
     input:
         network=rules.prepare_pint_reference.output.network,
-        projects=rules.read_projects.output.projects,
+        transmission_projects=rules.clean_projects.output.transmission_projects,
+        storage_projects=rules.clean_projects.output.storage_projects,
     output:
         network=resources(
             "cba/pint/networks/project_{cba_project}_{planning_horizons}.nc"
@@ -133,7 +140,7 @@ rule solve_cba_network:
 
 
 # compute all metrics for a single pint or toot project comparing reference and project solution
-rule compute_metrics:
+rule make_indicators:
     input:
         reference=resources(
             "cba/{cba_method}/postnetworks/reference_{planning_horizons}.nc"
@@ -142,42 +149,51 @@ rule compute_metrics:
             "cba/{cba_method}/postnetworks/project_{cba_project}_{planning_horizons}.nc"
         ),
     output:
-        metrics=RESULTS
+        indicators=RESULTS
         + "cba/{cba_method}/project_{cba_project}_{planning_horizons}.csv",
     script:
-        "../../scripts/cba/compute_metrics.py"
+        "../../scripts/cba/make_indicators.py"
 
 
-def input_metrics(w):
+def input_indicators(w):
     """
-    List all metric csv
+    List all indicators csv
     """
-    projects = pd.read_csv(checkpoints.read_projects.get(**w).output.projects)
+    transmission_projects = pd.read_csv(
+        checkpoints.clean_projects.get(**w).output.transmission_projects
+    )
+    storage_projects = pd.read_csv(
+        checkpoints.clean_projects.get(**w).output.storage_projects
+    )
     planning_horizons = config_provider("scenario", "planning_horizons")(w)
 
-    # assumes a one row per project csv file, maybe needs to be changed if we use
-    # a tidy format for the projects file.
-    cba_projects = projects.loc[projects["type"] == "transmission"].itertuples()
+    cba_projects = [
+        f"t{pid}" for pid in transmission_projects["project_id"].unique()
+    ] + [f"s{pid}" for pid in storage_projects["project_id"].unique()]
 
     return expand(
-        rules.compute_metrics.output.metrics,
+        rules.make_indicators.output.indicators,
         cba_project=cba_projects,
         cba_method=["toot", "pint"],  # maybe promote to config
         planning_horizons=planning_horizons,
+        allow_missing=True,
     )
 
 
-# assemble the metrics for all projects into a single overview csv (ideally just concatenating it)
-rule assemble_metrics:
+# collect the indicators for all transmission_projects into a single overview csv
+rule collect_indicators:
     input:
-        metrics=input_metrics,
+        indicators=input_indicators,
     output:
-        metrics=RESULTS + f"cba/metrics.csv",
+        indicators=RESULTS + "cba/indicators.csv",
     script:
-        "../../scripts/cba/assemble_metrics.py"
+        "../../scripts/cba/collect_indicators.py"
 
 
 # pseudo-rule, to run enable running cba with snakemake cba --configfile config/config.tyndp.yaml
 rule cba:
     input:
-        rules.assemble_metrics.output.metrics,
+        lambda w: expand(
+            rules.collect_indicators.output.indicators,
+            run=config_provider("run", "name")(w),
+        ),
