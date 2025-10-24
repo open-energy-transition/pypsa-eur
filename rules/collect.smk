@@ -153,3 +153,13 @@ rule plot_benchmarks:
             **config["scenario"],
             run=config["run"]["name"],
         ),
+
+
+rule run_all_h2_demand:
+    input:
+        expand(
+            resources("h2_demand_tyndp_{planning_horizons}.csv"),
+             **config["scenario"],
+            run=config["run"]["name"],
+        ),
+
