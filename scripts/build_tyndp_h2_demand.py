@@ -1,7 +1,11 @@
 # SPDX-FileCopyrightText: Contributors to Open-TYNDP <https://github.com/open-energy-transition/open-tyndp>
 #
 # SPDX-License-Identifier: MIT
+"""
+This script is used to build TYNDP Scenario Building hydrogen demand to be used in the PyPSA-Eur workflow. The `snapshot` year is used as climatic year (`cyear`). For DE and GA, `cyear` must be one of the following years: 1995, 2008 or 2009. For NT, it must be between 1982 and 2019. If the `snapshot` is not one of these years, then the demand is set to 2009 hydrogen demand (2009 being considered as the most representative of the three years).
 
+Depending on the scenario and hydrogen zone, different years are available in the input data. DE and GA are defined for 2030, 2040 and 2050 for Z2, and 2040, hydrogen zone Z1 is defined in 2050 for DE and GA, in 2040 only for GA. NT scenario is only defined for 2030 and 2040 without a split into two hydrogen zones. All the planning years are read at once. Missing years are linearly interpolated between the available years.
+"""
 import logging
 from pathlib import Path
 import pandas as pd
