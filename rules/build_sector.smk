@@ -761,10 +761,8 @@ rule build_ammonia_production:
 
 rule build_tyndp_h2_demand:
     params:
-        planning_horizons=config_provider("scenario", "planning_horizons"),
         snapshots=config_provider("snapshots"),
         scenario=config_provider("tyndp_scenario"),
-        available_years=config_provider("load", "available_years_tyndp"),
     input:
         h2_demand="data/tyndp_2024_bundle/Demand Profiles",
     output:
