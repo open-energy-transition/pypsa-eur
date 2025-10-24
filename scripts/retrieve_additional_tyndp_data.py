@@ -8,7 +8,7 @@ subdirectory, such that all files of the TYNDP bundle are stored in it.
 The original data is published by ENTSO-E and ENTSOG under Creative Commons Attribution 4.0 International License (CC-BY 4.0)
 and can be found under https://2024.entsos-tyndp-scenarios.eu/download/.
 
-Currently, this is used for two additional datasets:
+Currently, this is used for the following additional datasets:
 * TYNDP PECD data (raw or prebuilt): The TYNDP PECD v3.1 data contains input data for the 2024 TYNDP scenario building process.
 * TYNDP hydro inflows: The TYNDP hydro inflow data from PEMMDB v2.4 contains hydro inflow data for different hydro technologies:
     * Run of River,
@@ -16,6 +16,8 @@ Currently, this is used for two additional datasets:
     * Reservoir,
     * PS Open,
     * PS Closed
+* TYNDP PEMMDB data: The TYNDP PEMMDB v2.4 data contains capacity input data and must-run and availability profiles for generation technologies,
+  reserves, DSR, batteries and electrolysers.
 * TYNDP Scenarios Report Data Figures: The TYNDP Scenarios Report Data Figures file contains the data and calculation
     used to produce the figures in the Scenarios Report.
 
@@ -31,7 +33,7 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from _helpers import configure_logging, progress_retrieve, set_scenario_config
+from scripts._helpers import configure_logging, progress_retrieve, set_scenario_config
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ def retrieve_bundle(url: str, source: str, to_dir: str, disable_progress: bool =
 
 if __name__ == "__main__":
     if "snakemake" not in globals():
-        from _helpers import mock_snakemake
+        from scripts._helpers import mock_snakemake
 
         snakemake = mock_snakemake("retrieve_tyndp_hydro_inflow")
 

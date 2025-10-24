@@ -19,6 +19,7 @@ from typing import Callable, Union
 import atlite
 import fiona
 import git
+import numpy as np
 import pandas as pd
 import pypsa
 import pytz
@@ -26,6 +27,14 @@ import requests
 import xarray as xr
 import yaml
 from snakemake.utils import update_config
+from tenacity import (
+    retry as tenacity_retry,
+)
+from tenacity import (
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -421,17 +430,31 @@ def aggregate_costs(n, flatten=False, opts=None, existing_only=False):
     return costs
 
 
+@tenacity_retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type(
+        (requests.HTTPError, requests.ConnectionError, requests.Timeout)
+    ),
+)
 def progress_retrieve(url, file, disable=False):
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 
     Path(file).parent.mkdir(parents=True, exist_ok=True)
 
+    # Raise HTTPError for transient errors
+    # 429: Too Many Requests (rate limiting)
+    # 500, 502, 503, 504: Server errors
     if disable:
         response = requests.get(url, headers=headers, stream=True)
+        if response.status_code in (429, 500, 502, 503, 504):
+            response.raise_for_status()
         with open(file, "wb") as f:
             f.write(response.content)
     else:
         response = requests.get(url, headers=headers, stream=True)
+        if response.status_code in (429, 500, 502, 503, 504):
+            response.raise_for_status()
         total_size = int(response.headers.get("content-length", 0))
         chunk_size = 1024
 
@@ -848,12 +871,24 @@ def update_config_from_wildcards(config, w, inplace=True):
         return config
 
 
+@tenacity_retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception_type(
+        (requests.HTTPError, requests.ConnectionError, requests.Timeout)
+    ),
+)
 def get_checksum_from_zenodo(file_url):
     parts = file_url.split("/")
     record_id = parts[parts.index("records") + 1]
     filename = parts[-1]
 
     response = requests.get(f"https://zenodo.org/api/records/{record_id}", timeout=30)
+    # Raise HTTPError for transient errors
+    # 429: Too Many Requests (rate limiting)
+    # 500, 502, 503, 504: Server errors
+    if response.status_code in (429, 500, 502, 503, 504):
+        response.raise_for_status()
     response.raise_for_status()
     data = response.json()
 
@@ -1154,9 +1189,10 @@ def safe_pyear(
     available_years: list = [2030, 2040, 2050],
     source: str = "TYNDP",
     verbose: bool = True,
-):
+) -> int:
     """
-    Checks and adjusts whether a given pyear is in the available years of a given data source. If not, it falls back to the previous available year.
+    Checks and adjusts whether a given pyear is in the available years of a given data source. If not, it
+    falls back to the previous available year.
 
     Parameters
     ----------
@@ -1193,6 +1229,85 @@ def safe_pyear(
         year_new = year
 
     return year_new
+
+
+def map_tyndp_carrier_names(
+    df: pd.DataFrame,
+    carrier_mapping_fn: str,
+    on_columns: list[str],
+    drop_on_columns=False,
+):
+    """
+    Map external carriers to available tyndp_carrier names based on an input mapping. Optionally drop merged on columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with external carriers to map
+    carrier_mapping_fn : str
+        Path to file with mapping from external carriers to available tyndp_carrier names.
+    on_columns : list[str]
+        Columns to merge on between the external carriers and tyndp_carriers.
+    drop_on_columns : bool, optional
+        Whether to drop merge columns and rename `open_tyndp_carrier` and `open_tyndp_index` to `carrier`
+        and `index_carrier`. Defaults to False.
+
+    Returns
+    -------
+    pd.DataFrame
+        Input DataFrame with external carriers mapped to available tyndp_carriers and index_carriers.
+    """
+
+    # Read TYNDP carrier mapping
+    carrier_mapping = (
+        pd.read_csv(carrier_mapping_fn)[
+            on_columns + ["open_tyndp_carrier", "open_tyndp_index"]
+        ]
+    ).dropna()
+
+    # Map the carriers
+    df = df.merge(carrier_mapping, on=on_columns, how="left")
+
+    # If the carrier is DSR or Other Non-RES, the different price bands are too diverse for a robust external
+    # mapping. Instead, we will combine the carrier and type information.
+    if "pemmdb_carrier" in on_columns:
+
+        def normalize_carrier(s):
+            return s.lower().replace(" ", "-").replace("other-non-res", "chp")
+
+        # Other Non-RES are assumed to represent CHP plants (according to TYNDP 2024 Methodology report p.37)
+        df = df.assign(
+            open_tyndp_carrier=lambda x: np.where(
+                x["pemmdb_carrier"].isin(["DSR", "Other Non-RES"]),
+                x["pemmdb_carrier"].apply(normalize_carrier),
+                x["open_tyndp_carrier"],
+            ),
+            open_tyndp_index=lambda x: np.where(
+                x["pemmdb_carrier"].isin(["DSR", "Other Non-RES"]),
+                x["open_tyndp_carrier"]
+                + "-"
+                + x["pemmdb_type"].apply(normalize_carrier),
+                x["open_tyndp_index"],
+            ),
+        )
+
+    if not drop_on_columns:
+        return df
+
+    # Otherwise drop merge columns and rename to new "carrier" and "index_carrier" column
+    df = df.drop(on_columns, axis="columns").rename(
+        columns={
+            "open_tyndp_carrier": "carrier",
+            "open_tyndp_index": "index_carrier",
+        }
+    )
+
+    # Move "carrier" and "index_carrier" to the front
+    cols = ["carrier", "index_carrier"] + [
+        col for col in df.columns if col not in ["carrier", "index_carrier"]
+    ]
+
+    return df[cols]
 
 
 def get_version(hash_len: int = 9) -> str:

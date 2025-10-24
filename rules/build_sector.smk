@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: Contributors to Open-TYNDP <https://github.com/open-energy-transition/open-tyndp>
 # SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+# SPDX-FileCopyrightText: Open Energy Transition gGmbH
 #
 # SPDX-License-Identifier: MIT
 
@@ -1371,6 +1372,7 @@ if config["sector"]["offshore_hubs_tyndp"]["enable"]:
             scenario=config_provider("tyndp_scenario"),
             countries=config_provider("countries"),
             offshore_hubs_tyndp=config_provider("sector", "offshore_hubs_tyndp"),
+            extendable_carriers=config_provider("electricity", "extendable_carriers"),
         input:
             nodes="data/tyndp_2024_bundle/Offshore hubs/NODE.xlsx",
             grid="data/tyndp_2024_bundle/Offshore hubs/GRID.xlsx",
@@ -1405,6 +1407,23 @@ def input_offshore_hubs(w):
     if config_provider("sector", "offshore_hubs_tyndp", "enable")(w):
         return {f: resources(f"{f}.csv") for f in offshore_files}
     return {}
+
+
+def input_pemmdb_data(w):
+    if not config_provider("electricity", "pemmdb_capacities", "enable")(w):
+        return {}
+
+    available_years = config_provider(
+        "electricity", "pemmdb_capacities", "available_years"
+    )(w)
+    pemmdb_year = safe_pyear(w.planning_horizons, available_years, verbose=False)
+
+    return {
+        "pemmdb_capacities": resources(
+            "pemmdb_capacities_" + str(pemmdb_year) + ".csv"
+        ),
+        "pemmdb_profiles": resources("pemmdb_profiles_" + str(pemmdb_year) + ".nc"),
+    }
 
 
 rule prepare_sector_network:
@@ -1449,6 +1468,7 @@ rule prepare_sector_network:
         unpack(input_profile_pecd),
         unpack(input_heat_source_power),
         unpack(input_offshore_hubs),
+        unpack(input_pemmdb_data),
         **rules.cluster_gas_network.output,
         **rules.build_gas_input_locations.output,
         snapshot_weightings=resources(
@@ -1599,6 +1619,11 @@ rule prepare_sector_network:
             resources("profile_pemmdb_hydro.nc"),
             [],
         ),
+        tyndp_trajectories=branch(
+            config_provider("electricity", "tyndp_renewable_carriers"),
+            resources("tyndp_trajectories.csv"),
+        ),
+        carrier_mapping="data/tyndp_technology_map.csv",
     output:
         resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"

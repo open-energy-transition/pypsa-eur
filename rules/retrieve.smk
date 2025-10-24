@@ -202,6 +202,7 @@ if config["enable"]["retrieve"]:
             offshore_grid="data/tyndp_2024_bundle/Offshore hubs/GRID.xlsx",
             offshore_electrolysers="data/tyndp_2024_bundle/Offshore hubs/ELECTROLYSER.xlsx",
             offshore_generators="data/tyndp_2024_bundle/Offshore hubs/GENERATOR.xlsx",
+            trajectories="data/tyndp_2024_bundle/Investment Datasets/TRAJECTORY.xlsx",
         log:
             "logs/retrieve_tyndp_bundle.log",
         retries: 2
@@ -234,6 +235,16 @@ if config["enable"]["retrieve"]:
             dir=directory("data/tyndp_2024_bundle/Hydro Inflows"),
         log:
             "logs/retrieve_tyndp_hydro_inflows.log",
+
+    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_pemmdb_data with:
+        params:
+            # TODO Integrate into Zenodo tyndp data bundle
+            url="https://storage.googleapis.com/open-tyndp-data-store/PEMMDB.zip",
+            source="PEMMDB",
+        output:
+            dir=directory("data/tyndp_2024_bundle/PEMMDB2"),
+        log:
+            "logs/retrieve_tyndp_pemmdb_data.log",
 
     if config["electricity"]["pecd_renewable_profiles"]["pre_built"]["retrieve"]:
 
@@ -831,10 +842,9 @@ if config["enable"]["retrieve"]:
             ardeco_gdp="data/jrc-ardeco/ARDECO-SUVGDP.2021.table.csv",
             ardeco_pop="data/jrc-ardeco/ARDECO-SNPTD.2021.table.csv",
         run:
-            # TODO Revert to original data source once data becomes available again
             urls = {
-                "ardeco_gdp": "https://storage.googleapis.com/open-tyndp-data-store/jrc-ardeco/ARDECO-SUVGDP.2021.table.csv",
-                "ardeco_pop": "https://storage.googleapis.com/open-tyndp-data-store/jrc-ardeco/ARDECO-SNPTD.2021.table.csv",
+                "ardeco_gdp": "https://territorial.ec.europa.eu/ardeco-api-v2/rest/export/SUVGDP?versions=2021&unit=EUR&level_id=0&level_id=1&level_id=2&level_id=3&format=csv-table",
+                "ardeco_pop": "https://territorial.ec.europa.eu/ardeco-api-v2/rest/export/SNPTD?versions=2021&unit=NR&level_id=0&level_id=1&level_id=2&level_id=3&format=csv-table",
             }
 
             for key, url in urls.items():

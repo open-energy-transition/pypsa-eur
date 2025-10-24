@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def get_loss_factors(fn: str, n: pypsa.Network, planning_horizons: int) -> pd.Series:
     """
-    Load and prepare loss factors
+    Load and prepare loss factors.
 
     Parameters
     ----------
@@ -48,7 +48,7 @@ def get_loss_factors(fn: str, n: pypsa.Network, planning_horizons: int) -> pd.Se
     loss_factors = pd.read_csv(fn, index_col=0)[str(pyear)]
 
     # Create index map
-    idx_map = n.buses.query("Bus.str.contains('low voltage')").country
+    idx_map = n.buses.loc[n.buses.carrier == "low voltage", "country"]
     loss_factors = idx_map.map(loss_factors).dropna()
 
     return loss_factors
@@ -59,10 +59,11 @@ def compute_benchmark(
     table: str,
     options: dict,
     eu27: list[str],
+    tyndp_renewable_carriers: list[str],
     loss_factors: pd.Series = pd.Series(),
 ) -> pd.DataFrame:
     """
-    Compute benchmark metrics from optimised network.
+    Compute benchmark metrics from optimized network.
 
     Parameters
     ----------
@@ -74,6 +75,8 @@ def compute_benchmark(
         Full benchmarking configuration.
     eu27 : list[str]
         List of member state of European Union (EU27).
+    tyndp_renewable_carriers : list[str]
+        List of renewable carriers in TYNDP 2024.
     loss_factors : pd.Series, optional
         Series containing loss factors indexed by country.
 
@@ -83,7 +86,7 @@ def compute_benchmark(
         Benchmark data in long format.
     """
     opt = options["tables"][table]
-    map = opt.get("mapping", {})
+    mapping = opt.get("mapping", {})
     elec_bus_carrier = ["AC", "AC_OH", "low voltage"]
     supply_comps = ["Generator", "Link"]
     demand_comps = ["Link", "Load"]
@@ -167,6 +170,20 @@ def compute_benchmark(
             .loc[lambda x: x > 0]
             .drop(index=["electricity distribution grid"], errors="ignore")
         )
+
+        # Add H2 offwind capacities in MW_e
+        off_car = [c for c in tyndp_renewable_carriers if c.startswith("offwind-h2")]  # noqa: F841
+        df_offwind_h2 = (
+            n.generators.query("carrier.isin(@off_car)")
+            .assign(p_nom_opt=lambda df: df.p_nom_opt / df.efficiency_dc_to_h2)
+            .groupby(by=["bus"] + grouper)
+            .p_nom_opt.sum()
+            .reindex(eu27_idx, level="bus")
+            .groupby(by=grouper)
+            .sum()
+        )
+
+        df = pd.concat([df, df_offwind_h2])
     elif table == "power_generation":
         grouper = ["carrier"]
         df = (
@@ -300,7 +317,7 @@ def compute_benchmark(
     df = (
         df.reset_index()
         .rename(columns={"bus_carrier": "carrier", 0: "value", "objective": "value"})
-        .assign(carrier=lambda x: x["carrier"].map(map).fillna(x["carrier"]))
+        .assign(carrier=lambda x: x["carrier"].map(mapping).fillna(x["carrier"]))
     )
     grouper = [c for c in ["carrier", "snapshot"] if c in df.columns]
     df = (
@@ -337,6 +354,7 @@ if __name__ == "__main__":
 
     # Parameters
     options = snakemake.params["benchmarking"]
+    tyndp_renewable_carriers = snakemake.params["tyndp_renewable_carriers"]
     cc = coco.CountryConverter()
     eu27 = cc.EU27as("ISO2").ISO2.tolist()
     planning_horizons = int(snakemake.wildcards.planning_horizons)
@@ -358,7 +376,12 @@ if __name__ == "__main__":
     }
 
     func = partial(
-        compute_benchmark, n, options=options, eu27=eu27, loss_factors=loss_factors
+        compute_benchmark,
+        n,
+        options=options,
+        eu27=eu27,
+        tyndp_renewable_carriers=tyndp_renewable_carriers,
+        loss_factors=loss_factors,
     )
 
     with mp.Pool(processes=snakemake.threads) as pool:

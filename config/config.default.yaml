@@ -1,10 +1,11 @@
 # SPDX-FileCopyrightText: Contributors to Open-TYNDP <https://github.com/open-energy-transition/open-tyndp>
 # SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+# SPDX-FileCopyrightText: Open Energy Transition gGmbH
 #
 # SPDX-License-Identifier: CC0-1.0
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#top-level-configuration
-version: v0.2
+version: v0.3
 tutorial: false
 
 logging:
@@ -140,8 +141,10 @@ electricity:
   everywhere_powerplants: []
 
   conventional_carriers: [nuclear, oil, OCGT, CCGT, coal, lignite, geothermal, biomass]
+  tyndp_conventional_carriers: []
   renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, hydro]
   tyndp_renewable_carriers: []
+  tyndp_stores: []
 
   pecd_renewable_profiles:
     enable: false
@@ -159,15 +162,10 @@ electricity:
     - 2040
     - 2050
     technologies:
-      Wind_Offshore:
-      - offwind-ac-fb-r
-      - offwind-ac-fl-r
-      - offwind-dc-fb-r
-      - offwind-dc-fl-r
-      - offwind-dc-fb-oh
-      - offwind-dc-fl-oh
-      - offwind-h2-fb-oh
-      - offwind-h2-fl-oh
+    - Wind_Offshore
+    - LFSolarPVRooftop
+    - LFSolarPVUtility
+    - Wind_Onshore
 
   pemmdb_hydro_profiles:
     enable: false
@@ -181,6 +179,30 @@ electricity:
     - Reservoir
     - PS Open
     - PS Closed
+
+  pemmdb_capacities:
+    enable: false
+    nprocesses: 4
+    available_years:
+    - 2030
+    - 2040
+    - 2050
+    technologies:
+    - Solar
+    - Wind
+    - Hydro
+    - Other_RES
+    - Gas
+    - Nuclear
+    - Hard_coal
+    - Lignite
+    - Light_oil
+    - Heavy_oil
+    - Oil_shale
+    - Other_Non-RES
+    - Hydrogen
+    - Electrolyser
+    - Battery
 
   estimate_renewable_capacities:
     enable: true

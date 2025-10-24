@@ -28,6 +28,7 @@ from tqdm import tqdm
 from scripts._helpers import (
     configure_logging,
     get_snapshots,
+    safe_pyear,
     set_scenario_config,
 )
 
@@ -38,14 +39,14 @@ def read_hydro_inflows_file(
     node: str,
     hydro_inflows_dir: str,
     cyear: str,
-    pyear: str,
+    pyear: int,
     hydro_tech: str,
     sns: pd.DatetimeIndex,
     date_index: dict,
 ) -> pd.Series:
     fn = Path(
         hydro_inflows_dir,
-        pyear,
+        str(pyear),
         f"PEMMDB_{node.replace('GB', 'UK')}_Hydro_Inflows_{pyear}.xlsx",
     )
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
             "clean_tyndp_hydro_inflows",
             clusters="all",
             planning_horizons=2030,
-            tech="Run of River",
+            tech="Run_of_River",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
@@ -122,13 +123,17 @@ if __name__ == "__main__":
         cyear = 2009
 
     # Planning year
-    pyear = str(snakemake.wildcards.planning_horizons)
+    pyear = safe_pyear(
+        snakemake.wildcards.planning_horizons,
+        available_years=snakemake.params.available_years,
+        source="Hydro inflows",
+    )
 
     # Parameters
     onshore_buses = pd.read_csv(snakemake.input.busmap, index_col=0)
     nodes = onshore_buses.index
     hydro_inflows_dir = snakemake.input.hydro_inflows_dir
-    hydro_tech = str(snakemake.wildcards.tech)
+    hydro_tech = str(snakemake.wildcards.tech).replace("_", " ")
 
     # Load and prep inflow data
     tqdm_kwargs = {
