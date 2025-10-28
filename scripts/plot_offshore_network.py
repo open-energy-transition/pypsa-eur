@@ -11,9 +11,10 @@ import re
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pypsa
-from _helpers import configure_logging, set_scenario_config
-from plot_power_network import load_projection
 from pypsa.plot import add_legend_circles, add_legend_lines, add_legend_patches
+
+from scripts._helpers import configure_logging, set_scenario_config
+from scripts.plot_power_network import load_projection
 
 plt.style.use(["ggplot"])
 
@@ -206,7 +207,7 @@ def plot_offshore_map(
 
 if __name__ == "__main__":
     if "snakemake" not in globals():
-        from _helpers import mock_snakemake
+        from scripts._helpers import mock_snakemake
 
         snakemake = mock_snakemake(
             "plot_offshore_network",
