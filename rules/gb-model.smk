@@ -351,7 +351,7 @@ rule create_ev_demand_table:
     input:
         regional_gb_data=resources("gb-model/regional_gb_data.csv"),
     output:
-        ev_demand=resources("gb-model/fes_ev_demand.csv")
+        ev_demand=resources("gb-model/fes_ev_demand.csv"),
     log:
         logs("create_ev_demand_table.log"),
     script:

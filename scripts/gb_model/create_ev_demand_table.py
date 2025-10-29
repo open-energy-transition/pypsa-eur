@@ -27,13 +27,13 @@ def parse_ev_demand(
     Parse the electric vehicle (EV) demand data to the required format.
 
     Args:
-        regional_gb_data_path (str): Path to the regional GB data CSV file containing 
+        regional_gb_data_path (str): Path to the regional GB data CSV file containing
                                    EV demand data by region and year
         fes_scenario (str): FES scenario name to filter by (e.g., "leading the way")
         year_range (list): Two-element list [start_year, end_year] defining the year range to include
 
     Returns:
-        pd.DataFrame: Processed EV demand data with MultiIndex ['bus', 'year'] and 
+        pd.DataFrame: Processed EV demand data with MultiIndex ['bus', 'year'] and
                      'data' values representing total EV electricity demand in original units.
                      Combines both "ev demand 1" and "ev demand 2" categories.
 
@@ -59,7 +59,11 @@ def parse_ev_demand(
 
     # Select EV demands
     ev_demand_data = regional_gb_data[
-        (regional_gb_data["Technology Detail"].str.lower().isin(["ev demand 1", "ev demand 2"]))
+        (
+            regional_gb_data["Technology Detail"]
+            .str.lower()
+            .isin(["ev demand 1", "ev demand 2"])
+        )
     ]
 
     # Calculate regional EV demand
