@@ -137,3 +137,6 @@ geothermal_heat_utilisation_potentials,,,
 jrc_ardeco,,,
 -- source,str,"{archive, primary}","Source of annual regional database for EU regions"
 -- version,str,,"Version of the JRC ARDECO dataset"
+hera,,,
+-- source,str,"{primary}","dataset to produce a longterm hydrological reanalysis with downscaled and bias-connected climate reanalysis"
+-- version_or_latest,str,,"Version of hera dataset"
