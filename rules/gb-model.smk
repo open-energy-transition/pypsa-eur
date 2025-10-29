@@ -342,6 +342,22 @@ rule create_hydrogen_storage_table:
         "../scripts/gb_model/create_hydrogen_storage_table.py"
 
 
+rule create_ev_demand_table:
+    message:
+        "Process EV demand from FES workbook into CSV format"
+    params:
+        scenario=config["fes"]["gb"]["scenario"],
+        year_range=config["fes"]["year_range_incl"],
+    input:
+        regional_gb_data=resources("gb-model/regional_gb_data.csv"),
+    output:
+        ev_demand=resources("gb-model/fes_ev_demand.csv"),
+    log:
+        logs("create_ev_demand_table.log"),
+    script:
+        "../scripts/gb_model/create_ev_demand_table.py"
+
+
 rule create_ev_demand_profile:
     message:
         "Process EV demand profile into CSV format"
@@ -355,7 +371,7 @@ rule create_ev_demand_profile:
     log:
         logs("create_ev_demand_profile.log"),
     script:
-        "../scripts/gb_model/create_ev_demand_profile.py"      
+        "../scripts/gb_model/create_ev_demand_profile.py"  
 
 
 rule compose_network:
@@ -385,6 +401,7 @@ rule compose_network:
             resources("gb-model/fes_hydrogen_supply.csv"),
             resources("gb-model/fes_off_grid_electrolysis_electricity_demand.csv"),
             resources("gb-model/fes_hydrogen_storage.csv"),
+            resources("gb-model/fes_ev_demand.csv"),
         ],
     output:
         network=resources("networks/composed_{clusters}.nc"),
