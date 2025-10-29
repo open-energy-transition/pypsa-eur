@@ -342,6 +342,22 @@ rule create_hydrogen_storage_table:
         "../scripts/gb_model/create_hydrogen_storage_table.py"
 
 
+rule create_ev_demand_profile:
+    message:
+        "Process EV demand profile into CSV format"
+    params:
+        scenario=config["fes"]["gb"]["scenario"],
+        year_range=config["fes"]["year_range_incl"],
+    input:
+        ev_demand=resources("gb-model/fes_ev_demand.csv"),
+    output:
+        ev_demand_profile=resources("gb-model/ev_demand_profile.csv"),
+    log:
+        logs("create_ev_demand_profile.log"),
+    script:
+        "../scripts/gb_model/create_ev_demand_profile.py"      
+
+
 rule compose_network:
     input:
         unpack(input_profile_tech),
