@@ -177,6 +177,22 @@ rule process_fes_eur_data:
         "../scripts/gb_model/process_fes_eur_data.py"
 
 
+rule process_dukes_current_capacities:
+    message:
+        "Assign current capacities to GB model regions and PyPSA-Eur carriers"
+    input:
+        regions=resources("gb-model/merged_shapes.geojson"),
+        regions_offshore=resources("regions_offshore_base_s.geojson"),
+        dukes_data="data/downloaded/dukes-5.11.xlsx",
+    output:
+        csv=resources("gb-model/dukes-current-capacity.csv"),
+    params:
+        sheet_config=config["dukes-5.11"]["sheet-config"],
+        target_crs=config["target_crs"],
+    script:
+        "../scripts/gb_model/process_dukes_current_capacities.py"
+
+
 rule process_fes_gsp_data:
     message:
         "Process FES workbook sheet BB1 together with metadata from sheet BB2."
