@@ -69,6 +69,12 @@ def parse_ev_demand(
     # Calculate regional EV demand
     regional_ev_demand = ev_demand_data.groupby(["bus", "year"])["data"].sum()
 
+    # Convert from GWh to MWh
+    regional_ev_demand = regional_ev_demand * 1000.0
+
+    # Rename series to p_set
+    regional_ev_demand.name = "p_set"
+
     return regional_ev_demand
 
 
