@@ -254,7 +254,6 @@ if __name__ == "__main__":
     df_with_regions = pd.concat(
         [df, region_data.rename(columns={"name": "bus"})], axis=1
     )
-    breakpoint()
     for TO_region in gdf_regions["TO_region"].unique():
         df_with_regions.loc[
             df_with_regions.GSP == f"Direct({TO_region})", "TO_region"
