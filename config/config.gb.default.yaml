@@ -148,44 +148,46 @@ region_operations:
   - id: 21
     merge: [57]
     TO: NGET
-
   - id: 22
+    merge: [77, 78, 79]
+    TO: NGET
+
+  - id: 23
     merge: [58]
     TO: SPTL
-  - id: 23
+  - id: 24
     merge: [59]
     TO: SPTL
 
-  - id: 24
+  - id: 25
     merge: [60]
     TO: SHETL
-  - id: 25
+  - id: 26
     merge: [61, 64]
     TO: SHETL
-  - id: 26
+  - id: 27
     merge: [62, 63, 86, 87, 88]
     TO: SHETL
-  - id: 27
+  - id: 28
     merge: [65, 66, 67, 68, 69, 70, 71, 72, 73, 84, 85]
     TO: SHETL
-  - id: 28
+  - id: 29
     merge: [74, 75, 76]
     TO: SHETL
-  - id: 29
-    merge: [77, 78, 79]
-    TO: SHETL
   - id: 30
-    merge: [80, 81, 82, 83]
-    TO: SHETL
-  - id: 31
     merge: [89]
     TO: SHETL
-  - id: 32
+  - id: 31
     merge: [90]
     TO: SHETL
-  - id: 33
+  - id: 32
     merge: [93]
     TO: SHETL
+
+  # TODO: add this to Ireland
+  - id: 33
+    merge: [80, 81, 82, 83]
+    TO: N-IRL
 
 # Note: Set ENTSO_E_API_KEY in your .env file or environment variables
 # Register at https://transparency.entsoe.eu/ to get API key

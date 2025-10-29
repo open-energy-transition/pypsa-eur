@@ -183,6 +183,7 @@ rule process_fes_gsp_data:
     params:
         scenario=config["fes"]["gb"]["scenario"],
         year_range=config["fes"]["year_range_incl"],
+        target_crs=config["target_crs"],
     input:
         bb1_sheet=resources("gb-model/fes/2021/BB1.csv"),
         bb2_sheet=resources("gb-model/fes/2021/BB2.csv"),
@@ -222,6 +223,7 @@ rule create_interconnectors_table:
     params:
         interconnector_config=config["interconnectors"],
         year_range=config["fes"]["year_range_incl"],
+        target_crs=config["target_crs"],
     log:
         logs("create_interconnectors_table.log"),
     script:

@@ -243,17 +243,22 @@ if __name__ == "__main__":
         bb1_path, bb2_path, gsp_coordinates_path, fes_scenario, year_range
     )
 
-    region_data = map_points_to_regions(df, gdf_regions, "Latitude", "Longitude")[
-        ["name", "TO_region"]
-    ]
+    region_data = map_points_to_regions(
+        df,
+        gdf_regions,
+        "Latitude",
+        "Longitude",
+        "EPSG:4326",
+        snakemake.params.target_crs,
+    )[["name", "TO_region"]]
     df_with_regions = pd.concat(
         [df, region_data.rename(columns={"name": "bus"})], axis=1
     )
+    breakpoint()
     for TO_region in gdf_regions["TO_region"].unique():
         df_with_regions.loc[
             df_with_regions.GSP == f"Direct({TO_region})", "TO_region"
         ] = TO_region
-
     logger.info(f"Extracted the {fes_scenario} relevant data")
 
     # Distribute Direct GSP data to other GSPs in the same region
