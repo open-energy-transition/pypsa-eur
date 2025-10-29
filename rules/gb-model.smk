@@ -385,6 +385,7 @@ rule compose_network:
             resources("gb-model/fes_hydrogen_supply.csv"),
             resources("gb-model/fes_off_grid_electrolysis_electricity_demand.csv"),
             resources("gb-model/fes_hydrogen_storage.csv"),
+            resources("gb-model/fes_ev_demand.csv")
         ],
     output:
         network=resources("networks/composed_{clusters}.nc"),
