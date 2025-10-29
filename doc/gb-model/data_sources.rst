@@ -74,3 +74,8 @@ For instance, if there is a 80% availability in the first half of June for only 
 Hydrogen data
 -------------
 All hydrogen related data such as demand, supply, storage, and generation capacities are sourced from the FES workbooks as detailed above.
+
+--------------
+EV demand data
+--------------
+Electric vehicle (EV) demand data is extracted from the FES workbook table BB1.
