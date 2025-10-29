@@ -371,7 +371,7 @@ rule create_ev_demand_profile:
     log:
         logs("create_ev_demand_profile.log"),
     script:
-        "../scripts/gb_model/create_ev_demand_profile.py"  
+        "../scripts/gb_model/create_ev_demand_profile.py"
 
 
 rule compose_network:
