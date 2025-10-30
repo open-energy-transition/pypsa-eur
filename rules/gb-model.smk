@@ -358,6 +358,18 @@ rule create_ev_demand_table:
         "../scripts/gb_model/create_ev_demand_table.py"
 
 
+rule create_baseline_electricity_demand_table:
+    message:
+        "Process FES workbook to obtain electricity baseline demand in CSV format"        
+    input:
+        regional_gb_data=resources("gb-model/regional_gb_data.csv"),
+    output:
+        baseline_electricity_demand=resources("gb-model/fes_baseline_electricity_demand.csv"),
+    log:
+        logs("create_baseline_electricity_demand.log"),
+    script:
+        "../scripts/gb_model/create_baseline_electricity_demand_table.py"
+
 rule compose_network:
     input:
         unpack(input_profile_tech),
