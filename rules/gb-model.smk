@@ -182,8 +182,8 @@ rule process_dukes_current_capacities:
         "Assign current capacities to GB model regions and PyPSA-Eur carriers"
     input:
         regions=resources("gb-model/merged_shapes.geojson"),
-        regions_offshore=resources("regions_offshore_base_s.geojson"),
-        dukes_data="data/downloaded/dukes-5.11.xlsx",
+        regions_offshore=resources("regions_offshore.geojson"),
+        dukes_data="data/gb-model/downloaded/dukes-5.11.xlsx",
     output:
         csv=resources("gb-model/dukes-current-capacity.csv"),
     params:

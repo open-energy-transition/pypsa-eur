@@ -30,8 +30,7 @@ def _add_region_cols(df: pd.DataFrame, region_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def process_dukes_data(
-    df_dukes: pd.DataFrame,
-    gdf_regions: gpd.GeoDataFrame,
+    df_dukes: pd.DataFrame, gdf_regions: gpd.GeoDataFrame, target_crs: str
 ) -> pd.DataFrame:
     region_data = map_points_to_regions(
         df_dukes,
@@ -39,10 +38,10 @@ def process_dukes_data(
         "Y-Coordinate",
         "X-Coordinate",
         "EPSG:27700",
-        snakemake.params.target_crs,
+        target_crs,
     )
+    breakpoint()
     df_dukes = _add_region_cols(df_dukes, region_data)
-
     initial_drop = df_dukes["X-Coordinate"].isnull().sum()
     bus_drop = (df_dukes["X-Coordinate"].notnull() & df_dukes["bus"].isnull()).sum()
 
@@ -64,6 +63,20 @@ if __name__ == "__main__":
     # Load the file paths
     gdf_regions = gpd.read_file(snakemake.input.regions)
     gdf_regions_offshore = gpd.read_file(snakemake.input.regions_offshore)
+    gdf_regions_offshore_new = map_points_to_regions(
+        gdf_regions_offshore,
+        gdf_regions,
+        lon_col="x",
+        lat_col="y",
+        point_crs="EPSG:4326",
+        projected_crs=snakemake.params.target_crs,
+    )
+    gdf_regions_offshore = gdf_regions_offshore.merge(
+        gdf_regions_offshore_new[["TO_region"]],
+        left_index=True,
+        right_index=True,
+    )
+    breakpoint()
     gdf_regions_all = pd.concat([gdf_regions, gdf_regions_offshore]).query(
         "country == 'GB'"
     )
@@ -72,6 +85,8 @@ if __name__ == "__main__":
     df_dukes = pd.read_excel(
         snakemake.input.dukes_data, sheet_name=sheet_name, **sheet_config
     )
-    df_dukes_cleaned = process_dukes_data(df_dukes, gdf_regions_all)
+    df_dukes_cleaned = process_dukes_data(
+        df_dukes, gdf_regions_all, snakemake.params.target_crs
+    )
 
     df_dukes_cleaned.to_csv(snakemake.output.csv, index=False)
