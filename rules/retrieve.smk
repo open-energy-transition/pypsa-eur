@@ -1047,8 +1047,8 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
                 f"{HERA_DATASET['url']}climate_inputs/ta6/ta6_{{year}}.nc"
             ),
         output:
-            river_discharge=f"{HERA_DATASET['folder']}/hera_{{year}}/river_discharge_{{year}}.nc",
-            ambient_temperature=f"{HERA_DATASET['folder']}/hera_{{year}}/ambient_temp_{{year}}.nc",
+            river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{year}}.nc",
+            ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{year}}.nc",
         params:
             snapshot_year="{year}",
         log:
