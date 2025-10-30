@@ -1022,6 +1022,7 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
         run:
             copy2(input["lau_regions"], output["zip"])
 
+
 rule retrieve_seawater_temperature:
     params:
         default_cutout=config_provider("atlite", "default_cutout"),
@@ -1035,6 +1036,7 @@ rule retrieve_seawater_temperature:
         "../envs/environment.yaml"
     script:
         "../scripts/retrieve_seawater_temperature.py"
+
 
 rule retrieve_hera_data_test_cutout:
     input:
@@ -1054,11 +1056,13 @@ rule retrieve_hera_data_test_cutout:
     run:
         unpack_archive(input[0], params.folder)
 
+
 if (HERA_DATASET := dataset_version("hera"))["source"] in [
     "primary",
 ]:
+
     rule retrieve_hera_data:
-        input: 
+        input:
             river_discharge=storage(
                 f"{HERA_DATASET['url']}river_discharge/dis.HERA{{year}}.nc"
             ),
@@ -1078,6 +1082,7 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
         run:
             move(input.river_discharge, output.river_discharge)
             move(input.ambient_temperature, output.ambient_temperature)
+
 
 if (JRC_ARDECO_DATASET := dataset_version("jrc_ardeco"))["source"] in [
     "primary",
