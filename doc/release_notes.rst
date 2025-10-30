@@ -15,6 +15,8 @@ Upcoming Open-TYNDP Release
 Upcoming PyPSA-Eur Release
 ================
 
+* Added river-water and sea-water sourced heat pumps as well as interactive bus-balance plots and heat-source maps. Also introduced district heating areas in which heat sources must be located.
+
 * Added automatic retry for some (Zenodo) HTTP requests to handle transient errors 
   like rate limiting and server errors.
 
