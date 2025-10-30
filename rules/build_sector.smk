@@ -440,7 +440,7 @@ def input_hera_data(w) -> dict[str, str]:
                 f"data/hera_{year}/river_discharge_{year}.nc"
             )
             result[f"hera_ambient_temperature_{year}"] = (
-                rules.retrieve_hera_data.output['ambient_temperature']
+                rules.retrieve_hera_data.output["ambient_temperature"]
             )
 
         return result
