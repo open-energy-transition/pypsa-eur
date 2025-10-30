@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 import os
+import gzip
 import requests
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from shutil import move, unpack_archive, rmtree, copy2
+from shutil import move, unpack_archive, rmtree, copy2, copyfileobj
 from zipfile import ZipFile
 
 
@@ -96,7 +97,7 @@ elif (CORINE_DATASET := dataset_version("corine"))["source"] in ["primary"]:
 
     rule retrieve_corine:
         params:
-            apikey=config["secrets"]["corine"],
+            apikey=os.environ.get("CORINE_API_TOKEN", config["secrets"]["corine"]),
         output:
             zip=f"{CORINE_DATASET['folder']}/corine.zip",
             tif_file=f"{CORINE_DATASET['folder']}/corine.tif",
@@ -282,20 +283,17 @@ if (EU_NUTS2021_DATASET := dataset_version("eu_nuts2021"))["source"] in [
 ]:
 
     rule retrieve_eu_nuts_2021:
+        params:
+            shapes_level_3_path="NUTS_RG_01M_2021_4326_LEVL_3.geojson",
+            shapes_level_2_path="NUTS_RG_01M_2021_4326_LEVL_2.geojson",
+            shapes_level_1_path="NUTS_RG_01M_2021_4326_LEVL_1.geojson",
+            shapes_level_0_path="NUTS_RG_01M_2021_4326_LEVL_0.geojson",
         input:
             shapes=storage(EU_NUTS2021_DATASET["url"]),
         output:
             zip_file=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson.zip",
-            folder=directory(
-                f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson"
-            ),
-            shapes_level_3=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson/NUTS_RG_01M_2021_4326_LEVL_3.geojson",
-            shapes_level_2=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson/NUTS_RG_01M_2021_4326_LEVL_2.geojson",
-            shapes_level_1=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson/NUTS_RG_01M_2021_4326_LEVL_1.geojson",
-            shapes_level_0=f"{EU_NUTS2021_DATASET['folder']}/ref-nuts-2021-01m.geojson/NUTS_RG_01M_2021_4326_LEVL_0.geojson",
         run:
             copy2(input["shapes"], output["zip_file"])
-            unpack_archive(output["zip_file"], Path(output.shapes_level_3).parent)
 
 
 rule retrieve_bidding_zones:
@@ -431,10 +429,15 @@ if (
         input:
             csv=storage(SYNTHETIC_ELECTRICITY_DEMAND_DATASET["url"]),
         output:
-            csv=f"{SYNTHETIC_ELECTRICITY_DEMAND_DATASET['folder']}/load_synthetic_raw.csv",
+            csv=f"{SYNTHETIC_ELECTRICITY_DEMAND_DATASET['folder']}/load_synthetic_raw.csv.gz",
         retries: 2
         run:
-            copy2(input["csv"], output["csv"])
+            with (
+                open(input["csv"], "rb") as f_in,
+                gzip.open(output["csv"], "wb") as f_out,
+            ):
+                copyfileobj(f_in, f_out)
+
 
 
 if (SHIP_RASTER_DATASET := dataset_version("ship_raster"))["source"] in [
@@ -1121,28 +1124,14 @@ if (AQUIFER_DATA_DATASET := dataset_version("aquifer_data"))["source"] in [
 ]:
 
     rule retrieve_aquifer_data_bgr:
+        params:
+            shp_path="IHME1500_v12/shp/ihme1500_aquif_ec4060_v12_poly.shp",
         input:
             zip_file=storage(AQUIFER_DATA_DATASET["url"]),
         output:
             zip_file=f"{AQUIFER_DATA_DATASET['folder']}/ihme1500_aquif_ec4060_v12_poly.zip",
-            aquifer_shapes=expand(
-                f"{AQUIFER_DATA_DATASET['folder']}/IHME1500_v12/shp/ihme1500_aquif_ec4060_v12_poly.{{ext}}",
-                ext=[
-                    "shp",
-                    "shx",
-                    "dbf",
-                    "cpg",
-                    "prj",
-                    "sbn",
-                    "sbx",
-                ],
-            ),
         run:
             copy2(input["zip_file"], output["zip_file"])
-            unpack_archive(
-                output["zip_file"],
-                AQUIFER_DATA_DATASET["folder"],
-            )
 
 
 if (DH_AREAS_DATASET := dataset_version("dh_areas"))["source"] in [
