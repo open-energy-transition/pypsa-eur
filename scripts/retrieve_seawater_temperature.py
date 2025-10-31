@@ -83,7 +83,7 @@ if __name__ == "__main__":
                 f"Successfully downloaded test-cutout seawater temperature data to {snakemake.output.seawater_temperature}"
             )
         else:
-            raise ValueError (
+            raise ValueError(
                 f"Archive data does not exist for cutout {snakemake.params.default_cutout}. Use primary source to download cutout"
             )
     else:
