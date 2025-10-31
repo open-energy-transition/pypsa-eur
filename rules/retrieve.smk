@@ -1022,11 +1022,26 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
         run:
             copy2(input["lau_regions"], output["zip"])
 
+
+if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))[
+    "source"
+] in ["archive", "primary"]:
+
     rule retrieve_seawater_temperature:
         params:
-            default_cutout=config_provider("atlite", "default_cutout"),
+            default_cutout=(
+                config_provider("atlite", "default_cutout")
+                if SEAWATER_TEMPERATURE_DATASET["source"] == "archive"
+                else ""
+            ),
+        input:
+            data=(
+                storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}")
+                if SEAWATER_TEMPERATURE_DATASET["source"] == "archive"
+                else []
+            ),
         output:
-            seawater_temperature="data/seawater_temperature_{year}.nc",
+            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{year}}.nc",
         log:
             "logs/retrieve_seawater_temperature_{year}.log",
         resources:
@@ -1036,35 +1051,51 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
         script:
             "../scripts/retrieve_seawater_temperature.py"
 
-    rule retrieve_hera_data_test_cutout:
+
+if (HERA_TEST_CUTOUT_DATASET := dataset_version("hera_test_cutout"))["source"] in [
+    "archive"
+]:
+
+    rule retrieve_hera_test_cutout_dataset:
         input:
-            hera_data_url=storage(
-                f"https://zenodo.org/records/15828866/files/hera_be_2013-03-01_to_2013-03-08.zip"
-            ),
+            hera_data=storage(f"{HERA_TEST_CUTOUT_DATASET['url']}"),
         output:
-            river_discharge=f"data/hera_be_2013-03-01_to_2013-03-08/river_discharge_be_2013-03-01_to_2013-03-08.nc",
-            ambient_temperature=f"data/hera_be_2013-03-01_to_2013-03-08/ambient_temp_be_2013-03-01_to_2013-03-08.nc",
-        params:
-            folder="data",
+            river_discharge=f"{HERA_TEST_CUTOUT_DATASET['folder']}/river_discharge_be_2013-03-01_to_2013-03-08.nc",
+            ambient_temperature=f"{HERA_TEST_CUTOUT_DATASET['folder']}/ambient_temp_be_2013-03-01_to_2013-03-08.nc",
         log:
             "logs/retrieve_hera_data_test_cutout.log",
+        retries: 2
         resources:
             mem_mb=10000,
-        retries: 2
         run:
-            unpack_archive(input[0], params.folder)
+            unpack_archive(input["hera_data"], HERA_TEST_CUTOUT_DATASET["folder"])
+
+            # Move files one folder up
+            folder = HERA_TEST_CUTOUT_DATASET["folder"]
+            source_folder = Path.joinpath(
+                folder, "hera_be_2013-03-01_to_2013-03-08"
+            )
+            for file in source_folder.iterdir():
+                move(file, folder)
+            os.rmdir(source_folder)
+
+
+
+if (HERA_DATASET := dataset_version("hera"))["source"] in [
+    "primary",
+]:
 
     rule retrieve_hera_data:
         input:
             river_discharge=storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/river_discharge/dis.HERA{year}.nc"
+                f"{HERA_DATASET['url']}river_discharge/dis.HERA{{year}}.nc"
             ),
             ambient_temperature=storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/climate_inputs/ta6/ta6_{year}.nc"
+                f"{HERA_DATASET['url']}climate_inputs/ta6/ta6_{{year}}.nc"
             ),
         output:
-            river_discharge="data/hera_{year}/river_discharge_{year}.nc",
-            ambient_temperature="data/hera_{year}/ambient_temp_{year}.nc",
+            river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{year}}.nc",
+            ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{year}}.nc",
         params:
             snapshot_year="{year}",
         log:

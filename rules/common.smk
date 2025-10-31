@@ -151,7 +151,6 @@ def dataset_version(
 
     # Generate output folder path in the `data` directory
     dataset["folder"] = Path("data", name, dataset["source"], dataset["version"])
-
     return dataset
 
 
