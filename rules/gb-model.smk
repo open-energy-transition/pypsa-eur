@@ -364,10 +364,13 @@ rule create_ev_demand_profile:
     params:
         scenario=config["fes"]["gb"]["scenario"],
         year_range=config["fes"]["year_range_incl"],
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
     input:
         ev_demand=resources("gb-model/fes_ev_demand.csv"),
+        traffic_data_KFZ="data/bundle/emobility/KFZ__count",
     output:
-        ev_demand_profile=resources("gb-model/ev_demand_profile.csv"),
+        ev_demand_profile=resources("gb-model/ev_demand_profile_shape.csv"),
     log:
         logs("create_ev_demand_profile.log"),
     script:

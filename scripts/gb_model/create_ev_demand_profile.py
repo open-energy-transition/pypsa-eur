@@ -12,8 +12,15 @@ import logging
 from pathlib import Path
 
 import pandas as pd
+import xarray as xr
 
-from scripts._helpers import configure_logging, set_scenario_config
+from scripts._helpers import (
+    configure_logging,
+    set_scenario_config,
+    generate_periodic_profiles,
+    get_snapshots,
+)
+from scripts.build_transport_demand import transport_degree_factor
 from scripts.gb_model._helpers import get_regional_distribution
 
 logger = logging.getLogger(__name__)
@@ -21,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 def prepare_ev_demand_profiles(
     ev_demand_path: str,
+    traffic_fn: str,
+    snapshots: pd.DatetimeIndex,
 ) -> pd.DataFrame:
     """
     Parse and prepare EV demand profiles.
@@ -47,43 +56,24 @@ def prepare_ev_demand_profiles(
         5. Redistribute unmapped capacities based on regional distribution patterns
         6. Combine mapped and redistributed capacities into final dataset
     """
-    # Read regional GB data
-    regional_gb_data = pd.read_csv(regional_gb_data_path)
+    # Read regional EV demand data
+    regional_ev_demand = pd.read_csv(ev_demand_path)
 
-    # Select regional hydrogen electrolysis data
-    electrolysis_data = regional_gb_data[
-        (regional_gb_data["Technology Detail"].str.lower() == "hydrogen electrolysis")
-    ]
+    # Read averaged weekly traffic counts from the year 2010-2015
+    traffic = pd.read_csv(traffic_fn, skiprows=2, usecols=["count"]).squeeze("columns")
 
-    # Calculate regional grid-connected electrolysis capacities
-    regional_grid_electrolysis_capacities = electrolysis_data.groupby(["bus", "year"])[
-        "data"
-    ].sum()
+    # Determine nodes (regions) from the regional EV demand data
+    nodes = regional_ev_demand["bus"].unique()
 
-    # Calculate regional distribution of grid-connected electrolysis capacities
-    electrolysis_distribution = get_regional_distribution(
-        regional_grid_electrolysis_capacities
+    # Create annual profile take account time zone + summer time
+    transport_shape = generate_periodic_profiles(
+        dt_index=snapshots,
+        nodes=nodes,
+        weekly_profile=traffic.values,
     )
+    transport_shape = transport_shape / transport_shape.sum()
 
-    # Map unmapped grid-connected electrolysis data
-    unmapped_grid_electrolysis_capacities = (
-        electrolysis_data[electrolysis_data["bus"].isnull()]
-        .groupby("year")["data"]
-        .sum()
-    )
-    unmapped_grid_electrolysis_capacities = (
-        unmapped_grid_electrolysis_capacities * electrolysis_distribution
-    )
-
-    # Combine mapped and unmapped grid-connected electrolysis data
-    grid_electrolysis_capacities = (
-        regional_grid_electrolysis_capacities + unmapped_grid_electrolysis_capacities
-    )
-
-    # Rename series to 'p_nom'
-    grid_electrolysis_capacities.name = "p_nom"
-
-    return grid_electrolysis_capacities
+    return transport_shape
 
 
 if __name__ == "__main__":
@@ -97,11 +87,20 @@ if __name__ == "__main__":
     # Load the file path
     ev_demand_path = snakemake.input.ev_demand
 
-    # Prepare EV demand profiles
-    ev_demand_profiles = prepare_ev_demand_profiles(ev_demand_path)
+    # Define snapshots and nodes
+    snapshots = get_snapshots(
+        snakemake.params.snapshots, snakemake.params.drop_leap_day, tz="UTC"
+    )
+
+    # Prepare EV demand profile shape
+    ev_demand_profiles_shape = prepare_ev_demand_profiles(
+        ev_demand_path,
+        traffic_fn=snakemake.input.traffic_data_KFZ,
+        snapshots=snapshots,
+    )
 
     # Save the EV demand profiles
-    ev_demand_profiles.to_csv(snakemake.output.ev_demand_profiles)
+    ev_demand_profiles_shape.to_csv(snakemake.output.ev_demand_profile_shape)
     logger.info(
         f"Grid-connected electrolysis capacities saved to {snakemake.output.grid_electrolysis_capacities}"
     )
