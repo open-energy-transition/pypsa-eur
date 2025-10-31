@@ -365,7 +365,9 @@ rule process_transport_demand_shape:
         fes_ev_demand=resources("gb-model/fes_ev_demand.csv"),
         transport_demand=resources("transport_demand_s_{clusters}.csv"),
     output:
-        transport_demand_shape=resources("gb-model/transport_demand_shape_s_{clusters}.csv"),
+        transport_demand_shape=resources(
+            "gb-model/transport_demand_shape_s_{clusters}.csv"
+        ),
     log:
         logs("transport_demand_shape_s_{clusters}.log"),
     script:

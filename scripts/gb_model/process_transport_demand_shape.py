@@ -12,7 +12,6 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-import xarray as xr
 
 from scripts._helpers import configure_logging, set_scenario_config
 
@@ -29,18 +28,18 @@ def prepare_transport_demand_shape(
     normalized demand profiles (shapes) for use in EV demand modeling.
 
     Args:
-        transport_demand_path (str): Path to the CSV file containing regional 
-                                   transport demand data with buses as columns 
+        transport_demand_path (str): Path to the CSV file containing regional
+                                   transport demand data with buses as columns
                                    and time periods as index.
 
     Returns:
-        pd.DataFrame: Normalized transport demand profiles with the same structure 
+        pd.DataFrame: Normalized transport demand profiles with the same structure
                      as input but with values representing demand shares/proportions.
                      Each column (region) sums to 1.0 across all time periods.
 
     Processing steps:
         1. Load regional transport demand data from CSV file
-        2. Calculate normalized demand profiles by dividing each region's demand 
+        2. Calculate normalized demand profiles by dividing each region's demand
            by its total annual demand
         3. Return demand shape profiles for use in EV demand modeling
     """
