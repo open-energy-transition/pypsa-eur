@@ -5,7 +5,7 @@
 """
 Demand data processor.
 
-This script processes electricity demand data from the FES workbook.
+This script processes required electricity demand data from the FES workbook.
 """
 
 import logging
@@ -22,18 +22,18 @@ def parse_demand_data(
     technology_detail: list,
 ) -> pd.DataFrame:
     """
-    Parse the regional gb data to obtain electricity demand in the required format
+    Parse the regional gb data to obtain required electricity demand in the required format
 
     Args:
         regional_gb_data_path(str): Filepath to the regional data file containing the electricity demand
-        technology_detail(list): List of technology
+        technology_detail(list): List of technology details relevant to a particular demand type
 
     Returns:
         pd.DataFrame : MultiIndex dataframe containing the electricity demand indexed by PyPSA bus and year
     """
     df_regional_data = pd.read_csv(regional_gb_data_path)
 
-    # Filter the data for baseline demand
+    # Filter the data for required demand
     df_demand = df_regional_data.query("`Technology Detail`.str.lower() in @technology_detail")
     breakpoint()
 

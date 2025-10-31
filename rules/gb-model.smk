@@ -358,11 +358,6 @@ rule create_demand_tables:
         "../scripts/gb_model/create_demand_table.py"      
 
 
-rule create_demand_table:
-    input:
-        expand(resources("gb-model/{demand_type}_demand.csv"), demand_type=["fes_baseline_electricity","fes_ev"])
-
-
 rule compose_network:
     input:
         unpack(input_profile_tech),
@@ -390,6 +385,7 @@ rule compose_network:
             resources("gb-model/fes_hydrogen_supply.csv"),
             resources("gb-model/fes_off_grid_electrolysis_electricity_demand.csv"),
             resources("gb-model/fes_hydrogen_storage.csv"),
+            resources("gb-model/fes_baseline_electricity_demand.csv"),
             resources("gb-model/fes_ev_demand.csv"),
         ],
     output:
