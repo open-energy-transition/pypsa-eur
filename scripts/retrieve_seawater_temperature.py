@@ -65,21 +65,27 @@ if __name__ == "__main__":
     set_scenario_config(snakemake)
     update_config_from_wildcards(snakemake.config, snakemake.wildcards)
 
-    if snakemake.params.default_cutout == "be-03-2013-era5":
-        logger.info("Retrieving test-cutout seawater temperature data.")
+    if snakemake.input.data != []:
+        if snakemake.params.default_cutout == "be-03-2013-era5":
+            logger.info("Retrieving test-cutout seawater temperature data.")
 
-        url = "https://zenodo.org/records/15828866/files/seawater_temperature.nc"
+            # url = "https://zenodo.org/records/15828866/files/seawater_temperature.nc"
+            url = snakemake.input.seawater_temperature
 
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
 
-        with open(snakemake.output.seawater_temperature, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+            with open(snakemake.output.data, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
-        logger.info(
-            f"Successfully downloaded test-cutout seawater temperature data to {snakemake.output.seawater_temperature}"
-        )
+            logger.info(
+                f"Successfully downloaded test-cutout seawater temperature data to {snakemake.output.seawater_temperature}"
+            )
+        else:
+            raise ValueError (
+                f"Archive data does not exist for cutout {snakemake.params.default_cutout}. Use primary source to download cutout"
+            )
     else:
         # Download seawater temperature data from Copernicus Marine Service
         # Dataset: Global Ocean Physics Reanalysis (daily, 0.083° resolution)
