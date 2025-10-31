@@ -1000,19 +1000,25 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
             copy2(input["lau_regions"], output["zip"])
 
 
-rule retrieve_seawater_temperature:
-    params:
-        default_cutout=config_provider("atlite", "default_cutout"),
-    output:
-        seawater_temperature="data/seawater_temperature_{year}.nc",
-    log:
-        "logs/retrieve_seawater_temperature_{year}.log",
-    resources:
-        mem_mb=10000,
-    conda:
-        "../envs/environment.yaml"
-    script:
-        "../scripts/retrieve_seawater_temperature.py"
+if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
+    "archive",
+    "primary"
+]:
+    rule retrieve_seawater_temperature:
+        params:
+            default_cutout=config_provider("atlite","default_cutout") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else "",
+        input:
+            data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else [],
+        output:
+            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{year}}.nc",
+        log:
+            "logs/retrieve_seawater_temperature_{year}.log",
+        resources:
+            mem_mb=10000,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            "../scripts/retrieve_seawater_temperature.py"
 
 
 if (HERA_TEST_CUTOUT_DATASET := dataset_version("hera_test_cutout"))["source"] in [

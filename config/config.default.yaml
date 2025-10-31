@@ -1131,6 +1131,9 @@ data:
   hera_test_cutout:
     source: "archive"
     version: "latest"
+  seawater_temperature:
+    source: "primary"
+    version: "latest"
 
 secrets:
   corine: '' #Add API key here if primary source is used for retrieving corine dataset after registering in https://land.copernicus.eu/user/login

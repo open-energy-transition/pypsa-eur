@@ -139,4 +139,10 @@ jrc_ardeco,,,
 -- version,str,,"Version of the JRC ARDECO dataset"
 hera,,,
 -- source,str,"{primary}","dataset to produce a longterm hydrological reanalysis with downscaled and bias-connected climate reanalysis"
--- version_or_latest,str,,"Version of hera dataset"
+-- version,str,,"Version of hera dataset"
+hera_test_cutout,,,
+-- source,str,"{archive}","test dataset to produce a longterm hydrological reanalysis with downscaled and bias-connected climate reanalysis"
+-- version,str,,"Version of hera test cutout dataset"
+seawater_temperature,,,
+-- source,str,"{archive,primary}","daily and monthly mean files for temperature, salinity, currents, sea level, mixed layer depth and ice parameters from the top to the bottom of the ocean"
+-- version,str,,"Version of seawater temperature dataset"

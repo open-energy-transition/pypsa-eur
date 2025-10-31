@@ -574,7 +574,7 @@ def input_seawater_temperature(w) -> dict[str, str]:
 
     # Create dictionary with year-specific keys
     return {
-        f"seawater_temperature_{year}": f"data/seawater_temperature_{year}.nc"
+        f"seawater_temperature_{year}": rule.retrieve_seawater_temperature.output
         for year in unique_years
     }
 
