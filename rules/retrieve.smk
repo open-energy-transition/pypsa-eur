@@ -1048,28 +1048,30 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
 if (HERA_TEST_CUTOUT_DATASET := dataset_version("hera_test_cutout"))["source"] in [
     "archive"
 ]:
+
     rule retrieve_hera_test_cutout_dataset:
         input:
-            hera_data=storage(
-                f"{HERA_TEST_CUTOUT_DATASET['url']}"
-            ),
+            hera_data=storage(f"{HERA_TEST_CUTOUT_DATASET['url']}"),
         output:
             river_discharge=f"{HERA_TEST_CUTOUT_DATASET['folder']}/river_discharge_be_2013-03-01_to_2013-03-08.nc",
             ambient_temperature=f"{HERA_TEST_CUTOUT_DATASET['folder']}/ambient_temp_be_2013-03-01_to_2013-03-08.nc",
         log:
             "logs/retrieve_hera_data_test_cutout.log",
         retries: 2
-        resources: 
+        resources:
             mem_mb=10000,
         run:
-            unpack_archive(input['hera_data'], HERA_TEST_CUTOUT_DATASET['folder'])
+            unpack_archive(input["hera_data"], HERA_TEST_CUTOUT_DATASET["folder"])
 
             # Move files one folder up
-            folder=HERA_TEST_CUTOUT_DATASET['folder']
-            source_folder=Path.joinpath(folder,"hera_be_2013-03-01_to_2013-03-08")
+            folder = HERA_TEST_CUTOUT_DATASET["folder"]
+            source_folder = Path.joinpath(
+                folder, "hera_be_2013-03-01_to_2013-03-08"
+            )
             for file in source_folder.iterdir():
-                move(file,folder)
+                move(file, folder)
             os.rmdir(source_folder)
+
 
 
 if (HERA_DATASET := dataset_version("hera"))["source"] in [
