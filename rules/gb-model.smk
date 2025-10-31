@@ -353,9 +353,9 @@ rule create_demand_tables:
     output:
         demand=resources("gb-model/{demand_type}_demand.csv"),
     log:
-        logs("create_{demand_type}_demand_table.log")  
+        logs("create_{demand_type}_demand_table.log"),
     script:
-        "../scripts/gb_model/create_demand_table.py"      
+        "../scripts/gb_model/create_demand_table.py"
 
 
 rule compose_network:
