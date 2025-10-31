@@ -92,7 +92,19 @@ def extract_transmission_projects(excel_path: Path) -> pd.DataFrame:
             unclear_border, ["project_id", "project_name", "border"]
         ].to_string(index=False, max_colwidth=40, line_width=100),
     )
-    projects = projects.loc[~unclear_border]
+
+    empty_capacity = projects["p_nom 0->1"].isna() & projects["p_nom 1->0"].isna()
+    logger.warning(
+        "%d out of %d projects have no capacity extension, ignoring them:\n%s",
+        empty_capacity.sum(),
+        len(empty_capacity),
+        projects.loc[
+            empty_capacity, ["project_id", "project_name", "border"]
+        ].to_string(index=False, max_colwidth=40, line_width=100),
+    )
+
+    projects = projects.loc[~(empty_capacity | unclear_border)]
+
     return projects
 
 
