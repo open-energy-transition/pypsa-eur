@@ -791,8 +791,8 @@ if config["enable"]["retrieve"]:
             ardeco_pop="data/jrc-ardeco/ARDECO-SNPTD.2021.table.csv",
         run:
             urls = {
-                "ardeco_gdp": "https://territorial.ec.europa.eu/ardeco-api-v2/rest/export/SUVGDP?versions=2021&unit=EUR&level_id=0&level_id=1&level_id=2&level_id=3&format=csv-table",
-                "ardeco_pop": "https://territorial.ec.europa.eu/ardeco-api-v2/rest/export/SNPTD?versions=2021&unit=NR&level_id=0&level_id=1&level_id=2&level_id=3&format=csv-table",
+                "ardeco_gdp": "https://storage.googleapis.com/open-tyndp-data-store/jrc-ardeco/ARDECO-SUVGDP.2021.table.csv",
+                "ardeco_pop": "https://storage.googleapis.com/open-tyndp-data-store/jrc-ardeco/ARDECO-SNPTD.2021.table.csv",
             }
 
             for key, url in urls.items():

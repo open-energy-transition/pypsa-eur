@@ -98,6 +98,7 @@ renewable:
     min_depth: false
 
 clustering:
+  mode: custom_busmap_BE
   temporal:
     resolution_sector: 8760h
 
