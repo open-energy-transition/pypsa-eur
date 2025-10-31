@@ -342,6 +342,26 @@ rule create_hydrogen_storage_table:
         "../scripts/gb_model/create_hydrogen_storage_table.py"
 
 
+rule create_demand_tables:
+    message:
+        "Process {wildcards.demand_type} demand from FES workbook into CSV format"
+    params:
+        demand_type=lambda wildcards: wildcards.demand_type,
+        technology_detail=config["fes"]["gb"]["demand"]["Technology Detail"],
+    input:
+        regional_gb_data=resources("gb-model/regional_gb_data.csv"),
+    output:
+        demand=resources("gb-model/{demand_type}_demand.csv"),
+    log:
+        logs("create_{demand_type}_demand_table.log")  
+    script:
+        "../scripts/gb_model/create_demand_table.py"      
+
+
+rule create_demand_table:
+    input:
+        expand(resources("gb-model/{demand_type}_demand.csv"), demand_type=["fes_baseline_electricity","fes_ev"])
+
 rule create_ev_demand_table:
     message:
         "Process EV demand from FES workbook into CSV format"
@@ -361,16 +381,16 @@ rule create_ev_demand_table:
 rule create_baseline_electricity_demand_table:
     message:
         "Process FES workbook to obtain electricity baseline demand in CSV format"
-    input:
-        regional_gb_data=resources("gb-model/regional_gb_data.csv"),
+#    input:
+#       regional_gb_data=resources("gb-model/regional_gb_data.csv"),
     output:
         baseline_electricity_demand=resources(
             "gb-model/fes_baseline_electricity_demand.csv"
         ),
     log:
         logs("create_baseline_electricity_demand.log"),
-    script:
-        "../scripts/gb_model/create_baseline_electricity_demand_table.py"
+#    script:
+#       "../scripts/gb_model/create_baseline_electricity_demand_table.py"
 
 
 rule compose_network:
