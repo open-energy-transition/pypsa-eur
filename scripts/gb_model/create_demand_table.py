@@ -34,7 +34,9 @@ def parse_demand_data(
     df_regional_data = pd.read_csv(regional_gb_data_path)
 
     # Filter the data for required demand
-    df_demand = df_regional_data.query("`Technology Detail`.str.lower() in @technology_detail")
+    df_demand = df_regional_data.query(
+        "`Technology Detail`.str.lower() in @technology_detail"
+    )
     breakpoint()
 
     # Convert from GWh to MWh
@@ -59,14 +61,10 @@ if __name__ == "__main__":
     regional_gb_data_path = snakemake.input.regional_gb_data
 
     # Parse input data
-    demand_type=snakemake.params.demand_type
-    technology_detail=snakemake.params.technology_detail[demand_type]
+    demand_type = snakemake.params.demand_type
+    technology_detail = snakemake.params.technology_detail[demand_type]
     df_demand = parse_demand_data(regional_gb_data_path, technology_detail)
 
     # Write demand dataframe to csv file
-    df_demand.to_csv(
-        snakemake.output["demand"]
-    )
-    logger.info(
-        f"Electricity demand data saved to {snakemake.output['demand']}"
-    )
+    df_demand.to_csv(snakemake.output["demand"])
+    logger.info(f"Electricity demand data saved to {snakemake.output['demand']}")

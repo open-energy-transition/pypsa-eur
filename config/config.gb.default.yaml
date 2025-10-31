@@ -317,7 +317,7 @@ fes:
         Waste Incineration (including CHP): CHP
         Non-renewable CHP: CHP
         Storage: Store
-    
+
     demand:
       Technology Detail:
         fes_baseline_electricity: ["baseline demand"]
