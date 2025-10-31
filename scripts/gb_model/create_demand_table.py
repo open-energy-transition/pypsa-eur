@@ -14,6 +14,8 @@ import pandas as pd
 
 from scripts._helpers import configure_logging, set_scenario_config
 
+from pathlib import Path
+
 logger = logging.getLogger(__name__)
 
 
