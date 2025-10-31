@@ -358,23 +358,18 @@ rule create_ev_demand_table:
         "../scripts/gb_model/create_ev_demand_table.py"
 
 
-rule create_ev_demand_profile:
+rule process_transport_demand_shape:
     message:
-        "Process EV demand profile into CSV format"
-    params:
-        scenario=config["fes"]["gb"]["scenario"],
-        year_range=config["fes"]["year_range_incl"],
-        snapshots=config_provider("snapshots"),
-        drop_leap_day=config_provider("enable", "drop_leap_day"),
+        "Process transport demand profile shape into CSV format"
     input:
-        ev_demand=resources("gb-model/fes_ev_demand.csv"),
-        traffic_data_KFZ="data/bundle/emobility/KFZ__count",
+        fes_ev_demand=resources("gb-model/fes_ev_demand.csv"),
+        transport_demand=resources("transport_demand_s_{clusters}.csv"),
     output:
-        ev_demand_profile=resources("gb-model/ev_demand_profile_shape.csv"),
+        transport_demand_shape=resources("gb-model/transport_demand_shape_s_{clusters}.csv"),
     log:
-        logs("create_ev_demand_profile.log"),
+        logs("transport_demand_shape_s_{clusters}.log"),
     script:
-        "../scripts/gb_model/create_ev_demand_profile.py"
+        "../scripts/gb_model/process_transport_demand_shape.py"
 
 
 rule compose_network:
