@@ -12,16 +12,13 @@ import logging
 from pathlib import Path
 
 import pandas as pd
-import xarray as xr
 
 from scripts._helpers import (
     configure_logging,
-    set_scenario_config,
     generate_periodic_profiles,
     get_snapshots,
+    set_scenario_config,
 )
-from scripts.build_transport_demand import transport_degree_factor
-from scripts.gb_model._helpers import get_regional_distribution
 
 logger = logging.getLogger(__name__)
 
