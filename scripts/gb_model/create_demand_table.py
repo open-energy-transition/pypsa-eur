@@ -38,7 +38,6 @@ def parse_demand_data(
     df_demand = df_regional_data.query(
         "`Technology Detail`.str.lower() in @technology_detail"
     )
-    breakpoint()
 
     # Convert from GWh to MWh
     df_demand.loc[:, "data"] *= 1000
