@@ -342,7 +342,7 @@ rule create_hydrogen_storage_table:
         "../scripts/gb_model/create_hydrogen_storage_table.py"
 
 
-rule create_demand_tables:
+rule create_demand_table:
     message:
         "Process {wildcards.demand_type} demand from FES workbook into CSV format"
     params:
@@ -356,6 +356,24 @@ rule create_demand_tables:
         logs("create_{demand_type}_demand_table.log"),
     script:
         "../scripts/gb_model/create_demand_table.py"
+
+
+rule create_flexibility_table:
+    message:
+        "Process {wildcards.flexibility_type} flexibility from FES workbook into CSV format"
+    params:
+        scenario=config["fes"]["gb"]["scenario"],
+        year_range=config["fes"]["year_range_incl"],
+        flexibility_type=lambda wildcards: wildcards.flexibility_type,
+        technology_detail=config["fes"]["gb"]["flexibility"]["Technology Detail"],
+    input:
+        flexibility_sheet=resources("gb-model/fes/2021/FLX1.csv"),
+    output:
+        flexibility=resources("gb-model/{flexibility_type}_flexibility.csv"),
+    log:
+        logs("create_{flexibility_type}_flexibility_table.log"),
+    script:
+        "../scripts/gb_model/create_flexibility_table.py"
 
 
 rule process_transport_demand_shape:
@@ -372,22 +390,6 @@ rule process_transport_demand_shape:
         logs("transport_demand_shape_s_{clusters}.log"),
     script:
         "../scripts/gb_model/process_transport_demand_shape.py"
-
-
-rule create_ev_dsm_v2g_table:
-    message:
-        "Process EV DSM and V2G from FES workbook into CSV format"
-    params:
-        scenario=config["fes"]["gb"]["scenario"],
-        year_range=config["fes"]["year_range_incl"],
-    input:
-        flexibility_sheet=resources("gb-model/fes/2021/FLX1.csv"),
-    output:
-        ev_demand=resources("gb-model/fes_ev_dsm_v2g.csv"),
-    log:
-        logs("create_ev_dsm_v2g_table.log"),
-    script:
-        "../scripts/gb_model/create_ev_dsm_v2g_table.py"
 
 
 rule compose_network:

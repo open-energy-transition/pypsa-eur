@@ -331,6 +331,14 @@ fes:
       Technology Detail:
         fes_baseline_electricity: ["baseline demand"]
         fes_ev: ["ev demand 1", "ev demand 2"]
+
+    flexibility:
+      Technology Detail:
+        fes_ev_dsm: ["smart charging impact at peak"]
+        fes_ev_v2g: ["v2g impact at peak"]
+        fes_residential_dsr: ["residential peak shifting (smart/touts effect)"]
+        fes_services_dsr: ["i&c dsr impact at peak (processes)"]
+
   eur:
     scenario: CT & LW    # "Leading the Way" equivalent in the NESO european supply table
     carrier_mapping:
