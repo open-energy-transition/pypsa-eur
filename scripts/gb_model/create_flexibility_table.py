@@ -45,11 +45,15 @@ def parse_flexibility_data(
         "`Detail`.str.lower() in @technology_detail"
     )
 
-    # Select scenario 
-    df_flexibility = df_flexibility[df_flexibility["Scenario"].str.lower() == fes_scenario.lower()]
+    # Select scenario
+    df_flexibility = df_flexibility[
+        df_flexibility["Scenario"].str.lower() == fes_scenario.lower()
+    ]
 
     # Select year range
-    df_flexibility = df_flexibility[df_flexibility["year"].between(year_range[0], year_range[1])]
+    df_flexibility = df_flexibility[
+        df_flexibility["year"].between(year_range[0], year_range[1])
+    ]
 
     # Convert from GW to MW
     df_flexibility.loc[:, "data"] *= 1000
@@ -67,10 +71,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
 
-        snakemake = mock_snakemake(
-            Path(__file__).stem,
-            flexibility_type="fes_ev_dsm"
-        )
+        snakemake = mock_snakemake(Path(__file__).stem, flexibility_type="fes_ev_dsm")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
