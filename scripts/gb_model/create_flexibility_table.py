@@ -26,14 +26,25 @@ def parse_flexibility_data(
     year_range: list,
 ) -> pd.DataFrame:
     """
-    Parse the regional gb data to obtain required electricity demand in the required format
+    Parse the flexibility data to obtain required flexibility capacity in the required format.
 
     Args:
-        regional_gb_data_path(str): Filepath to the regional data file containing the electricity demand
-        technology_detail(list): List of technology details relevant to a particular demand type
+        flexibility_data_path (str): Filepath to the flexibility data CSV file containing 
+                                   flexibility capacity data by technology and year
+        technology_detail (list): List of technology details relevant to a particular 
+                                flexibility type (e.g., EV DSM technologies)
+        fes_scenario (str): FES scenario name to filter by (e.g., "leading the way")
+        year_range (list): Two-element list [start_year, end_year] defining the year range to include
 
     Returns:
-        pd.DataFrame : MultiIndex dataframe containing the electricity demand indexed by PyPSA bus and year
+        pd.Series: Series containing aggregated flexibility capacity indexed by year.
+                  Values represent total flexibility capacity in MW for the specified
+                  technology types and scenario.
+
+    Processing steps:
+        1. Load and pre-format flexibility data from CSV file
+        2. Filter by technology type, scenario, and year range
+        3. Convert units from GW to MW and aggregate by year
     """
     df_flexibility_data = pd.read_csv(flexibility_data_path)
 
