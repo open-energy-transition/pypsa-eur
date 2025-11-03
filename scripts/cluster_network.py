@@ -626,6 +626,9 @@ if __name__ == "__main__":
         busmap = n.buses.index.to_series()
         linemap = n.lines.index.to_series()
         clustering = pypsa.clustering.spatial.Clustering(n, busmap, linemap)
+        # Load custom shapes if needed for overwriting onshore regions later
+        if mode in ["custom_busshapes", "gb_shapes"]:
+            custom_shapes = gpd.read_file(snakemake.input.custom_busshapes)
     else:
         Nyears = n.snapshot_weightings.objective.sum() / 8760
 
@@ -702,6 +705,14 @@ if __name__ == "__main__":
 
     # nc.shapes = n.shapes.copy()
     for which in ["regions_onshore", "regions_offshore"]:
+        if (
+            which == "regions_onshore"
+            and snakemake.params.overwrite_custom_onshore_clusters
+            and mode in ["custom_busshapes", "gb_shapes"]
+            and snakemake.wildcards.clusters != "all"
+        ):
+            custom_shapes.to_file(snakemake.output[which])
+            continue
         regions = gpd.read_file(snakemake.input[which])
         clustered_regions = cluster_regions((clustering.busmap,), regions)
         clustered_regions.to_file(snakemake.output[which])
