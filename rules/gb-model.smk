@@ -358,6 +358,22 @@ rule create_ev_demand_table:
         "../scripts/gb_model/create_ev_demand_table.py"
 
 
+rule create_ev_dsm_v2g_table:
+    message:
+        "Process EV DSM and V2G from FES workbook into CSV format"
+    params:
+        scenario=config["fes"]["gb"]["scenario"],
+        year_range=config["fes"]["year_range_incl"],
+    input:
+        flexibility_sheet=resources("gb-model/fes/2021/FLX1.csv"),
+    output:
+        ev_demand=resources("gb-model/fes_ev_dsm_v2g.csv"),
+    log:
+        logs("create_ev_dsm_v2g_table.log"),
+    script:
+        "../scripts/gb_model/create_ev_dsm_v2g_table.py"
+
+
 rule compose_network:
     input:
         unpack(input_profile_tech),

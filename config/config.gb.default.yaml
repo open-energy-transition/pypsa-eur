@@ -259,6 +259,15 @@ fes-sheet-config:
         index: year
         columns: scenario
 
+    # Annual flexibility data for 2020-2050
+    FLX1:
+      usecols: "C:AL"
+      skiprows: 9
+      index_col: [0, 1, 2, 3, 4]
+      header: 0
+      rename:
+        columns: year
+
     BB2:
       usecols: "A:E"
       skiprows: 2
