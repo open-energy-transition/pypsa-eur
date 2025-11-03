@@ -711,10 +711,10 @@ if __name__ == "__main__":
             and mode in ["custom_busshapes", "gb_shapes"]
             and snakemake.wildcards.clusters != "all"
         ):
-            custom_shapes.to_file(snakemake.output[which])
-            continue
-        regions = gpd.read_file(snakemake.input[which])
-        clustered_regions = cluster_regions((clustering.busmap,), regions)
+            clustered_regions = gpd.read_file(snakemake.input.custom_busshapes)
+        else:
+            regions = gpd.read_file(snakemake.input[which])
+            clustered_regions = cluster_regions((clustering.busmap,), regions)
         clustered_regions.to_file(snakemake.output[which])
         # append_bus_shapes(nc, clustered_regions, type=which.split("_")[1])
 
