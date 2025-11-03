@@ -29,9 +29,9 @@ def parse_flexibility_data(
     Parse the flexibility data to obtain required flexibility capacity in the required format.
 
     Args:
-        flexibility_data_path (str): Filepath to the flexibility data CSV file containing 
+        flexibility_data_path (str): Filepath to the flexibility data CSV file containing
                                    flexibility capacity data by technology and year
-        technology_detail (list): List of technology details relevant to a particular 
+        technology_detail (list): List of technology details relevant to a particular
                                 flexibility type (e.g., EV DSM technologies)
         fes_scenario (str): FES scenario name to filter by (e.g., "leading the way")
         year_range (list): Two-element list [start_year, end_year] defining the year range to include
