@@ -12,6 +12,9 @@ Release Notes
 Upcoming Release
 ================
 
+* Prepared transport demand profile shape which will be used for EV demand profile (#84)
+* Merged isolated North-West islands regions (`GB 89` and `GB 90`) into mainland region (#90).
+* Tabulated regional baseline electricity demand data (#85).
 * Tabulated regional EV demand data (#83).
 * Tabulated hydrogen related data including demand, supply, storage, and generation capacities (#73).
 * Tabulated interconnector capacities between GB regions and neighbouring countries (#10).
