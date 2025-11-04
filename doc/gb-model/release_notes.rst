@@ -12,6 +12,7 @@ Release Notes
 Upcoming Release
 ================
 
+* Changed base year to 2012 (#92)
 * Tabulated regional baseline electricity demand data (#85).
 * Tabulated regional EV demand data (#83).
 * Tabulated hydrogen related data including demand, supply, storage, and generation capacities (#73).
