@@ -422,6 +422,19 @@ rule compose_network:
             resources("gb-model/fes_baseline_electricity_demand.csv"),
             resources("gb-model/fes_ev_demand.csv"),
             resources("gb-model/transport_demand_shape_s_clustered.csv"),
+            expand(
+                resources(
+                    "gb-model/{demand_type}_demand.csv"
+                ),
+                demand_type=config["fes"]["gb"]["demand"]["Technology Detail"].keys()
+            ),
+            expand(
+                resources(
+                    "gb-model/{flexibility_type}_flexibility.csv"
+                ),
+                flexibility_type=config["fes"]["gb"]["flexibility"]["Technology Detail"].keys()
+            ),
+
         ],
     output:
         network=resources("networks/composed_{clusters}.nc"),
