@@ -12,7 +12,6 @@ foresight: overnight
 scenario:
   clusters:
   - clustered
-  - all
   opts:
   - ""
   sector_opts:
@@ -42,6 +41,9 @@ enable:
 clustering:
   focus_weights: {NL: 0.01, "NO": 0.01, BE: 0.01, DK: 0.01, IE: 0.02, FR: 0.03, GB: 0.91}
   mode: gb_shapes
+  overwrite_custom_onshore_clusters: true
+  simplify_network:
+    remove_stubs: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#solving
 solving:
