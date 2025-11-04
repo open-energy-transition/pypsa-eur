@@ -12,13 +12,34 @@ foresight: overnight
 scenario:
   clusters:
   - clustered
-  - all
   opts:
   - ""
   sector_opts:
   - ""
   planning_horizons:
   - 2030
+
+snapshots:
+  start: "2012-01-01"
+  end: "2013-01-01"
+  inclusive: 'left'
+
+atlite:
+  default_cutout: europe-2012-sarah3-era5
+  cutouts:
+    # use 'base' to determine geographical bounds and time span from config
+    # base:
+      # module: era5
+    europe-2012-sarah3-era5:
+      module: [sarah, era5] # in priority order
+      x: [-12., 42.]
+      y: [33., 72.]
+      dx: 0.3
+      dy: 0.3
+      time: ['2012', '2012']
+      # features: []
+      # sarah_dir: ""
+
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
 countries:
@@ -42,6 +63,9 @@ enable:
 clustering:
   focus_weights: {NL: 0.01, "NO": 0.01, BE: 0.01, DK: 0.01, IE: 0.02, FR: 0.03, GB: 0.91}
   mode: gb_shapes
+  overwrite_custom_onshore_clusters: true
+  simplify_network:
+    remove_stubs: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#solving
 solving:
@@ -167,7 +191,7 @@ region_operations:
     merge: [61, 64]
     TO: SHETL
   - id: 27
-    merge: [62, 63, 86, 87, 88]
+    merge: [62, 63, 86, 87, 88, 89, 90]
     TO: SHETL
   - id: 28
     merge: [65, 66, 67, 68, 69, 70, 71, 72, 73, 84, 85]
@@ -378,6 +402,15 @@ fes-sheet-config:
         index: year
         columns: scenario
 
+    # Annual flexibility data for 2020-2050
+    FLX1:
+      usecols: "C:AL"
+      skiprows: 9
+      index_col: [0, 1, 2, 3, 4]
+      header: 0
+      rename:
+        columns: year
+
     BB2:
       usecols: "A:E"
       skiprows: 2
@@ -438,6 +471,19 @@ fes:
         Waste Incineration (including CHP): CHP
         Non-renewable CHP: CHP
         Storage: Store
+
+    demand:
+      Technology Detail:
+        fes_baseline_electricity: ["baseline demand"]
+        fes_ev: ["ev demand 1", "ev demand 2"]
+
+    flexibility:
+      Technology Detail:
+        fes_ev_dsm: ["smart charging impact at peak"]
+        fes_ev_v2g: ["v2g impact at peak"]
+        fes_residential_dsr: ["residential peak shifting (smart/touts effect)"]
+        fes_services_dsr: ["i&c dsr impact at peak (processes)"]
+
   eur:
     scenario: CT & LW    # "Leading the Way" equivalent in the NESO european supply table
     carrier_mapping:
