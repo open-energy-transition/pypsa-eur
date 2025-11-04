@@ -13,7 +13,6 @@ import logging
 from pathlib import Path
 
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 
 from scripts._helpers import configure_logging, set_scenario_config
@@ -130,97 +129,6 @@ def parse_inputs(
     return df_final
 
 
-def distribute_direct_gsp_data(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Distribute data from Direct(<TO_region>) rows to the GSPs in the same TO region.
-
-    For each "Direct" data row, the data is distributed across other GSPs in the same
-    TO_region that share the same FES Scenario, Technology Detail, year, Template,
-    Unit, and Technology. Distribution is proportional to the existing GSP data values.
-    If no other GSPs exist with data, the Direct data is distributed evenly across
-    all GSPs in the region.
-
-    Args:
-        df (pd.DataFrame): DataFrame with GSP data including Direct GSPs
-
-    Returns:
-        pd.DataFrame: DataFrame with Direct data distributed to other GSPs, stored in a "TO_region" column
-    """
-    # Identify Direct GSP rows
-    is_direct = df.GSP == f"Direct({df.name})"
-    df_direct = df[is_direct].drop("GSP", axis=1).dropna(how="all", axis=1)
-
-    non_data_cols = df_direct.columns.drop("data").to_list()
-    data_direct = df_direct.set_index(non_data_cols).data
-    data_gsp = df[~is_direct].set_index(non_data_cols + ["GSP"]).data
-
-    GSPs = df.dropna(subset=["Latitude", "Longitude"]).GSP.unique().tolist()
-
-    data_direct_extended = pd.concat(
-        [data_direct for i in GSPs], keys=pd.Index(GSPs, name="GSP")
-    )
-    # Where possible, get the relative proportions of existing GSP data to distribute Direct data accordingly
-    data_gsp_relative = data_gsp.groupby(non_data_cols, group_keys=False).apply(
-        lambda x: x / x.sum()
-    )
-    distributed_data = data_direct_extended * data_gsp_relative
-
-    # Some data will still be missing where there was no existing GSP data to base the distribution on
-    still_missing = (
-        (data_direct - distributed_data.groupby(non_data_cols, group_keys=False).sum())
-        .dropna()
-        .abs()
-        .where(lambda x: x > 1e-10)
-    )
-
-    if (still_missing > 0).any():
-        being_filled = (
-            still_missing.groupby(["Template", "Technology", "Technology Detail"])
-            .first()
-            .index.values
-        )
-        logger.debug(
-            f"No matching GSPs with data found to distribute {df.name} data for:\n{being_filled}\n"
-            "Distributing TO-level data evenly across all GSPs for these cases."
-        )
-        still_missing_extended = pd.concat(
-            [still_missing / len(GSPs) for i in GSPs], keys=pd.Index(GSPs, name="GSP")
-        )
-        distributed_data = distributed_data.fillna(
-            still_missing_extended.reindex(distributed_data.index)
-        )
-
-    all_data = pd.concat(
-        [
-            df.set_index(data_gsp.index.names),
-            distributed_data.to_frame("TO_data").reorder_levels(data_gsp.index.names),
-        ],
-        axis=1,
-    ).dropna(subset=["data", "TO_data"], how="all")
-
-    # The concat doesn't pass on some column data (e.g. lat/lon) into new rows, so we fill these with a per-GSP forward fill.
-    all_data_filled = all_data.fillna(
-        all_data.groupby("GSP", group_keys=False)
-        .apply(lambda x: x.ffill())
-        .drop(["TO_data", "data"], axis=1)
-    )
-
-    # We might get floating point precision issues from the data distribution, so use almost equal
-    np.testing.assert_almost_equal(
-        all_data["TO_data"].sum(),
-        data_direct.sum(),
-        err_msg=f"Data mismatch after distributing Direct {df.name} GSP data",
-    )
-
-    assert all_data_filled["data"].sum() == df["data"].sum(), (
-        f"Data loss after distributing Direct {df.name} GSP data"
-    )
-    logger.info(
-        f"Distributed {len(data_direct)} rows of {df.name} TO-level data to GSPs."
-    )
-    return all_data_filled.reset_index()
-
-
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -260,9 +168,4 @@ if __name__ == "__main__":
         ] = TO_region
     logger.info(f"Extracted the {fes_scenario} relevant data")
 
-    # Distribute Direct GSP data to other GSPs in the same region
-    df_distributed = df_with_regions.groupby("TO_region", group_keys=False).apply(
-        distribute_direct_gsp_data
-    )
-
-    df_distributed.to_csv(snakemake.output.csv, index=False)
+    df_with_regions.to_csv(snakemake.output.csv, index=False)

@@ -259,8 +259,8 @@ entsoe_unavailability:
 dukes-5.11:
   # list of major power producers
   sheet-config:
-    sheet_name: "5.11 Full list"
-    usecols: "A:Q"
+    sheet_name: "DUKES 2023" # compromise sheet as it has both coal and pumped hydro data
+    usecols: "A:P"
     skiprows: 5
     index_col: [0, 1]
     header: 0
@@ -282,6 +282,12 @@ dukes-5.11:
       Natural Gas: gas
       Diesel/Gas Oil: oil
       Coal: coal
+  set_mapping:
+    CHP:
+      Yes: CHP
+    Technology:
+      Pumped Hydro: Store
+      Pumped hydro: Store
 
 
 fes-sheet-config:

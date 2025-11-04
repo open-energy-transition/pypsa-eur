@@ -182,10 +182,12 @@ rule process_dukes_current_capacities:
         "Assign current capacities to GB model regions and PyPSA-Eur carriers"
     input:
         regions=resources("gb-model/merged_shapes.geojson"),
-        regions_offshore=resources("regions_offshore.geojson"),
+        regions_offshore=resources("regions_offshore_base_s_{clusters}.geojson"),
         dukes_data="data/gb-model/downloaded/dukes-5.11.xlsx",
     output:
-        csv=resources("gb-model/dukes-current-capacity.csv"),
+        csv=resources("gb-model/dukes-current-capacity-{clusters}.csv"),
+    log:
+        logs("process_dukes_current_capacities_{clusters}.log"),
     params:
         sheet_config=config["dukes-5.11"]["sheet-config"],
         target_crs=config["target_crs"],
@@ -219,10 +221,12 @@ rule create_powerplants_table:
     params:
         gb_config=config["fes"]["gb"],
         eur_config=config["fes"]["eur"],
+        dukes_config=config["dukes-5.11"],
         default_set=config["fes"]["default_set"],
     input:
         gsp_data=resources("gb-model/regional_gb_data.csv"),
         eur_data=resources("gb-model/national_eur_data.csv"),
+        dukes_data=resources("gb-model/dukes-current-capacity-clustered.csv"),
     output:
         csv=resources("gb-model/fes_p_nom.csv"),
     log:
