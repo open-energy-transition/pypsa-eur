@@ -19,6 +19,28 @@ scenario:
   planning_horizons:
   - 2030
 
+snapshots:
+  start: "2012-01-01"
+  end: "2013-01-01"
+  inclusive: 'left'
+
+atlite:
+  default_cutout: europe-2012-sarah3-era5
+  cutouts:
+    # use 'base' to determine geographical bounds and time span from config
+    # base:
+      # module: era5
+    europe-2012-sarah3-era5:
+      module: [sarah, era5] # in priority order
+      x: [-12., 42.]
+      y: [33., 72.]
+      dx: 0.3
+      dy: 0.3
+      time: ['2012', '2012']
+      # features: [] 
+      # sarah_dir: ""
+
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
 countries:
 - "BE"
