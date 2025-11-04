@@ -53,9 +53,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
 
-        snakemake = mock_snakemake(
-            Path(__file__).stem, demand_type="fes_baseline_electricity"
-        )
+        snakemake = mock_snakemake(Path(__file__).stem)
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
