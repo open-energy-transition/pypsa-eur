@@ -37,10 +37,19 @@ Tables from the workbook we use are:
 
 - WS1: Whole System & Gas Supply
 
+------------------------------------------
+The Digest of UK Energy Statistics (DUKES)
+------------------------------------------
+
+From <DUKES `https://www.gov.uk/government/statistics/electricity-chapter-5-digest-of-united-kingdom-energy-statistics-dukes`>_, we access existing capacities (Table 5.11).
+This is used to help distribute unallocated future capacities to GB regions, based on the relative capacity of technologies already existing.
+It replaces the equivalent existing power plant dataset computed in PyPSA-Eur due to being more comprehensive.
+
 -----------------
 GSP coordinates
 -----------------
-The GSP coordinates <https://api.neso.energy/dataset/963525d6-5d83-4448-a99c-663f1c76330a/resource/41fb4ca1-7b59-4fce-b480-b46682f346c9/download/fes2021_regional_breakdown_gsp_info.csv> is obtained from the NESO website. This is used to assign lat, lon to powerplants extracted from the FES workbook
+GB <grid-supply point (GSP) coordinates `https://api.neso.energy/dataset/963525d6-5d83-4448-a99c-663f1c76330a/resource/41fb4ca1-7b59-4fce-b480-b46682f346c9/download/fes2021_regional_breakdown_gsp_info.csv`>_ are obtained from the NESO website.
+This is used to assign lat, lon to powerplants extracted from the FES workbook
 
 ---------------
 EU Supply data
