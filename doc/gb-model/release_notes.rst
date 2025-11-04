@@ -12,6 +12,7 @@ Release Notes
 Upcoming Release
 ================
 
+* Tabulated flexibility data for EV and demand-side management (DSM) for base electricity (#91).
 * Prepared transport demand profile shape which will be used for EV demand profile (#84)
 * Merged isolated North-West islands regions (`GB 89` and `GB 90`) into mainland region (#90).
 * Tabulated regional baseline electricity demand data (#85).
