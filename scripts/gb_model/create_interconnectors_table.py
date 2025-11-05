@@ -22,14 +22,32 @@ from scripts.gb_model._helpers import map_points_to_regions
 logger = logging.getLogger(__name__)
 
 
-def projects_to_pypsa_links(interconnector_config, gdf_regions):
+def projects_to_pypsa_links(
+    interconnector_config: dict, gdf_regions: gpd.GeoDataFrame
+) -> pd.DataFrame:
+    """
+    Map interconnector projects to links in our PyPSA network
+
+    Args:
+        interconnector_config (dict): Configuration dictionary defining interconnector projects
+        gdf_regions (gpd.GeoDataFrame): GeoDataFrame containing network bus geometries
+
+    Returns:
+        pd.DataFrame: DataFrame mapping interconnector projects to PyPSA links
+    """
     df_cols = ["name", "neighbour", "capacity_mw", "lat", "lon"]
-    df = pd.concat(
-        [
-            pd.DataFrame({k: [v] for k, v in interconnector.items() if k in df_cols})
-            for interconnector in interconnector_config["options"]
-        ]
-    ).set_index("name")
+    df = (
+        pd.concat(
+            [
+                pd.DataFrame(
+                    {k: [v] for k, v in interconnector.items() if k in df_cols}
+                )
+                for interconnector in interconnector_config["options"]
+            ]
+        )
+        .set_index("name")
+        .rename_axis(index="project")
+    )
 
     df["bus0"] = map_points_to_regions(
         df, gdf_regions, "lat", "lon", "EPSG:4326", snakemake.params.target_crs

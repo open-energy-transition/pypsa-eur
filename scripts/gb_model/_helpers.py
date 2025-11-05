@@ -49,7 +49,6 @@ def map_points_to_regions(
         predicate="dwithin",
         distance=dwithin_distance,
     ).drop(columns="geometry")
-
     return regions
 
 

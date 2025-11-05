@@ -202,6 +202,7 @@ rule process_fes_gsp_data:
         scenario=config["fes"]["gb"]["scenario"],
         year_range=config["fes"]["year_range_incl"],
         target_crs=config["target_crs"],
+        fill_gsp_lat_lons=config["fill-gsp-lat-lons"],
     input:
         bb1_sheet=resources("gb-model/fes/2021/BB1.csv"),
         bb2_sheet=resources("gb-model/fes/2021/BB2.csv"),

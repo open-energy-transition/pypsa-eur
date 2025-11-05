@@ -200,17 +200,11 @@ region_operations:
     merge: [74, 75, 76]
     TO: SHETL
   - id: 30
-    merge: [89]
-    TO: SHETL
-  - id: 31
-    merge: [90]
-    TO: SHETL
-  - id: 32
     merge: [93]
     TO: SHETL
 
   # TODO: add this to Ireland
-  - id: 33
+  - id: 31
     merge: [80, 81, 82, 83]
     TO: N-IRL
 
@@ -297,6 +291,7 @@ dukes-5.11:
       Pumped hydro: PHS
     Type:
       Onshore: onwind
+      onshore: onwind
       Offshore: offwind
       CCGT: CCGT
       Small Hydro: ror
@@ -313,6 +308,26 @@ dukes-5.11:
       Pumped Hydro: Store
       Pumped hydro: Store
 
+fill-gsp-lat-lons:
+  # Any GSPs defined in `gsp-coordinates` but missing lat/lon coordinates can have their coordinates manually set here.
+  Dunbar A: # Same as Dunbar
+    Latitude: 55.977
+    Longitude: -2.573
+  Dunbar B: # Same as Dunbar
+    Latitude: 55.977
+    Longitude: -2.573
+  Finstown: # From FES2024
+    Latitude: 59.003
+    Longitude: -3.147
+  Lesmahagow: # From FES2024
+    Latitude: 55.618
+    Longitude: -3.867
+  Moffat: # From FES2024
+    Latitude: 55.301
+    Longitude: -3.428
+  Rothienorman: # From FES2024
+    Latitude: 57.404
+    Longitude: -2.518
 
 fes-sheet-config:
   2021:
@@ -503,6 +518,7 @@ fes:
         OCGT: OCGT
         Gas Reciprocating Engines: gas
         Hydrogen: hydrogen # hydrogen-fueled turbine
+        Hydrogen CHP: hydrogen # hydrogen-fueled turbine
         Fuel Oil: oil
         Battery: battery
         Pumped Hydro: PHS
@@ -529,6 +545,7 @@ fes:
       SubType:
         Biomass CHP: CHP
         Gas CHP: CHP
+        Hydrogen CHP: CHP
         Battery: Store
         Pumped Hydro: Store
       SubSubType:
