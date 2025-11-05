@@ -1135,6 +1135,15 @@ data:
     source: "primary"
     version: "latest"
 
+
+copernicusmarine:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+  #date: []
+  longitude: [-12, 42]
+  latitude: [33, 72]
+  variables: ["thetao"]
+  depth: [5, 15]
+
 secrets:
   corine: '' #Add API key here if primary source is used for retrieving corine dataset after registering in https://land.copernicus.eu/user/login
 

@@ -1007,6 +1007,11 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
     rule retrieve_seawater_temperature:
         params:
             default_cutout=config_provider("atlite","default_cutout") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else "",
+            dataset_id=config_provider("copernicusmarine","dataset_id"),
+            latitude=config_provider("copernicusmarine","latitude"),
+            longitude=config_provider("copernicusmarine","longitude"),
+            depth=config_provider("copernicusmarine","depth"),
+            variables=config_provider("copernicusmarine","variables")
         input:
             data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else [],
         output:
