@@ -27,9 +27,17 @@ rule retrieve_tyndp_cba_projects:
 
 
 # read in transmission and storage projects from excel sheets
+#
+def input_clustered_network(w):
+    scenario = config_provider("scenario")(w)
+    (clusters,) = scenario["clusters"]
+    return rules.cluster_network.output.network.format(clusters=clusters)
+
+
 checkpoint clean_projects:
     input:
         dir="data/tyndp_2024_bundle/cba_projects",
+        network=input_clustered_network,
     output:
         transmission_projects=resources("cba/transmission_projects.csv"),
         storage_projects=resources("cba/storage_projects.csv"),
