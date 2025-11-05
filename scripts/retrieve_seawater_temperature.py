@@ -96,17 +96,17 @@ if __name__ == "__main__":
             f"Downloading seawater temperature data for year {snakemake.wildcards.year}"
         )
 
-        _ = copernicusmarine.subset(
-            dataset_id="cmems_mod_glo_phy_my_0.083deg_P1D-m",  # Global ocean physics reanalysis
+        copernicusmarine_cutout=copernicusmarine.subset(
+            dataset_id=snakemake.params.dataset_id,
             start_datetime=f"{snakemake.wildcards.year}-01-01",
             end_datetime=f"{int(snakemake.wildcards.year)}-12-31",
-            minimum_longitude=-12,  # Western European boundary
-            maximum_longitude=42,  # Eastern European boundary
-            minimum_latitude=33,  # Southern European boundary
-            maximum_latitude=72,  # Northern European boundary
-            variables=["thetao"],  # Potential temperature [°C]
-            minimum_depth=5,  # Near-surface depth for heat pumps [m]
-            maximum_depth=15,  # Near-surface depth for heat pumps [m]
+            minimum_longitude=snakemake.params.longitude[0],  # Western European boundary
+            maximum_longitude=snakemake.params.longitude[1],  # Eastern European boundary
+            minimum_latitude=snakemake.params.latitude[0],  # Southern European boundary
+            maximum_latitude=snakemake.params.latitude[1],  # Northern European boundary
+            variables=snakemake.params.variables,  # Potential temperature [°C]
+            minimum_depth=snakemake.params.depth[0],  # Near-surface depth for heat pumps [m]
+            maximum_depth=snakemake.params.depth[1],  # Near-surface depth for heat pumps [m]
             output_filename=snakemake.output.seawater_temperature,
         )
 
