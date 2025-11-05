@@ -1005,31 +1005,28 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
 ]:
     rule retrieve_seawater_temperature:
         params:
-            default_cutout=config_provider("atlite","default_cutout") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else "",
-            dataset_id=config_provider("copernicusmarine","dataset_id"),
-            latitude=config_provider("copernicusmarine","latitude"),
-            longitude=config_provider("copernicusmarine","longitude"),
-            depth=config_provider("copernicusmarine","depth"),
-            variables=config_provider("copernicusmarine","variables")
+            cutout=config_provider("atlite","default_cutout") 
         input:
-            data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else [],
+            data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}"),
         output:
-            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{year}}.nc",
+            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{cutout}}.nc",
         log:
-            "logs/retrieve_seawater_temperature_{year}.log",
+            "logs/retrieve_seawater_temperature_{cutout}.log",
         resources:
             mem_mb=10000,
         conda:
             "../envs/environment.yaml"
-        script:
-            "../scripts/retrieve_seawater_temperature.py"
+        run:
+            move(input.data,output.seawater_temperature)
+
+
 
 if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
     "build",
 ]:
     rule build_seawater_temperature:
         params:
-            default_cutout=config_provider("atlite","default_cutout") if SEAWATER_TEMPERATURE_DATASET['source'] == 'archive' else "",
+            default_cutout=config_provider("atlite","default_cutout"),
             dataset_id=config_provider("copernicusmarine","dataset_id"),
             latitude=config_provider("copernicusmarine","latitude"),
             longitude=config_provider("copernicusmarine","longitude"),
