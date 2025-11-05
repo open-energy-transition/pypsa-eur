@@ -18,6 +18,7 @@ path = [
     ".github/**",
     "borg-it",
     "envs/*.lock.yaml",
+    "pixi.lock",
     "matplotlibrc",
 ]
 SPDX-FileCopyrightText = "The PyPSA-Eur Authors"
