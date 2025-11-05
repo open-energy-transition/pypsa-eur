@@ -404,6 +404,27 @@ rule create_flexibility_table:
         "../scripts/gb_model/create_flexibility_table.py"
 
 
+rule process_regional_flexibility_table:
+    message:
+        "Process regional {wildcards.flexibility_type} flexibility from FES workbook into CSV format"
+    params:
+        scenario=config["fes"]["gb"]["scenario"],
+        year_range=config["fes"]["year_range_incl"],
+        flexibility_type=lambda wildcards: wildcards.flexibility_type,
+        technology_detail=config["fes"]["gb"]["flexibility"]["Technology Detail"],
+    input:
+        flexibility=resources("gb-model/{flexibility_type}_flexibility.csv"),
+        regional_gb_data=resources("gb-model/regional_gb_data.csv"),
+    output:
+        regional_flexibility=resources(
+            "gb-model/regional_{flexibility_type}_flexibility.csv"
+        ),
+    log:
+        logs("process_regional_{flexibility_type}_flexibility_table.log"),
+    script:
+        "../scripts/gb_model/process_regional_flexibility_table.py"
+
+
 rule process_transport_demand_shape:
     message:
         "Process transport demand profile shape into CSV format"
