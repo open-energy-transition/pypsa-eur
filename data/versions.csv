@@ -103,4 +103,4 @@
 "hera_test_cutout","archive","2024","['latest', 'supported']","https://zenodo.org/records/15828866/files/hera_be_2013-03-01_to_2013-03-08.zip",""
 "hera_test_cutout","primary","2024","['not-implemented']","https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/",""
 "seawater_temperature","archive","202311","['latest', 'supported']","https://zenodo.org/records/17491046/files/seawater_temperature.nc",""
-"seawater_temperature","primary","202311","['latest', 'supported']","","copernicusmarine package is used to retrieve the dataset - login credentials required"
+"seawater_temperature","build","202311","['latest', 'supported']","","copernicusmarine package is used to retrieve the dataset - login credentials required"

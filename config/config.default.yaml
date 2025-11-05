@@ -1132,7 +1132,7 @@ data:
     source: "archive"
     version: "latest"
   seawater_temperature:
-    source: "primary"
+    source: "build"
     version: "latest"
 
 
