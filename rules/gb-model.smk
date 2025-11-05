@@ -33,6 +33,11 @@ rule create_region_shapes:
         etys_boundary_lines="data/gb-model/downloaded/gb-etys-boundaries.zip",
     output:
         raw_region_shapes=resources("gb-model/raw_region_shapes.geojson"),
+    params:
+        area_loss_tolerance_percent=config["region_operations"][
+            "area_loss_tolerance_percent"
+        ],
+        min_region_area=config["region_operations"]["min_region_area"],
     log:
         logs("raw_region_shapes.log"),
     resources:
@@ -172,12 +177,32 @@ rule process_fes_eur_data:
         "../scripts/gb_model/process_fes_eur_data.py"
 
 
+rule process_dukes_current_capacities:
+    message:
+        "Assign current capacities to GB model regions and PyPSA-Eur carriers"
+    input:
+        regions=resources("gb-model/merged_shapes.geojson"),
+        regions_offshore=resources("regions_offshore_base_s_{clusters}.geojson"),
+        dukes_data="data/gb-model/downloaded/dukes-5.11.xlsx",
+    output:
+        csv=resources("gb-model/dukes-current-capacity-{clusters}.csv"),
+    log:
+        logs("process_dukes_current_capacities_{clusters}.log"),
+    params:
+        sheet_config=config["dukes-5.11"]["sheet-config"],
+        target_crs=config["target_crs"],
+    script:
+        "../scripts/gb_model/process_dukes_current_capacities.py"
+
+
 rule process_fes_gsp_data:
     message:
         "Process FES workbook sheet BB1 together with metadata from sheet BB2."
     params:
         scenario=config["fes"]["gb"]["scenario"],
         year_range=config["fes"]["year_range_incl"],
+        target_crs=config["target_crs"],
+        fill_gsp_lat_lons=config["fill-gsp-lat-lons"],
     input:
         bb1_sheet=resources("gb-model/fes/2021/BB1.csv"),
         bb2_sheet=resources("gb-model/fes/2021/BB2.csv"),
@@ -197,10 +222,12 @@ rule create_powerplants_table:
     params:
         gb_config=config["fes"]["gb"],
         eur_config=config["fes"]["eur"],
+        dukes_config=config["dukes-5.11"],
         default_set=config["fes"]["default_set"],
     input:
         gsp_data=resources("gb-model/regional_gb_data.csv"),
         eur_data=resources("gb-model/national_eur_data.csv"),
+        dukes_data=resources("gb-model/dukes-current-capacity-clustered.csv"),
     output:
         csv=resources("gb-model/fes_p_nom.csv"),
     log:
@@ -217,6 +244,7 @@ rule create_interconnectors_table:
     params:
         interconnector_config=config["interconnectors"],
         year_range=config["fes"]["year_range_incl"],
+        target_crs=config["target_crs"],
     log:
         logs("create_interconnectors_table.log"),
     script:
