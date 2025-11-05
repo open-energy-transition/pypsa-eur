@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 """
-Retrieve seawater temperature data from Copernicus Marine Service.
+Build seawater temperature data from Copernicus Marine Service.
 
 This script downloads historical seawater temperature data for use in sea water
 heat pump calculations. It retrieves potential temperature (thetao) data from
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "retrieve_seawater_temperature",
+            "build_seawater_temperature",
             clusters="39",
             opts="",
             ll="vopt",
