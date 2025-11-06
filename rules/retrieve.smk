@@ -602,7 +602,7 @@ if (WB_URB_POP_DATASET := dataset_version("worldbank_urban_population"))["source
                 Path(WB_URB_POP_DATASET["folder"]).rglob(
                     target_filename.stem + "*" + target_filename.suffix
                 )
-            ).as_posix()
+            )
             origin_filename.rename(output.csv)
 
 
