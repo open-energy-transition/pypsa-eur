@@ -116,12 +116,13 @@ if __name__ == "__main__":
 
     # Load snakemake parameters
     cutout=snakemake.params.cutout
+    cutout_dict=snakemake.params.cutout_dict
     dataset_id=snakemake.params.dataset_id
-    longitude=snakemake.params.longitude
-    latitude=snakemake.params.latitude
+    longitude=cutout_dict[cutout]["x"]
+    latitude=cutout_dict[cutout]["y"]
     variables=snakemake.params.variables
     depth=snakemake.params.depth
-    year_range=snakemake.params.cutout_dict[cutout]["time"]
+    year_range=cutout_dict[cutout]["time"]
 
     output_path=snakemake.output.seawater_temperature
 

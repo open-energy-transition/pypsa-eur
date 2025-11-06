@@ -1027,12 +1027,10 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
     rule build_seawater_temperature:
         params:
             cutout=config_provider("atlite","default_cutout"),
+            cutout_dict=config_provider("atlite","cutouts"),
             dataset_id=config_provider("copernicusmarine","dataset_id"),
-            latitude=config_provider("copernicusmarine","latitude"),
-            longitude=config_provider("copernicusmarine","longitude"),
             depth=config_provider("copernicusmarine","depth"),
             variables=config_provider("copernicusmarine","variables"),
-            cutout_dict=config_provider("atlite","cutouts")
         output:
             seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{cutout}}.nc",
         log:
