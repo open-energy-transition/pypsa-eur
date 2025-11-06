@@ -16,8 +16,15 @@ Relevant Settings
 
 .. code:: yaml
 
-    # No specific configuration required
-    # Uses year wildcard from Snakemake rule
+    copernicusmarine:
+        dataset_id: ID of the dataset to download from copernicusmarine package
+        longitude: min and max longitude for the cutout
+        latitude: min and max latitude for the cutout
+        variables: Potential temperature [°C]
+        depth: Near-surface depth for heat pumps [m]
+        time: start and end year
+
+    # Uses cutout wildcard from Snakemake rule
 
 Inputs
 ------
@@ -25,7 +32,7 @@ Inputs
 
 Outputs
 -------
-- `data/seawater_temperature_{year}.nc`: NetCDF file containing seawater temperature data
+- `data/seawater_temperature_{cutout}.nc`: NetCDF file containing seawater temperature data
 
 Notes
 -----
@@ -63,7 +70,7 @@ def build_cutout(
     # Spatial coverage: European waters (-12°W to 42°E, 33°N to 72°N)
     # Depth range: 5-15m (suitable for heat pump intake depths)
 
-    copernicusmarine_cutout=copernicusmarine.subset(
+    _=copernicusmarine.subset(
         dataset_id=dataset_id,
         start_datetime=f"{int(year_range[0])}-01-01",
         end_datetime=f"{int(year_range[1])}-12-31",
@@ -86,7 +93,7 @@ def build_cutout(
         )
 
     logger.info(
-        f"Successfully downloaded seawater temperature data to {snakemake.output.seawater_temperature}"
+        f"Successfully downloaded seawater temperature data to {output_path}"
     )
 
 if __name__ == "__main__":
@@ -122,7 +129,7 @@ if __name__ == "__main__":
     build_cutout(dataset_id, latitude, longitude, variables, depth, year_range, output_path)
 
     logger.info(
-        f"Downloading seawater temperature data for year {snakemake.wildcards.year}"
+        f"Downloading seawater temperature data for year {year_range[0]}"
     )
 
 
