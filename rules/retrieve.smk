@@ -1005,7 +1005,7 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
 ]:
     rule retrieve_seawater_temperature:
         params:
-            cutout=config_provider("atlite","default_cutout") 
+            cutout_dict=config_provider("atlite","cutouts"),
         input:
             data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}"),
         output:
@@ -1017,10 +1017,22 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
         conda:
             "../envs/environment.yaml"
         run:
-            if params.cutout == "europe-2013-sarah3-era5":
+            europe_cutout=params.cutout_dict["europe-2013-sarah3-era5"]
+            default_cutout=params.cutout_dict[wildcards.cutout]
+
+            keys = ["x", "y", "time"]
+            # Check if the geometric bounds of the default cutout are within the geometric bounds of the European cutout from the archive
+            is_inside = all(
+                (default_cutout[k][0] >= europe_cutout[k][0]) and
+                (default_cutout[k][1] <= europe_cutout[k][1])
+                for k in keys
+            )
+
+            if is_inside:
                 move(input.data,output.seawater_temperature)
+
             else:
-                logger.error(f"A seawater temperature cutout dedicated to {params.cutout} unavailable. Use build option to build the cutout.")
+                logger.error(f"A seawater temperature cutout dedicated to {wildcards.cutout} unavailable. Use build option to build the cutout.")
 
 
 if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
@@ -1028,7 +1040,6 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
 ]:
     rule build_seawater_temperature:
         params:
-            cutout=config_provider("atlite","default_cutout"),
             cutout_dict=config_provider("atlite","cutouts"),
             dataset_id=config_provider("copernicusmarine","dataset_id"),
             depth=config_provider("copernicusmarine","depth"),
