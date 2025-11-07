@@ -115,7 +115,7 @@ if __name__ == "__main__":
     update_config_from_wildcards(snakemake.config, snakemake.wildcards)
 
     # Load snakemake parameters
-    cutout=snakemake.params.cutout
+    cutout=snakemake.wildcards.cutout
     cutout_dict=snakemake.params.cutout_dict
     dataset_id=snakemake.params.dataset_id
     longitude=cutout_dict[cutout]["x"]
