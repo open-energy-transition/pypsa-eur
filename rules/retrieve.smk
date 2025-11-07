@@ -1017,8 +1017,10 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
         conda:
             "../envs/environment.yaml"
         run:
-            move(input.data,output.seawater_temperature)
-
+            if params.cutout == "europe-2013-sarah3-era5":
+                move(input.data,output.seawater_temperature)
+            else:
+                logger.error(f"A seawater temperature cutout dedicated to {params.cutout} unavailable. Use build option to build the cutout.")
 
 
 if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
