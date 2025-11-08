@@ -14,6 +14,7 @@ from pathlib import Path
 import pandas as pd
 
 from scripts._helpers import configure_logging, set_scenario_config
+from scripts.gb_model._helpers import get_regional_distribution
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,7 @@ logger = logging.getLogger(__name__)
 def parse_regional_flexibility_data(
     flexibility_data_path: str,
     regional_gb_data_path: str,
-    technology_detail: list,
-    fes_scenario: str,
-    year_range: list,
+    regional_distribution_reference: list,
 ) -> pd.DataFrame:
     """
     Parse the flexibility data to obtain required flexibility capacity in the required format.
@@ -47,9 +46,32 @@ def parse_regional_flexibility_data(
         3. Convert units from GW to MW and aggregate by year
     """
     # Load annual flexibility data
-    flexibility_data = pd.read_csv(flexibility_data_path)
+    flexibility_data = pd.read_csv(flexibility_data_path, index_col=0)
 
-    return flexibility_data
+    # Load regional GB data
+    regional_gb_data = pd.read_csv(regional_gb_data_path)
+
+    # Obtain regional reference for distribution
+    regional_reference = regional_gb_data[
+        regional_gb_data["Technology Detail"].str.lower().isin(regional_distribution_reference)
+    ]
+
+    # Group by bus and year
+    regional_reference = regional_reference.groupby(["bus", "year"])["data"].sum()
+
+    # Get regional distribution
+    regional_dist = get_regional_distribution(regional_reference)
+
+    # Fill backward for NaN values (there are 0 instances in early years for regional data, but not in annual data)
+    regional_dist = regional_dist.bfill()
+
+    # Distribute flexibility data regionally
+    flexibility_regional = regional_dist * flexibility_data['p_nom']
+
+    # Set name as p_nom
+    flexibility_regional.name = "p_nom"
+
+    return flexibility_regional
 
 
 if __name__ == "__main__":
@@ -65,19 +87,15 @@ if __name__ == "__main__":
     regional_gb_data_path = snakemake.input.regional_gb_data
 
     # Parse input data
-    fes_scenario = snakemake.params.scenario
-    year_range = snakemake.params.year_range
     flexibility_type = snakemake.params.flexibility_type
-    technology_detail = snakemake.params.technology_detail[flexibility_type]
+    regional_distribution_reference = snakemake.params.regional_distribution_reference[flexibility_type]
 
     df_regional_flexibility = parse_regional_flexibility_data(
         flexibility_data_path,
         regional_gb_data_path,
-        technology_detail,
-        fes_scenario,
-        year_range,
+        regional_distribution_reference,
     )
 
-    # Write flexibility dataframe to csv file
-    df_regional_flexibility.to_csv(snakemake.output["flexibility"])
-    logger.info(f"Regional flexibility data saved to {snakemake.output['flexibility']}")
+    # Write regional flexibility dataframe to csv file
+    df_regional_flexibility.to_csv(snakemake.output.regional_flexibility)
+    logger.info(f"Regional flexibility data saved to {snakemake.output.regional_flexibility}")

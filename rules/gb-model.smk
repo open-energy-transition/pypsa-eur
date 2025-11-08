@@ -408,10 +408,8 @@ rule process_regional_flexibility_table:
     message:
         "Process regional {wildcards.flexibility_type} flexibility from FES workbook into CSV format"
     params:
-        scenario=config["fes"]["gb"]["scenario"],
-        year_range=config["fes"]["year_range_incl"],
         flexibility_type=lambda wildcards: wildcards.flexibility_type,
-        technology_detail=config["fes"]["gb"]["flexibility"]["Technology Detail"],
+        regional_distribution_reference=config["fes"]["gb"]["flexibility"]["regional_distribution_reference"],
     input:
         flexibility=resources("gb-model/{flexibility_type}_flexibility.csv"),
         regional_gb_data=resources("gb-model/regional_gb_data.csv"),
@@ -476,7 +474,10 @@ rule compose_network:
                 demand_type=config["fes"]["gb"]["demand"]["Technology Detail"].keys(),
             ),
             expand(
-                resources("gb-model/{flexibility_type}_flexibility.csv"),
+                [
+                    resources("gb-model/{flexibility_type}_flexibility.csv"),
+                    resources("gb-model/regional_{flexibility_type}_flexibility.csv"),
+                ],
                 flexibility_type=config["fes"]["gb"]["flexibility"][
                     "Technology Detail"
                 ].keys(),
