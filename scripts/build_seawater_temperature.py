@@ -62,13 +62,30 @@ def build_cutout(
     depth: (list), 
     year_range: (list),
     output_path: (str)
-):
+) -> None:
+"""
+Download seawater temperature data from Copernicus Marine Service.
 
-    # Download seawater temperature data from Copernicus Marine Service
-    # Dataset: Global Ocean Physics Reanalysis (daily, 0.083° resolution)
-    # Variable: thetao (potential temperature in °C)
-    # Spatial coverage: European waters (-12°W to 42°E, 33°N to 72°N)
-    # Depth range: 5-15m (suitable for heat pump intake depths)
+Parameters
+----
+dataset_id: str
+    ID of the Global Ocean Physics Reanalysis dataset (daily, 0.083° resolution)
+latitude: list
+    Min. and max. latitude
+longitude: list
+    Min. and max. longitude
+variables: list
+    Variables to download. "thetao" refers to temperature
+depth: list
+   Depth range
+year_range: list
+   Years for which to download data from Jan through Dec
+output_path: str
+    Output path to store temeperature data
+
+Notes
+----
+Requires login for Copernicusmarine API.
 
     _=copernicusmarine.subset(
         dataset_id=dataset_id,
