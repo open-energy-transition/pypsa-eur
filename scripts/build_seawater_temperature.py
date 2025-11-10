@@ -9,7 +9,7 @@ heat pump calculations. It retrieves potential temperature (thetao) data from
 the global ocean physics reanalysis dataset at daily resolution.
 
 The data covers European coastal areas at a spatial resolution of 0.083° and
-includes near-surface depths (5-15m) suitable for heat pump applications.
+includes near-surface depths (depth range set in config) suitable for heat pump applications.
 
 Relevant Settings
 -----------------
