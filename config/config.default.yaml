@@ -1132,7 +1132,7 @@ data:
     source: archive
     version: latest
   hera:
-    source: "archive"
+    source: "primary"
     version: "latest"
   seawater_temperature:
     source: "build"

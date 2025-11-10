@@ -1061,6 +1061,9 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
 ]:
 
     rule retrieve_hera_data:
+        params:
+            cutout_dict=config_provider("atlite","cutouts"),
+            default_cutout=config_provider("atlite","default_cutout")
         input:
             river_discharge=storage(
                 f"{HERA_DATASET['url']}river_discharge/dis.HERA{{year}}.nc"
@@ -1077,8 +1080,20 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
             mem_mb=10000,
         retries: 2
         run:
-            move(input.river_discharge, output.river_discharge)
-            move(input.ambient_temperature, output.ambient_temperature)
+            import xarray as xr
+
+            latitude=params.cutout_dict[params.default_cutout]['y']
+            latitude.reverse()
+            longitude=params.cutout_dict[params.default_cutout]['x']
+
+            for parameter in ["river_discharge","ambient_temperature"]:
+                copy2(input[parameter],output[parameter])
+
+                ds = xr.open_dataset(output[parameter])
+                ds_selected = ds.sel(lat=slice(*latitude),lon=slice(*longitude))
+                ds_selected.to_netcdf(output[parameter])
+
+
 
 if (HERA_DATASET := dataset_version("hera"))["source"] in [
     "archive",
