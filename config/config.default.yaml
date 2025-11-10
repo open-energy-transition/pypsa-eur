@@ -1132,13 +1132,13 @@ data:
     source: archive
     version: latest
   hera:
-    source: "primary"
+    source: "archive"
     version: "latest"
   hera_test_cutout:
     source: "archive"
     version: "latest"
   seawater_temperature:
-    source: "archive"
+    source: "build"
     version: "latest"
 
 secrets:

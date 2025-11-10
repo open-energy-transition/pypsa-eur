@@ -1064,20 +1064,21 @@ if (HERA_TEST_CUTOUT_DATASET := dataset_version("hera_test_cutout"))["source"] i
         input:
             hera_data=storage(f"{HERA_TEST_CUTOUT_DATASET['url']}"),
         output:
-            river_discharge=f"{HERA_TEST_CUTOUT_DATASET['folder']}/river_discharge_be_2013-03-01_to_2013-03-08.nc",
-            ambient_temperature=f"{HERA_TEST_CUTOUT_DATASET['folder']}/ambient_temp_be_2013-03-01_to_2013-03-08.nc",
+            river_discharge=f"{HERA_TEST_CUTOUT_DATASET['folder']}/river_discharge_{{cutout}}.nc",
+            ambient_temperature=f"{HERA_TEST_CUTOUT_DATASET['folder']}/ambient_temp_{{cutout}}.nc",
         log:
-            "logs/retrieve_hera_data_test_cutout.log",
+            "logs/retrieve_hera_data_{cutout}.log",
         retries: 2
         resources:
             mem_mb=10000,
         run:
             unpack_archive(input["hera_data"], HERA_TEST_CUTOUT_DATASET["folder"])
 
+            cutout=wildcards.cutout
             # Move files one folder up
             folder = HERA_TEST_CUTOUT_DATASET["folder"]
             source_folder = Path.joinpath(
-                folder, "hera_be_2013-03-01_to_2013-03-08"
+                folder, f"hera_{cutout}"
             )
             for file in source_folder.iterdir():
                 move(file, folder)
@@ -1100,8 +1101,6 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
         output:
             river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{year}}.nc",
             ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{year}}.nc",
-        params:
-            snapshot_year="{year}",
         log:
             "logs/retrieve_hera_data_{year}.log",
         resources:
@@ -1110,6 +1109,34 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
         run:
             move(input.river_discharge, output.river_discharge)
             move(input.ambient_temperature, output.ambient_temperature)
+
+if (HERA_DATASET := dataset_version("hera"))["source"] in [
+    "archive",
+]:
+
+    rule retrieve_hera_data:
+        input:
+            river_discharge=storage(
+                f"{HERA_DATASET['url']}river_discharge_{{cutout}}.nc"
+            ),
+            ambient_temperature=storage(
+                f"{HERA_DATASET['url']}ambient_temp_{{cutout}}.nc"
+            ),
+        output:
+            river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{cutout}}.nc",
+            ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{cutout}}.nc",
+        log:
+            "logs/retrieve_hera_data_{cutout}.log",
+        resources:
+            mem_mb=10000,
+        retries: 2
+        run:
+            if wildcards.cutout in ["be-03-2013-era5","europe-2013-sarah3-era5"]:
+                move(input.river_discharge, output.river_discharge)
+                move(input.ambient_temperature, output.ambient_temperature)
+            else:
+                logger.error(f"A hera cutout dedicated to {wildcards.cutout} is unavailable. Use primary option to retrieve the cutout from the primary source.")
+
 
 
 if (JRC_ARDECO_DATASET := dataset_version("jrc_ardeco"))["source"] in [
