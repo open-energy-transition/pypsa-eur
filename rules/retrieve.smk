@@ -1056,36 +1056,6 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
             "../scripts/build_seawater_temperature.py"
 
 
-if (HERA_TEST_CUTOUT_DATASET := dataset_version("hera_test_cutout"))["source"] in [
-    "archive"
-]:
-
-    rule retrieve_hera_test_cutout_dataset:
-        input:
-            hera_data=storage(f"{HERA_TEST_CUTOUT_DATASET['url']}"),
-        output:
-            river_discharge=f"{HERA_TEST_CUTOUT_DATASET['folder']}/river_discharge_{{cutout}}.nc",
-            ambient_temperature=f"{HERA_TEST_CUTOUT_DATASET['folder']}/ambient_temp_{{cutout}}.nc",
-        log:
-            "logs/retrieve_hera_data_{cutout}.log",
-        retries: 2
-        resources:
-            mem_mb=10000,
-        run:
-            unpack_archive(input["hera_data"], HERA_TEST_CUTOUT_DATASET["folder"])
-
-            cutout=wildcards.cutout
-            # Move files one folder up
-            folder = HERA_TEST_CUTOUT_DATASET["folder"]
-            source_folder = Path.joinpath(
-                folder, f"hera_{cutout}"
-            )
-            for file in source_folder.iterdir():
-                move(file, folder)
-            os.rmdir(source_folder)
-
-
-
 if (HERA_DATASET := dataset_version("hera"))["source"] in [
     "primary",
 ]:
