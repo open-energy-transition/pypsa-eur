@@ -91,13 +91,13 @@ Requires login for Copernicusmarine API.
         dataset_id=dataset_id,
         start_datetime=f"{int(year_range[0])}-01-01",
         end_datetime=f"{int(year_range[1])}-12-31",
-        minimum_longitude=longitude[0],  # Western European boundary
-        maximum_longitude=longitude[1],  # Eastern European boundary
-        minimum_latitude=latitude[0],  # Southern European boundary
-        maximum_latitude=latitude[1],  # Northern European boundary
-        variables=variables,  # Potential temperature [°C]
-        minimum_depth=depth[0],  # Near-surface depth for heat pumps [m]
-        maximum_depth=depth[1],  # Near-surface depth for heat pumps [m]
+        minimum_longitude=longitude[0],
+        maximum_longitude=longitude[1],
+        minimum_latitude=latitude[0],
+        maximum_latitude=latitude[1],
+        variables=variables,
+        minimum_depth=depth[0],
+        maximum_depth=depth[1],
         output_filename=output_path,
     )
 
