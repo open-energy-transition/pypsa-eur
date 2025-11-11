@@ -52,7 +52,6 @@ if __name__ == "__main__":
     projects_added = []
     projects_created = []
     projects_in_base = []
-    projects_missing_buses = []
 
     # Add transmission projects for this horizon
     for _, project in transmission_projects.iterrows():
@@ -92,13 +91,9 @@ if __name__ == "__main__":
                 # Links don't exist but buses do - CREATE new links
                 # Get a template DC link for attributes
                 dc_links = n.links[n.links.carrier == "DC"]
-                if len(dc_links) == 0:
-                    logger.error(
-                        "Cannot create new links: No DC links found in network as template"
-                    )
-                    projects_missing_buses.append(project["project_id"])
-                    continue
-
+                assert not dc_links.empty, (
+                    "Cannot create new links: No DC links found in network as template"
+                )
                 template = dc_links.iloc[0]
 
                 # Create forward link
@@ -138,28 +133,19 @@ if __name__ == "__main__":
                     f"    Link {reverse_link_id}: 0 → {capacity_1to0:.0f} MW (new)"
                 )
 
-        else:
+        elif link_id in n.links.index and reverse_link_id in n.links.index:
             # Project IS already in the base network - log it for transparency
-            if link_id in n.links.index and reverse_link_id in n.links.index:
-                capacity_forward = n.links.loc[link_id, "p_nom"]
-                capacity_reverse = n.links.loc[reverse_link_id, "p_nom"]
+            capacity_forward = n.links.loc[link_id, "p_nom"]
+            capacity_reverse = n.links.loc[reverse_link_id, "p_nom"]
 
-                projects_in_base.append(project["project_id"])
-                logger.info(
-                    f"Project {project['project_id']} ({project['project_name']}) already in base network:"
-                )
-                logger.info(
-                    f"    Link {link_id}: {capacity_forward:.0f} MW (no change)"
-                )
-                logger.info(
-                    f"    Link {reverse_link_id}: {capacity_reverse:.0f} MW (no change)"
-                )
-            else:
-                projects_missing_buses.append(project["project_id"])
-                logger.warning(
-                    f" Project {project['project_id']} ({project['project_name']}): Marked in_reference but links not found"
-                )
-                logger.warning(f"    Missing: {link_id} and/or {reverse_link_id}")
+            projects_in_base.append(project["project_id"])
+            logger.info(
+                f"Project {project['project_id']} ({project['project_name']}) already in base network:"
+            )
+            logger.info(f"    Link {link_id}: {capacity_forward:.0f} MW (no change)")
+            logger.info(
+                f"    Link {reverse_link_id}: {capacity_reverse:.0f} MW (no change)"
+            )
 
     # Analyze border aggregation (multiple projects per border)
     border_projects = {}
@@ -217,11 +203,6 @@ if __name__ == "__main__":
         )
         for border, pids in sorted(borders_with_multiple.items()):
             logger.info(f"    {border}: projects {pids}")
-
-    if projects_missing_buses:
-        logger.info(
-            f" {len(projects_missing_buses)} projects excluded (buses not in network): {projects_missing_buses}"
-        )
 
     logger.info(f"{'=' * 80}\n")
 
