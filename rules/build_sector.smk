@@ -406,9 +406,8 @@ rule build_ates_potentials:
             "ignore_missing_regions",
         ),
         countries=config_provider("countries"),
-        aquifer_shp_path=rules.retrieve_aquifer_data_bgr.params.shp_path,
     input:
-        aquifer_shapes_zip=rules.retrieve_aquifer_data_bgr.output.zip_file,
+        aquifer_shapes_shp=rules.retrieve_aquifer_data_bgr.output["aquifer_shapes"][0],
         dh_areas=resources("dh_areas_base_s_{clusters}.geojson"),
         regions_onshore=resources("regions_onshore_base_s_{clusters}.geojson"),
         central_heating_forward_temperature_profiles=resources(
@@ -825,7 +824,7 @@ if (COUNTRY_HDD_DATASET := dataset_version("country_hdd"))["source"] in ["build"
             cutouts=["cutouts/europe-1940-2024-era5.nc"],
             country_shapes=resources("country_shapes.geojson"),
         output:
-            era5_hdd=COUNTRY_HDD_DATASET["folder"] / "era5-HDD-per-country.csv",
+            era5_hdd=f"{COUNTRY_HDD_DATASET["folder"]}/era5-HDD-per-country.csv",
         log:
             logs("build_country_hdd.log"),
         benchmark:
@@ -838,7 +837,7 @@ if (COUNTRY_HDD_DATASET := dataset_version("country_hdd"))["source"] in ["build"
 
 rule build_heat_totals:
     input:
-        hdd=COUNTRY_HDD_DATASET["folder"] / "era5-HDD-per-country.csv",
+        hdd=f"{COUNTRY_HDD_DATASET["folder"]}/era5-HDD-per-country.csv",
         energy_totals=resources("energy_totals.csv"),
     output:
         heat_totals=resources("heat_totals.csv"),
@@ -1356,13 +1355,14 @@ rule build_transport_demand:
         sector=config_provider("sector"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
     input:
+        network=resources("networks/base_s.nc"),
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
         pop_weighted_energy_totals=resources(
             "pop_weighted_energy_totals_s_{clusters}.csv"
         ),
         transport_data=resources("transport_data.csv"),
-        traffic_data_KFZ=MOBILITY_PROFILES_DATASET["folder"] / "kfz.csv",
-        traffic_data_Pkw=MOBILITY_PROFILES_DATASET["folder"] / "pkw.csv",
+        traffic_data_KFZ=f"{MOBILITY_PROFILES_DATASET["folder"]}/kfz.csv",
+        traffic_data_Pkw=f"{MOBILITY_PROFILES_DATASET["folder"]}/pkw.csv",
         temp_air_total=resources("temp_air_total_base_s_{clusters}.nc"),
     output:
         transport_demand=resources("transport_demand_s_{clusters}.csv"),
@@ -1611,10 +1611,10 @@ rule prepare_sector_network:
             "biomass_potentials_s_{clusters}_{planning_horizons}.csv"
         ),
         costs=lambda w: COSTS_DATASET["folder"]
-        / (
-            "costs_{}.csv".format(config_provider("costs", "year")(w))
+        + (
+            "/costs_{}.csv".format(config_provider("costs", "year")(w))
             if config_provider("foresight")(w) == "overnight"
-            else "costs_{planning_horizons}.csv"
+            else "/costs_{planning_horizons}.csv"
         ),
         h2_cavern=resources("salt_cavern_potentials_s_{clusters}.csv"),
         busmap_s=resources("busmap_base_s.csv"),

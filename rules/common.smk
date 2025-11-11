@@ -7,12 +7,7 @@ from functools import partial, lru_cache
 
 import os, sys, glob
 import requests
-from tenacity import (
-    retry as tenacity_retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
+
 
 import pandas as pd
 import json
@@ -150,7 +145,10 @@ def dataset_version(
     dataset = dataset.squeeze()
 
     # Generate output folder path in the `data` directory
-    dataset["folder"] = Path("data", name, dataset["source"], dataset["version"])
+    dataset["folder"] = Path(
+        "data", name, dataset["source"], dataset["version"]
+    ).as_posix()
+
     return dataset
 
 
@@ -189,35 +187,6 @@ def input_custom_extra_functionality(w):
     return []
 
 
-@tenacity_retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10),
-    retry=retry_if_exception_type(
-        (requests.HTTPError, requests.ConnectionError, requests.Timeout)
-    ),
-)
-def has_internet_access(url: str = "https://www.zenodo.org", timeout: int = 5) -> bool:
-    """
-    Checks if internet connection is available by sending a HEAD request
-    to a reliable server like Zenodo.
-
-    Parameters:
-    - url (str): The URL to check for internet connection. Default is Zenodo.
-    - timeout (int | float): The maximum time (in seconds) the request should wait.
-
-    Returns:
-    - bool: True if the internet is available, otherwise False.
-    """
-    # Send a HEAD request to avoid fetching full response
-    response = requests.head(url, timeout=timeout, allow_redirects=True)
-    # Raise HTTPError for transient errors
-    # 429: Too Many Requests (rate limiting)
-    # 500, 502, 503, 504: Server errors
-    if response.status_code in (429, 500, 502, 503, 504):
-        response.raise_for_status()
-    return response.status_code == 200
-
-
 def solved_previous_horizon(w):
     planning_horizons = config_provider("scenario", "planning_horizons")(w)
     i = planning_horizons.index(int(w.planning_horizons))
@@ -239,6 +208,6 @@ def input_cutout(wildcards, cutout_names="default"):
         cutout_names = config_provider("atlite", "default_cutout")(wildcards)
 
     if isinstance(cutout_names, list):
-        return [(cutouts_path / f"{cn}.nc").as_posix() for cn in cutout_names]
+        return [f"{cutouts_path}/{cn}.nc" for cn in cutout_names]
     else:
-        return (cutouts_path / f"{cutout_names}.nc").as_posix()
+        return f"{cutouts_path}/{cutout_names}.nc"
