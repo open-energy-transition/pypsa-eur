@@ -1087,9 +1087,10 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
             longitude=params.cutout_dict[params.default_cutout]['x']
 
             for parameter in ["river_discharge","ambient_temperature"]:
-                copy2(input[parameter],output[parameter])
+                full_cutout_path = output[parameter].replace(".nc", "_full_cutout.nc")
+                copy2(input[parameter],full_cutout_path)
 
-                ds = xr.open_dataset(output[parameter])
+                ds = xr.open_dataset(full_cutout_path)
                 ds_selected = ds.sel(lat=slice(*latitude),lon=slice(*longitude))
                 ds_selected.to_netcdf(output[parameter])
 
