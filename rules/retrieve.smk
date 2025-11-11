@@ -1000,12 +1000,15 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
             copy2(input["lau_regions"], output["zip"])
 
 
-if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
+if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))[
+    "source"
+] in [
     "archive",
 ]:
+
     rule retrieve_seawater_temperature:
         params:
-            cutout_dict=config_provider("atlite","cutouts"),
+            cutout_dict=config_provider("atlite", "cutouts"),
         input:
             data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}"),
         output:
@@ -1017,33 +1020,41 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
         conda:
             "../envs/environment.yaml"
         run:
-            europe_cutout=params.cutout_dict["europe-2013-sarah3-era5"]
-            default_cutout=params.cutout_dict[wildcards.cutout]
+            europe_cutout = params.cutout_dict["europe-2013-sarah3-era5"]
+            default_cutout = params.cutout_dict[wildcards.cutout]
 
             keys = ["x", "y", "time"]
             # Check if the geometric bounds of the default cutout are within the geometric bounds of the European cutout from the archive
             is_inside = all(
-                (default_cutout[k][0] >= europe_cutout[k][0]) and
-                (default_cutout[k][1] <= europe_cutout[k][1])
+                (default_cutout[k][0] >= europe_cutout[k][0])
+                and (default_cutout[k][1] <= europe_cutout[k][1])
                 for k in keys
             )
 
             if is_inside:
-                move(input.data,output.seawater_temperature)
+                move(input.data, output.seawater_temperature)
 
             else:
-                logger.error(f"A seawater temperature cutout dedicated to {wildcards.cutout} unavailable. Use build option to build the cutout.")
+                logger.error(
+                    f"A seawater temperature cutout dedicated to {wildcards.cutout} unavailable. Use build option to build the cutout."
+                )
 
 
-if (SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version("seawater_temperature_copernicusmarine"))["source"] in [
+
+if (
+    SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version(
+        "seawater_temperature_copernicusmarine"
+    )
+)["source"] in [
     "build",
 ]:
+
     rule build_seawater_temperature_copernicusmarine:
         params:
-            cutout_dict=config_provider("atlite","cutouts"),
-            dataset_id=config_provider("copernicusmarine","dataset_id"),
-            depth=config_provider("copernicusmarine","depth"),
-            variables=config_provider("copernicusmarine","variables"),
+            cutout_dict=config_provider("atlite", "cutouts"),
+            dataset_id=config_provider("copernicusmarine", "dataset_id"),
+            depth=config_provider("copernicusmarine", "depth"),
+            variables=config_provider("copernicusmarine", "variables"),
         output:
             seawater_temperature_copernicusmarine=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
         log:
@@ -1062,8 +1073,8 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
 
     rule retrieve_hera_data:
         params:
-            cutout_dict=config_provider("atlite","cutouts"),
-            default_cutout=config_provider("atlite","default_cutout")
+            cutout_dict=config_provider("atlite", "cutouts"),
+            default_cutout=config_provider("atlite", "default_cutout"),
         input:
             river_discharge=storage(
                 f"{HERA_DATASET['url']}river_discharge/dis.HERA{{year}}.nc"
@@ -1082,16 +1093,18 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
         run:
             import xarray as xr
 
-            latitude=params.cutout_dict[params.default_cutout]['y']
+            latitude = params.cutout_dict[params.default_cutout]["y"]
             latitude.reverse()
-            longitude=params.cutout_dict[params.default_cutout]['x']
+            longitude = params.cutout_dict[params.default_cutout]["x"]
 
-            for parameter in ["river_discharge","ambient_temperature"]:
-                full_cutout_path = output[parameter].replace(".nc", "_full_cutout.nc")
-                copy2(input[parameter],full_cutout_path)
+            for parameter in ["river_discharge", "ambient_temperature"]:
+                full_cutout_path = output[parameter].replace(
+                    ".nc", "_full_cutout.nc"
+                )
+                copy2(input[parameter], full_cutout_path)
 
                 ds = xr.open_dataset(full_cutout_path)
-                ds_selected = ds.sel(lat=slice(*latitude),lon=slice(*longitude))
+                ds_selected = ds.sel(lat=slice(*latitude), lon=slice(*longitude))
                 ds_selected.to_netcdf(output[parameter])
 
 
@@ -1117,11 +1130,13 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
             mem_mb=10000,
         retries: 2
         run:
-            if wildcards.cutout in ["be-03-2013-era5","europe-2013-sarah3-era5"]:
+            if wildcards.cutout in ["be-03-2013-era5", "europe-2013-sarah3-era5"]:
                 move(input.river_discharge, output.river_discharge)
                 move(input.ambient_temperature, output.ambient_temperature)
             else:
-                logger.error(f"A hera cutout dedicated to {wildcards.cutout} is unavailable. Use primary option to retrieve the cutout from the primary source.")
+                logger.error(
+                    f"A hera cutout dedicated to {wildcards.cutout} is unavailable. Use primary option to retrieve the cutout from the primary source."
+                )
 
 
 
