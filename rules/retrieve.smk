@@ -1035,25 +1035,25 @@ if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["so
                 logger.error(f"A seawater temperature cutout dedicated to {wildcards.cutout} unavailable. Use build option to build the cutout.")
 
 
-if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))["source"] in [
+if (SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version("seawater_temperature_copernicusmarine"))["source"] in [
     "build",
 ]:
-    rule build_seawater_temperature:
+    rule build_seawater_temperature_copernicusmarine:
         params:
             cutout_dict=config_provider("atlite","cutouts"),
             dataset_id=config_provider("copernicusmarine","dataset_id"),
             depth=config_provider("copernicusmarine","depth"),
             variables=config_provider("copernicusmarine","variables"),
         output:
-            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{cutout}}.nc",
+            seawater_temperature_copernicusmarine=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
         log:
-            "logs/build_seawater_temperature_{cutout}.log",
+            "logs/build_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:
             mem_mb=10000,
         conda:
             "../envs/environment.yaml"
         script:
-            "../scripts/build_seawater_temperature.py"
+            "../scripts/build_seawater_temperature_copernicusmarine.py"
 
 
 if (HERA_DATASET := dataset_version("hera"))["source"] in [

@@ -1134,7 +1134,7 @@ data:
   hera:
     source: "primary"
     version: "latest"
-  seawater_temperature:
+  seawater_temperature_copernicusmarine:
     source: "build"
     version: "latest"
 
