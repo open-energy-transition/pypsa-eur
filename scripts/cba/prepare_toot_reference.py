@@ -74,20 +74,6 @@ if __name__ == "__main__":
         link_id = f"{bus0}-{bus1}-DC"
         reverse_link_id = f"{bus1}-{bus0}-DC"
 
-        # Check if both buses exist in the network
-        buses_exist = bus0 in n.buses.index and bus1 in n.buses.index
-
-        if not buses_exist:
-            # Buses don't exist - skip project (e.g., extra-EU connections)
-            projects_missing_buses.append(project["project_id"])
-            logger.warning(
-                f" Project {project['project_id']} ({project['project_name']}): Buses not in network"
-            )
-            logger.warning(
-                f"    Missing buses: {bus0 if bus0 not in n.buses.index else ''} {bus1 if bus1 not in n.buses.index else ''}"
-            )
-            continue
-
         if not in_reference:
             # Project is NOT in the base network - ADD it to create TOOT reference
             capacity_0to1 = project["p_nom 0->1"]
