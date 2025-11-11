@@ -48,7 +48,8 @@ TRANSMISSION_PROJECTS_COLUMN_MAP = {
     "Project ID": "project_id",
     "Project Name": "project_name",
     "Is the project in the 2030 reference grid?": "in_reference2030",
-    "Is the project in the 2035 reference grid?": "in_reference2035",
+    # 2035 reference grid is used for assessing CBA projects in planning horizon 2040:
+    "Is the project in the 2035 reference grid?": "in_reference2040",
     "Border": "border",
     "Transfer capacity increase A-B (MW)": "p_nom 0->1",
     "Transfer capacity increase B-A (MW)": "p_nom 1->0",

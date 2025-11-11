@@ -21,10 +21,6 @@ import pandas as pd
 import pypsa
 
 from scripts._helpers import configure_logging, set_scenario_config
-from scripts.cba.project_helpers import (
-    get_project_status_for_horizon,
-    log_horizon_mapping,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -44,17 +40,12 @@ if __name__ == "__main__":
     transmission_projects = pd.read_csv(snakemake.input.transmission_projects)
 
     # Get planning horizons from config
-    planning_horizons = snakemake.config["scenario"]["planning_horizons"]
-    current_horizon = int(snakemake.wildcards.planning_horizons)
+    planning_horizons = int(snakemake.wildcards.planning_horizons)
 
     logger.info(f"\n{'=' * 80}")
     logger.info("PREPARING TOOT REFERENCE NETWORK")
     logger.info(f"{'=' * 80}")
-    logger.info(f"Current planning horizon: {current_horizon}")
-    logger.info(f"Available planning horizons: {planning_horizons}")
-
-    # Log reference mapping
-    log_horizon_mapping(planning_horizons)
+    logger.info(f"Current planning horizon: {planning_horizons}")
 
     # For TOOT: Add projects that are NOT in the reference (in_reference=False)
     # the reference network should have ALL projects
@@ -65,9 +56,7 @@ if __name__ == "__main__":
 
     # Add transmission projects for this horizon
     for _, project in transmission_projects.iterrows():
-        in_reference = get_project_status_for_horizon(
-            project, current_horizon, planning_horizons
-        )
+        in_reference: bool = project[f"in_reference{planning_horizons}"]
 
         bus0 = project["bus0"]
         bus1 = project["bus1"]
@@ -176,13 +165,10 @@ if __name__ == "__main__":
     border_projects = {}
     new_links_list = []
     for _, project in transmission_projects.iterrows():
-        in_reference = get_project_status_for_horizon(
-            project, current_horizon, planning_horizons
-        )
+        in_reference: bool = project[f"in_reference{planning_horizons}"]
         bus0, bus1 = project["bus0"], project["bus1"]
-        buses_exist = bus0 in n.buses.index and bus1 in n.buses.index
 
-        if not in_reference and buses_exist:
+        if not in_reference:
             border = f"{bus0}-{bus1}"
             if border not in border_projects:
                 border_projects[border] = []
@@ -242,5 +228,5 @@ if __name__ == "__main__":
     # Save reference network with all projects
     n.export_to_netcdf(snakemake.output.network)
     logger.info(
-        f"TOOT reference network saved (horizon {current_horizon}, {len(projects_added)} capacity added, {len(projects_created)} links created)"
+        f"TOOT reference network saved (horizon {planning_horizons}, {len(projects_added)} capacity added, {len(projects_created)} links created)"
     )
