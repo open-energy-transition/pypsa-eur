@@ -9,7 +9,7 @@ heat pump calculations. It retrieves potential temperature (thetao) data from
 the global ocean physics reanalysis dataset at daily resolution.
 
 The data covers European coastal areas at a spatial resolution of 0.083° and
-includes near-surface depths (5-15m) suitable for heat pump applications.
+includes near-surface depths (depth range set in config) suitable for heat pump applications.
 
 Relevant Settings
 -----------------
@@ -62,25 +62,42 @@ def build_cutout(
     depth: (list), 
     year_range: (list),
     output_path: (str)
-):
+) -> None:
+"""
+Download seawater temperature data from Copernicus Marine Service.
 
-    # Download seawater temperature data from Copernicus Marine Service
-    # Dataset: Global Ocean Physics Reanalysis (daily, 0.083° resolution)
-    # Variable: thetao (potential temperature in °C)
-    # Spatial coverage: European waters (-12°W to 42°E, 33°N to 72°N)
-    # Depth range: 5-15m (suitable for heat pump intake depths)
+Parameters
+----
+dataset_id: str
+    ID of the Global Ocean Physics Reanalysis dataset (daily, 0.083° resolution)
+latitude: list
+    Min. and max. latitude
+longitude: list
+    Min. and max. longitude
+variables: list
+    Variables to download. "thetao" refers to temperature
+depth: list
+   Depth range
+year_range: list
+   Years for which to download data from Jan through Dec
+output_path: str
+    Output path to store temeperature data
+
+Notes
+----
+Requires login for Copernicusmarine API.
 
     _=copernicusmarine.subset(
         dataset_id=dataset_id,
         start_datetime=f"{int(year_range[0])}-01-01",
         end_datetime=f"{int(year_range[1])}-12-31",
-        minimum_longitude=longitude[0],  # Western European boundary
-        maximum_longitude=longitude[1],  # Eastern European boundary
-        minimum_latitude=latitude[0],  # Southern European boundary
-        maximum_latitude=latitude[1],  # Northern European boundary
-        variables=variables,  # Potential temperature [°C]
-        minimum_depth=depth[0],  # Near-surface depth for heat pumps [m]
-        maximum_depth=depth[1],  # Near-surface depth for heat pumps [m]
+        minimum_longitude=longitude[0],
+        maximum_longitude=longitude[1],
+        minimum_latitude=latitude[0],
+        maximum_latitude=latitude[1],
+        variables=variables,
+        minimum_depth=depth[0],
+        maximum_depth=depth[1],
         output_filename=output_path,
     )
 
