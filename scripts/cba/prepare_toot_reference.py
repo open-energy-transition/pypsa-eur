@@ -42,10 +42,10 @@ if __name__ == "__main__":
     # Get planning horizons from config
     planning_horizons = int(snakemake.wildcards.planning_horizons)
 
-    logger.info(f"\n{'=' * 80}")
-    logger.info("PREPARING TOOT REFERENCE NETWORK")
-    logger.info(f"{'=' * 80}")
-    logger.info(f"Current planning horizon: {planning_horizons}")
+    logger.debug(f"\n{'=' * 80}")
+    logger.debug("PREPARING TOOT REFERENCE NETWORK")
+    logger.debug(f"{'=' * 80}")
+    logger.debug(f"Current planning horizon: {planning_horizons}")
 
     # For TOOT: Add projects that are NOT in the reference (in_reference=False)
     # the reference network should have ALL projects
@@ -78,13 +78,13 @@ if __name__ == "__main__":
                 n.links.loc[reverse_link_id, "p_nom"] += capacity_1to0
 
                 projects_added.append(project["project_id"])
-                logger.info(
+                logger.debug(
                     f"Project {project['project_id']} ({project['project_name']}) ADDED to existing links:"
                 )
-                logger.info(
+                logger.debug(
                     f"    Link {link_id}: {original_capacity:.0f} → {n.links.loc[link_id, 'p_nom']:.0f} MW (+{capacity_0to1:.0f} MW)"
                 )
-                logger.info(
+                logger.debug(
                     f"    Link {reverse_link_id}: {original_capacity_reverse:.0f} → {n.links.loc[reverse_link_id, 'p_nom']:.0f} MW (+{capacity_1to0:.0f} MW)"
                 )
             else:
@@ -92,9 +92,8 @@ if __name__ == "__main__":
                 # Get a template DC link for attributes
                 dc_links = n.links[n.links.carrier == "DC"]
                 assert not dc_links.empty, (
-                    "Cannot create new links: No DC links found in network as template"
+                    "Cannot create new links: No DC links found in network"
                 )
-                template = dc_links.iloc[0]
 
                 # Create forward link
                 n.add(
@@ -105,9 +104,7 @@ if __name__ == "__main__":
                     carrier="DC",
                     p_nom=capacity_0to1,
                     p_nom_extendable=False,
-                    length=0,  # Will be calculated if needed
-                    marginal_cost=template.marginal_cost,  # TODO: adjust if needed
-                    capital_cost=template.capital_cost,  # Not relevant in market simulation, will be set in CBA B1
+                    marginal_cost=0.01,  # Hurdle costs: 0.01 €/MWh (p.20, 104 TYNDP 2024 CBA implementation guidelines)
                 )
 
                 # Create reverse link
@@ -119,17 +116,15 @@ if __name__ == "__main__":
                     carrier="DC",
                     p_nom=capacity_1to0,
                     p_nom_extendable=False,
-                    length=0,
-                    marginal_cost=template.marginal_cost,
-                    capital_cost=template.capital_cost,
+                    marginal_cost=0.01,  # Hurdle costs: 0.01 €/MWh
                 )
 
                 projects_created.append(project["project_id"])
-                logger.info(
+                logger.debug(
                     f"Project {project['project_id']} ({project['project_name']}) CREATED new links:"
                 )
-                logger.info(f"    Link {link_id}: 0 → {capacity_0to1:.0f} MW (new)")
-                logger.info(
+                logger.debug(f"    Link {link_id}: 0 → {capacity_0to1:.0f} MW (new)")
+                logger.debug(
                     f"    Link {reverse_link_id}: 0 → {capacity_1to0:.0f} MW (new)"
                 )
 
@@ -139,14 +134,15 @@ if __name__ == "__main__":
             capacity_reverse = n.links.loc[reverse_link_id, "p_nom"]
 
             projects_in_base.append(project["project_id"])
-            logger.info(
+            logger.debug(
                 f"Project {project['project_id']} ({project['project_name']}) already in base network:"
             )
-            logger.info(f"    Link {link_id}: {capacity_forward:.0f} MW (no change)")
-            logger.info(
+            logger.debug(f"    Link {link_id}: {capacity_forward:.0f} MW (no change)")
+            logger.debug(
                 f"    Link {reverse_link_id}: {capacity_reverse:.0f} MW (no change)"
             )
 
+    # For debugging purpose
     # Analyze border aggregation (multiple projects per border)
     border_projects = {}
     new_links_list = []
