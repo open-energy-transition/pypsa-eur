@@ -468,7 +468,7 @@ def input_hera_data(w) -> dict[str, str]:
                 f"data/hera_{year}/river_discharge_{year}.nc"
             )
             result[f"hera_ambient_temperature_{year}"] = (
-                f"data/hera_{year}/ambient_temp_{year}.nc"
+                rules.retrieve_hera_data.output["ambient_temperature"]
             )
 
         return result
@@ -604,7 +604,7 @@ def input_seawater_temperature(w) -> dict[str, str]:
 
     # Create dictionary with year-specific keys
     return {
-        f"seawater_temperature_{year}": f"data/seawater_temperature_{year}.nc"
+        f"seawater_temperature_{year}": rule.retrieve_seawater_temperature.output
         for year in unique_years
     }
 

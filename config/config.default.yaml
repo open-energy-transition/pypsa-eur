@@ -181,6 +181,12 @@ atlite:
         monthly_requests: true
         tmpdir: "./cutouts_tmp/"
 
+# The latitude, longitude and time information is taken from the default atlite cutout used
+copernicusmarine:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+  variables: ["thetao"]
+  depth: [5, 15]
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#renewable
 renewable:
   onwind:
@@ -1136,6 +1142,12 @@ data:
     version: "latest"
   jrc_ardeco:
     source: "archive"
+    version: "latest"
+  hera:
+    source: "primary"
+    version: "latest"
+  seawater_temperature_copernicusmarine:
+    source: "build"
     version: "latest"
 
 secrets:
