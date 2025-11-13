@@ -24,7 +24,9 @@ if __name__ == "__main__":
 
     # Load the solved base network
     # The wildcard has been expanded to {clusters}_{opts}_{sector_opts}_{planning_horizons}
-    n = pypsa.Network(snakemake.input.network[0])
+    n = pypsa.Network(snakemake.input.network)
+
+    # TODO: in the case of a perfect foresight network we need to extract a single planning horizon here
 
     # TODO: Apply CBA-specific simplifications
     # For now, pass through the network as-is
