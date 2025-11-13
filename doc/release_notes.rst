@@ -11,11 +11,22 @@ Release Notes
 Upcoming Open-TYNDP Release
 ================
 
+**Features**
+
+* Introduce a workflow branch for performing Cost-Benefit Analysis (CBA) using both TOOT
+  (Take One Out at a Time) and PINT (Put In at a Time) methodologies for TYNDP
+  transmission and storage projects
+  (https://github.com/open-energy-transition/open-tyndp/pull/149) on top of the SB
+  results. The workflow structure has rules for retrieving CBA project data, processing
+  transmission and storage projects from Excel exports, creating reference networks,
+  building individual project networks, solving network optimizations, and computing CBA
+  indicators.
+
 
 Upcoming PyPSA-Eur Release
 ================
 
-* Added automatic retry for some (Zenodo) HTTP requests to handle transient errors 
+* Added automatic retry for some (Zenodo) HTTP requests to handle transient errors
   like rate limiting and server errors.
 
 * Fixed `ValueError` in `prepare_sector_network.py` in function `add_storage_and_grids`
@@ -31,10 +42,10 @@ Upcoming PyPSA-Eur Release
   This didn't fail when using PyPSA-Eur as a standalone module, because the directory
   was the same as the rule's output file. However, when using PyPSA-Eur as a Snakemake
   module, this was not the case as Snakemake prepends a prefix to all the input and
-  output files, but not to any file locations listed as parameters. The fix was to save 
-  intermediate zip files at the top directory level. This was fixed for many rules in 
-  `retrieve.smk`, i.e., `retrieve_eez`, `retrieve_nuts_2021_shapes`, 
-  `retrieve_nuts_2013_shapes`, `retrieve_worldbank_urban_population`, 
+  output files, but not to any file locations listed as parameters. The fix was to save
+  intermediate zip files at the top directory level. This was fixed for many rules in
+  `retrieve.smk`, i.e., `retrieve_eez`, `retrieve_nuts_2021_shapes`,
+  `retrieve_nuts_2013_shapes`, `retrieve_worldbank_urban_population`,
   `retrieve_co2stop`, `download_wdpa`, `download_wdpa_marine`, `retrieve_eurostat_data`.
   (https://github.com/PyPSA/pypsa-eur/pull/1768)
 
@@ -160,7 +171,7 @@ PyPSA-Eur v2025.07.0 (11th July 2025, merged 24th July 2025)
 
 * The `plotting|map|color_geomap` was renamed to `plotting|map|geomap_colors` to align
   with the new PyPSA API.
-  
+
 **Bugfixes and Compatibility**
 
 * Select correct capital costs for floating offshore wind. Previously, the same
@@ -186,7 +197,7 @@ PyPSA-Eur v2025.07.0 (11th July 2025, merged 24th July 2025)
 * Adjustments to upcoming PyPSA API changes.
   (https://github.com/PyPSA/pypsa-eur/pull/1720,
   https://github.com/PyPSA/pypsa-eur/pull/1750)
-  
+
 * Ensure consistent use of wildcards in :mod:`build_renewable_profiles` for
   ``run: shared_resources: policy: base``.
   (https://github.com/PyPSA/pypsa-eur/pull/1641)
@@ -295,7 +306,7 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
   default_cutouts:``. (https://github.com/PyPSA/pypsa-eur/pull/1613)
 
   - All cutout references in ``config.default.yaml`` can now be specified by a
-    list of cutouts which will be concatenated along the time dimension.    
+    list of cutouts which will be concatenated along the time dimension.
 
   - All cutout references in ``config.default.yaml`` now default to ``atlite:
     default_cutout:``.
@@ -321,7 +332,7 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
   - Splits renewable potentials and time series into a configurable number of
     resource classes per carrier and clustered region. The binning is linear
     based on the average capacity factors.
-  
+
   - With the setting ``renewables: onwind: resource_classes: 4``, each region
     would have four onshore wind generators, each with different potential
     (``p_nom_max``) and capacity factor (``p_max_pu``). The same applies to
@@ -332,7 +343,7 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
   - In :mod:`build_renewable_profiles`, a new dimension "bin" is added to the
     output (``xarray.Dataset``). The resource classes are numbered from 0
     (lowest) to N (highest).
-    
+
   - Additionally, a new ``.geojson`` file of clustered regions split by resource
     classes is exported, which is is used in :mod:`add_electricity` and
     :mod:`build_clustered_solar_rooftop_potentials` to assign existing wind and
@@ -349,7 +360,7 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
     configurable prices (``sector: imports: prices:``).
 
   - Methane imports use existing LNG terminal entry points, hydrogen imports use
-    existing pipeline entry points. 
+    existing pipeline entry points.
 
   - Simplification: Import prices are uniform across all regions.
 
@@ -441,7 +452,7 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
 
   - Inferral of component locations was made more robust. The revised function
     uses ``n.buses.location`` rather than the index strings. Components inherit
-    the location of the bus they connect to with the highest spatial resolution. 
+    the location of the bus they connect to with the highest spatial resolution.
 
   - The file ``supply.csv`` was **removed**; the file ``price_statistics.csv``
     was **removed and integrated** into ``metrics.csv``; the files
@@ -514,9 +525,9 @@ PyPSA-Eur v2025.04.0 (6th April 2025)
 * Add customisable memory logging frequency for :mod:`solve_network`.
   (https://github.com/PyPSA/pypsa-eur/pull/1521)
 
-* The ``config/config.yaml`` will no longer be created when running snakemake. It will 
+* The ``config/config.yaml`` will no longer be created when running snakemake. It will
   still be used by the workflow if it exists, but ignored otherwise and is not required.
-  See :ref:`defaultconfig` for more information. 
+  See :ref:`defaultconfig` for more information.
   (https://github.com/PyPSA/pypsa-eur/pull/1649)
 
 **Bugfixes and Compatibility**
