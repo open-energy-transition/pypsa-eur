@@ -64,8 +64,8 @@ if __name__ == "__main__":
 
         if not in_reference:
             # Project is NOT in the base network - ADD it to create TOOT reference
-            capacity_0to1 = project["p_nom 0->1"]
-            capacity_1to0 = project["p_nom 1->0"]
+            capacity = project["p_nom 0->1"]
+            capacity_reverse = project["p_nom 1->0"]
 
             links_exist = link_id in n.links.index and reverse_link_id in n.links.index
 
@@ -74,18 +74,18 @@ if __name__ == "__main__":
                 original_capacity = n.links.loc[link_id, "p_nom"]
                 original_capacity_reverse = n.links.loc[reverse_link_id, "p_nom"]
 
-                n.links.loc[link_id, "p_nom"] += capacity_0to1
-                n.links.loc[reverse_link_id, "p_nom"] += capacity_1to0
+                n.links.loc[link_id, "p_nom"] += capacity
+                n.links.loc[reverse_link_id, "p_nom"] += capacity_reverse
 
                 projects_added.append(project["project_id"])
                 logger.debug(
                     f"Project {project['project_id']} ({project['project_name']}) ADDED to existing links:"
                 )
                 logger.debug(
-                    f"    Link {link_id}: {original_capacity:.0f} → {n.links.loc[link_id, 'p_nom']:.0f} MW (+{capacity_0to1:.0f} MW)"
+                    f"    Link {link_id}: {original_capacity:.0f} → {n.links.loc[link_id, 'p_nom']:.0f} MW (+{capacity:.0f} MW)"
                 )
                 logger.debug(
-                    f"    Link {reverse_link_id}: {original_capacity_reverse:.0f} → {n.links.loc[reverse_link_id, 'p_nom']:.0f} MW (+{capacity_1to0:.0f} MW)"
+                    f"    Link {reverse_link_id}: {original_capacity_reverse:.0f} → {n.links.loc[reverse_link_id, 'p_nom']:.0f} MW (+{capacity_reverse:.0f} MW)"
                 )
             else:
                 # Links don't exist but buses do - CREATE new links
@@ -102,7 +102,7 @@ if __name__ == "__main__":
                     bus0=bus0,
                     bus1=bus1,
                     carrier="DC",
-                    p_nom=capacity_0to1,
+                    p_nom=capacity,
                     p_nom_extendable=False,
                     marginal_cost=0.01,  # Hurdle costs: 0.01 €/MWh (p.20, 104 TYNDP 2024 CBA implementation guidelines)
                 )
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                     bus0=bus1,
                     bus1=bus0,
                     carrier="DC",
-                    p_nom=capacity_1to0,
+                    p_nom=capacity_reverse,
                     p_nom_extendable=False,
                     marginal_cost=0.01,  # Hurdle costs: 0.01 €/MWh
                 )
@@ -123,26 +123,26 @@ if __name__ == "__main__":
                 logger.debug(
                     f"Project {project['project_id']} ({project['project_name']}) CREATED new links:"
                 )
-                logger.debug(f"    Link {link_id}: 0 → {capacity_0to1:.0f} MW (new)")
+                logger.debug(f"    Link {link_id}: 0 → {capacity:.0f} MW (new)")
                 logger.debug(
-                    f"    Link {reverse_link_id}: 0 → {capacity_1to0:.0f} MW (new)"
+                    f"    Link {reverse_link_id}: 0 → {capacity_reverse:.0f} MW (new)"
                 )
 
         elif link_id in n.links.index and reverse_link_id in n.links.index:
             # Project IS already in the base network - log it for transparency
-            capacity_forward = n.links.loc[link_id, "p_nom"]
+            capacity = n.links.loc[link_id, "p_nom"]
             capacity_reverse = n.links.loc[reverse_link_id, "p_nom"]
 
             projects_in_base.append(project["project_id"])
             logger.debug(
                 f"Project {project['project_id']} ({project['project_name']}) already in base network:"
             )
-            logger.debug(f"    Link {link_id}: {capacity_forward:.0f} MW (no change)")
+            logger.debug(f"    Link {link_id}: {capacity:.0f} MW (no change)")
             logger.debug(
                 f"    Link {reverse_link_id}: {capacity_reverse:.0f} MW (no change)"
             )
 
-    # For debugging purpose
+    # For debugging purposes
     # Analyze border aggregation (multiple projects per border)
     border_projects = {}
     new_links_list = []
