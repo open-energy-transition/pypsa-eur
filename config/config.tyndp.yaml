@@ -194,6 +194,7 @@ sector:
   aviation: false
   agriculture: false
   fossil_fuels: true
+  solar_thermal: false
 
   land_transport_fuel_cell_share:  # Not modelled
     2020: 0
