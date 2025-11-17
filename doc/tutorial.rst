@@ -127,7 +127,7 @@ Open a terminal, go into the PyPSA-Eur directory, and activate the ``pypsa-eur``
 
 .. code:: console
 
-    $ pixi shell
+    $ pixi shell -e open-tyndp
 
 Let's say based on the modifications above we would like to solve a very simplified model
 clustered down to 6 buses and every 24 hours aggregated to one snapshot. The command

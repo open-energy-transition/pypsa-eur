@@ -124,7 +124,7 @@ PyPSA-Eur, and consequently Open-TYNDP, relies on a set of other Python packages
 We manage these using [pixi](https://pixi.sh/latest/>).
 Once pixi is installed, you can activate the project environment for your operating system and have access to all the PyPSA-Eur dependencies from the command line:
 
-    pixi shell
+    pixi shell -e open-tyndp
 
 ## 2. Run the analysis
 

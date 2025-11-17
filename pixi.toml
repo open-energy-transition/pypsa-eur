@@ -35,14 +35,6 @@ update-dags = """
 	snakemake --rulegraph -F | sed -n "/digraph/,/}/p" | dot -Tpng -o doc/img/workflow.png
 """
 
-[tasks.tyndp]
-cmd = """bash -c '
-	snakemake -call --configfile config/config.tyndp.yaml "$@" && \
-	snakemake -call rulegraphs filegraphs --configfile config/config.tyndp.yaml
-	' --
- """
-depends-on = []
-
 [dependencies]
 atlite = ">=0.3"
 bokeh = ">=3.8.0"
@@ -79,7 +71,7 @@ powerplantmatching = ">=0.5.15"
 pre-commit = ">=4.3.0"
 proj = ">=9.6.2"
 pylint = ">=4.0.2"
-pypsa = ">=0.35.2,<1.0.0"
+pypsa = ">=0.35.2"
 pyscipopt = ">=5.6.0"
 pytables = ">=3.10.2"
 python = ">=3.10"
@@ -119,7 +111,7 @@ memory_profiler = ">=0.61.0"
 myst-parser = ">=4.0.1"
 powerplantmatching = ">=0.5.5"
 pydot = ">=4.0.1,<5"
-pypsa = ">=0.35.2,<1.0.0"
+pypsa = ">=0.35.2"
 pytables = ">=3.10.1"
 python = ">=3.10.19"
 pyyaml = ">=6.0.3"
@@ -164,6 +156,18 @@ all-tests = {depends-on = ["integration-tests", "clean-tests", "unit-tests"]}
 [feature.test.dependencies]
 pytest = ">=8.4.2"
 
+[feature.open-tyndp.tasks]
+tyndp = """bash -c '
+	snakemake -call --configfile config/config.tyndp.yaml "$@" && \
+	snakemake -call rulegraphs filegraphs --configfile config/config.tyndp.yaml
+	' --
+ """
+depends-on = []
+
+[feature.open-tyndp.dependencies]
+pypsa = "<1.0.0"
+
 [environments]
 doc = { features = ["doc"], no-default-feature = true }
 test = ["test"]
+open-tyndp = ["open-tyndp", "test", "doc"]  # for ease, we include test and doc deps in our working environment

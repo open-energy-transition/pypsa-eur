@@ -36,7 +36,7 @@ Once pixi is installed, you can activate the project environment for your operat
 
 .. code:: console
 
-    $ pixi shell
+    $ pixi shell -e open-tyndp
 
 .. tip::
     You can also set up automatic shell activation in several popular editors (e.g. in `VSCode <https://pixi.sh/dev/integration/editor/vscode/>`_ or `Zed <https://pixi.sh/dev/integration/editor/zed/>`_).
