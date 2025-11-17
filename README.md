@@ -29,7 +29,7 @@ This repository is maintained using [OET's soft-fork strategy](https://open-ener
 * `cutouts`: will store raw weather data cutouts from `atlite` (does not exist initially)
 * `data`: includes input data that is not produced by any `snakemake` rule
 * `doc`: includes all files necessary to build the `readthedocs` documentation of PyPSA-Eur
-* `envs`: includes all the `mamba` environment specifications to run the workflow
+* `envs`: includes backup `conda` environments if `pixi` installation does not work.
 * `logs`: will store log files (does not exist initially)
 * `notebooks`: includes all the `notebooks` used for ad-hoc analysis
 * `report`: contains all files necessary to build the report; plots and result files are generated automatically
@@ -44,25 +44,67 @@ This repository is maintained using [OET's soft-fork strategy](https://open-ener
 
 Clone the repository:
 
-    git clone https://github.com/open-energy-transition/{{repository}}
+```sh
+git clone https://github.com/open-energy-transition/{{repository}}
+```
 
-You need [mamba](https://mamba.readthedocs.io/en/latest/) to run the analysis. Users may also prefer to use [micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) or [conda](https://docs.conda.io/projects/conda/en/latest/index.html). Using `mamba`, you can create an environment from within you can run it:
+You need [pixi](https://pixi.sh/latest/) to run the analysis.
+Once installed, activate your pixi environment in a terminal session:
 
-    mamba env create -f environment.yaml
+```sh
+pixi shell
+```
 
-Activate the newly created `{{project_short_name}}` environment:
+If you add dependencies to your project, we recommend you add them to a [new `pixi` environment](https://pixi.sh/v0.21.1/features/multi_environment/#feature-environment-set-definitions).
+For instance, if you need access to `plotly`, want to pin the version of gurobi you are using, and want to add a PyPI dependency:
 
-    mamba activate {{project_short_name}}
+```sh
+pixi add -f {{ project_short_name }} "gurobi<13" "plotly"
+pixi add -f {{ project_short_name }} --pypi pypsa-explorer
+```
+
+This will create these entries in your `pixi.toml`
+
+```toml
+[feature.{{ project_short_name }}.pypi-dependencies]
+pypsa-explorer = "*"
+
+[feature.{{ project_short_name }}.dependencies]
+gurobi = "<13"
+plotly = "*"
+```
+
+Then, you can create an environment from this feature in `pixi.toml`:
+
+```toml
+[environments]
+...
+{{ project_short_name }} = [{{ project_short_name }}]
+```
+
+These dependencies will be combined with the core PyPSA-Eur dependencies and can be accessed by calling:
+
+```sh
+pixi shell -e {{ project_short_name }}
+```
+
+>[!NOTE]
+>If `pixi` isn't working, you can install from one of the fallback `conda` environment files found in `envs`.
+>For more details see [the PyPSA-Eur installation guide](https://pypsa-eur.readthedocs.io/en/latest/installation.html).
 
 ## 2. Run the analysis
 
-    snakemake -call
+```sh
+snakemake -call
+```
 
 This will run all analysis steps to reproduce results and build the report.
 
 To generate a PDF of the dependency graph of all steps `resources/dag.pdf` run:
 
-    snakemake -c1 dag
+```sh
+snakemake -c1 dag
+```
 
 <sup>*</sup> Open Energy Transition (g)GmbH, Königsallee 52, 95448 Bayreuth, Germany
 
