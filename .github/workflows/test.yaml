@@ -59,11 +59,11 @@ jobs:
 
     - name: Run snakemake test workflows
       run: |
-        pixi run integration-tests
+        pixi run -e open-tyndp integration-tests
 
     - name: Run unit tests
       run: |
-        pixi run unit-tests
+        pixi run -e open-tyndp unit-tests
 
     - name: Upload artifacts
       if: always()

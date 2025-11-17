@@ -162,7 +162,6 @@ tyndp = """bash -c '
 	snakemake -call rulegraphs filegraphs --configfile config/config.tyndp.yaml
 	' --
  """
-depends-on = []
 
 [feature.open-tyndp.dependencies]
 pypsa = "<1.0.0"
@@ -170,4 +169,4 @@ pypsa = "<1.0.0"
 [environments]
 doc = { features = ["doc"], no-default-feature = true }
 test = ["test"]
-open-tyndp = ["open-tyndp", "test", "doc"]  # for ease, we include test and doc deps in our working environment
+open-tyndp = ["open-tyndp", "test"]  # for ease, we include test and doc deps in our working environment
