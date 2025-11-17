@@ -412,8 +412,6 @@ rule clean_pecd_data:
     threads: 4
     resources:
         mem_mb=4000,
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/clean_pecd_data.py"
 
@@ -452,8 +450,6 @@ rule build_renewable_profiles_pecd:
         mem_mb=4000,
     wildcard_constraints:
         technology="(?!hydro).*",  # Any technology other than hydro
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/build_renewable_profiles_pecd.py"
 
@@ -487,8 +483,6 @@ rule build_pemmdb_data:
         mem_mb=16000,
     benchmark:
         benchmarks("build_pemmdb_data_{planning_horizons}")
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/build_pemmdb_data.py"
 
@@ -506,8 +500,6 @@ rule build_tyndp_trajectories:
     threads: 4
     benchmark:
         benchmarks("build_tyndp_trajectories")
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/build_tyndp_trajectories.py"
 
@@ -576,8 +568,6 @@ rule clean_tyndp_hydro_inflows:
     retries: 2
     benchmark:
         benchmarks("clean_tyndp_hydro_inflows_{tech}_{planning_horizons}")
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/clean_tyndp_hydro_inflows.py"
 
@@ -629,8 +619,6 @@ rule build_tyndp_hydro_profile:
         benchmarks("build_tyndp_hydro_profile")
     resources:
         mem_mb=5000,
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/build_tyndp_hydro_profile.py"
 

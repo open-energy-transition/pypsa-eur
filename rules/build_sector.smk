@@ -945,8 +945,6 @@ rule build_tyndp_h2_demand:
         logs("build_tyndp_h2_demand_{planning_horizons}.log"),
     benchmark:
         benchmarks("build_tyndp_h2_demand_{planning_horizons}")
-    conda:
-        "../envs/environment.yaml"
     script:
         "../scripts/build_tyndp_h2_demand.py"
 
