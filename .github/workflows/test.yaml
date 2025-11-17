@@ -39,6 +39,7 @@ jobs:
         cache: true
         # Do not cache in branches
         cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        environments: open-tyndp
 
     - name: Setup cache keys
       run: |
