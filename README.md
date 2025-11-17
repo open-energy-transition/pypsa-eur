@@ -55,6 +55,12 @@ Once installed, activate your pixi environment in a terminal session:
 pixi shell
 ```
 
+>[!NOTE]
+>If `pixi` isn't working, you can install from one of the fallback `conda` environment files found in `envs`.
+>For more details see [the PyPSA-Eur installation guide](https://pypsa-eur.readthedocs.io/en/latest/installation.html).
+
+### Extra soft-fork dependencies
+
 If you add dependencies to your project, we recommend you add them to a [new `pixi` environment](https://pixi.sh/v0.21.1/features/multi_environment/#feature-environment-set-definitions).
 For instance, if you need access to `plotly`, want to pin the version of gurobi you are using, and want to add a PyPI dependency:
 
@@ -88,9 +94,35 @@ These dependencies will be combined with the core PyPSA-Eur dependencies and can
 pixi shell -e {{ project_short_name }}
 ```
 
->[!NOTE]
->If `pixi` isn't working, you can install from one of the fallback `conda` environment files found in `envs`.
->For more details see [the PyPSA-Eur installation guide](https://pypsa-eur.readthedocs.io/en/latest/installation.html).
+#### Updating CI tests
+
+To run CI tests using your environment you should add the `test` feature to it and create test tasks for your environment, e.g.:
+
+```toml
+[feature.{{ project_short_name }}.tasks]
+{{ project_short_name }}-test = """
+	snakemake --configfile config/config.{{ project_short_name }}.default.yaml -n &&
+    """
+[environments]
+...
+{{ project_short_name }} = ["test", {{ project_short_name }}]
+```
+
+And then update `.github/workflows/test.yaml` to run that test:
+
+```yaml
+- name: Run project-specific snakemake test workflows
+  run: |
+    pixi run {{ project_short_name }}-test
+```
+
+If you also add your own unit tests, update the unit test runner to use your environment as well:
+
+```yaml
+- name: Run unit tests
+  run: |
+    pixi run -e {{ project_short_name }} unit-tests
+```
 
 ## 2. Run the analysis
 
