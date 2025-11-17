@@ -1,9 +1,10 @@
+# SPDX-FileCopyrightText: Contributors to Open-TYNDP <https://github.com/open-energy-transition/open-tyndp>
 # SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
 #
 # SPDX-License-Identifier: MIT
 
 [workspace]
-authors = ["Contributors to PyPSA-Eur"]
+authors = ["Contributors to Open-TYNDP"]
 channels = ["conda-forge", "bioconda", "gurobi"]
 name = "pypsa-eur"
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
@@ -33,6 +34,14 @@ update-dags = """
 	snakemake results/networks/base_s_128_elec_.nc -F --dag | sed -n "/digraph/,/}/p" | dot -Tpng -o doc/img/intro-workflow.png && \
 	snakemake --rulegraph -F | sed -n "/digraph/,/}/p" | dot -Tpng -o doc/img/workflow.png
 """
+
+[tasks.tyndp]
+cmd = """bash -c '
+	snakemake -call --configfile config/config.tyndp.yaml "$@" && \
+	snakemake -call rulegraphs filegraphs --configfile config/config.tyndp.yaml
+	' --
+ """
+depends-on = []
 
 [dependencies]
 atlite = ">=0.3"
