@@ -93,7 +93,6 @@ tsam = ">=2.3.1"
 xarray = ">=2024.3.0,<2025.7.0"
 xlrd = ">=2.0.2"
 yaml = ">=0.2.5"
-pixi-pycharm = ">=0.0.9"
 
 [feature.doc.tasks.build-docs]
 args = ["dir", {"arg" = "output", "default" = "html"}]
@@ -165,6 +164,7 @@ tyndp = """bash -c '
 
 [feature.open-tyndp.dependencies]
 pypsa = "<1.0.0"
+pixi-pycharm = ">=0.0.9"
 
 [environments]
 doc = { features = ["doc"], no-default-feature = true }
