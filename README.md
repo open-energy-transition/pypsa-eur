@@ -59,6 +59,22 @@ pixi shell
 >If `pixi` isn't working, you can install from one of the fallback `conda` environment files found in `envs`.
 >For more details see [the PyPSA-Eur installation guide](https://pypsa-eur.readthedocs.io/en/latest/installation.html).
 
+### Sharing pixi environment across copies of the same cloned project
+
+`pixi` works on the concept of per-project dependency management.
+Unlike `conda`, this means that you cannot generally use the same environment when you switch between local directories.
+If you have several copies of this repository cloned locally (e.g., to develop features in parallel), then you can avoid duplicating the working environment (and the space on disk it entails) by calling:
+
+```sh
+pixi shell --manifest-path /path/to/main/project/clone/pixi.toml -e {{ project_name }}
+```
+
+Where one local clone is designating as the "main" clone, from which all other clones will inherit their `pixi` environment.
+
+>[!WARNING]
+>Although it reduces overall space on disk, sharing a `pixi` environment is not actually recommended.
+>This is due to possible discrepancies in the dependencies that are defined between the different clones.
+
 ### Extra soft-fork dependencies
 
 If you add dependencies to your project, we recommend you add them to a [new `pixi` environment](https://pixi.sh/v0.21.1/features/multi_environment/#feature-environment-set-definitions).
@@ -123,6 +139,7 @@ If you also add your own unit tests, update the unit test runner to use your env
   run: |
     pixi run -e {{ project_short_name }} unit-tests
 ```
+
 
 ## 2. Run the analysis
 
