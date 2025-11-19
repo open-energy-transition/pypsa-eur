@@ -163,7 +163,6 @@ tyndp = """bash -c '
  """
 
 [feature.open-tyndp.dependencies]
-pypsa = "<1.0.0"
 pixi-pycharm = ">=0.0.9"
 
 [environments]
