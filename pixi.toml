@@ -168,4 +168,4 @@ pixi-pycharm = ">=0.0.9"
 [environments]
 doc = { features = ["doc"], no-default-feature = true }
 test = ["test"]
-open-tyndp = ["open-tyndp", "test"]  # for ease, we include test and doc deps in our working environment
+open-tyndp = ["open-tyndp", "test"]  # for ease, we include test deps in our working environment
