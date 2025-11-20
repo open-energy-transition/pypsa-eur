@@ -1077,10 +1077,10 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
             default_cutout=config_provider("atlite", "default_cutout"),
         input:
             river_discharge=storage(
-                f"{HERA_DATASET['url']}river_discharge/dis.HERA{{year}}.nc"
+                f"{HERA_DATASET['url']}/river_discharge/dis.HERA{{year}}.nc"
             ),
             ambient_temperature=storage(
-                f"{HERA_DATASET['url']}climate_inputs/ta6/ta6_{{year}}.nc"
+                f"{HERA_DATASET['url']}/climate_inputs/ta6/ta6_{{year}}.nc"
             ),
         output:
             river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{year}}.nc",
