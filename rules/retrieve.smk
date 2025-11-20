@@ -1000,21 +1000,21 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
             copy2(input["lau_regions"], output["zip"])
 
 
-if (SEAWATER_TEMPERATURE_DATASET := dataset_version("seawater_temperature"))[
+if (SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version("seawater_temperature_copernicusmarine"))[
     "source"
 ] in [
     "archive",
 ]:
 
-    rule retrieve_seawater_temperature:
+    rule retrieve_seawater_temperature_copernicusmarine:
         params:
             cutout_dict=config_provider("atlite", "cutouts"),
         input:
-            data=storage(f"{SEAWATER_TEMPERATURE_DATASET['url']}"),
+            data=storage(f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['url']}"),
         output:
-            seawater_temperature=f"{SEAWATER_TEMPERATURE_DATASET['folder']}/seawater_temperature_{{cutout}}.nc",
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
         log:
-            "logs/retrieve_seawater_temperature_{cutout}.log",
+            "logs/retrieve_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:
             mem_mb=10000,
         conda:
@@ -1056,7 +1056,7 @@ if (
             depth=config_provider("copernicusmarine", "depth"),
             variables=config_provider("copernicusmarine", "variables"),
         output:
-            seawater_temperature_copernicusmarine=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
         log:
             "logs/build_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:
@@ -1133,10 +1133,6 @@ if (HERA_DATASET := dataset_version("hera"))["source"] in [
             if wildcards.cutout in ["be-03-2013-era5", "europe-2013-sarah3-era5"]:
                 move(input.river_discharge, output.river_discharge)
                 move(input.ambient_temperature, output.ambient_temperature)
-            else:
-                logger.error(
-                    f"A hera cutout dedicated to {wildcards.cutout} is unavailable. Use primary option to retrieve the cutout from the primary source."
-                )
 
 
 
