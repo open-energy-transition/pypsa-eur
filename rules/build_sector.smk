@@ -572,16 +572,13 @@ def input_seawater_temperature(w) -> dict[str, str]:
     snapshots = get_snapshots(snapshots_config)
     unique_years = snapshots.year.unique()
 
-    if SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET["source"] == 'build':
-        output=rules.build_seawater_temperature_copernicusmarine.output['nc']
+    if SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET["source"] == "build":
+        output = rules.build_seawater_temperature_copernicusmarine.output["nc"]
     else:
-        output=rules.retrieve_seawater_temperature_copernicusmarine.output['nc']
-        
+        output = rules.retrieve_seawater_temperature_copernicusmarine.output["nc"]
+
     # Create dictionary with year-specific keys
-    return {
-        f"seawater_temperature_{year}": output
-        for year in unique_years
-    }
+    return {f"seawater_temperature_{year}": output for year in unique_years}
 
 
 rule build_sea_heat_potential:
