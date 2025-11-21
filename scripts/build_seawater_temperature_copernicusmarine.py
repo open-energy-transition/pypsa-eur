@@ -34,7 +34,7 @@ Outputs
 Notes
 -----
 Requires Copernicus Marine Service credentials configured via copernicusmarine package.
-See https://marine.copernicus.eu/ for account setup and API access.
+For account setup and API access see this [documentation article](https://help.marine.copernicus.eu/en/articles/8185007-copernicus-marine-toolbox-credentials-configuration#h_f60e2fce95) on the [Copernicus Marine website](https://marine.copernicus.eu/).
 """
 
 import logging
