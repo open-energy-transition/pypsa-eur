@@ -340,6 +340,7 @@ plotting:
     gas for industry co2 to stored: '#8a3400'
     gas for industry: '#853403'
     gas for industry CC: '#692e0a'
+    exogenous gas demand: '#b77045'
     gas pipeline: '#ebbca0'
     gas pipeline new: '#a87c62'
     # oil
@@ -396,6 +397,7 @@ plotting:
     services rural biomass boiler: '#c6cf98'
     services urban decentral biomass boiler: '#dde5b5'
     biomass to liquid: '#32CD32'
+    biomass to liquid CC: '#2a9f2a'
     unsustainable solid biomass: '#998622'
     unsustainable bioliquids: '#32CD32'
     electrobiofuels: 'red'

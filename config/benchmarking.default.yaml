@@ -4,6 +4,7 @@
 
 benchmarking:
   enable: false
+  remove_last_day: true
 
   tables:
     final_energy_demand:
@@ -21,13 +22,14 @@ benchmarking:
       mapping:
         AC: electricity
         AC_OH: electricity
-        H2: hydrogen
-        gas: methane
         low voltage: electricity
+        H2: hydrogen
+        exogenous gas demand: methane
         oil: liquids
+        kerosene for aviation: liquids
+        shipping oil: liquids
+        land transport oil: liquids
         coal: solids
-        naphtha for industry: liquids
-        solid biomass for industry: biofuels
 
     elec_demand:
       table_type: scenario_comparison
@@ -46,27 +48,27 @@ benchmarking:
 
     methane_demand:
       table_type: scenario_comparison
-      sheet_name: 53-
+      sheet_name: 8-
       unit: TWh
-      index_col: [2, 3]
-      header: 4
+      index_col: 2
+      header: [4, 5]
+      nrows: 15
       names:
         index:
-        - year
-        - scenario
-        column:
         - carrier
+        column:
+        - scenario
+        - year
       mapping:
-        CCGT: transformation input
-        OCGT: transformation input
-        gas-ccgt: transformation input
-        gas-ccgt-ccs: transformation input
-        gas-ocgt: transformation input
-        gas-conv: transformation input
-        SMR: transformation input
-        SMR CC: transformation input
-        gas for industry: industry
-        gas for industry CC: industry
+        CCGT: power generation
+        OCGT: power generation
+        gas-ccgt: power generation
+        gas-ccgt-ccs: power generation
+        gas-ocgt: power generation
+        gas-conv: power generation
+        SMR: smr
+        SMR CC: smr
+        exogenous gas demand: total (excl. SMR and power generation)
 
     hydrogen_demand:
       table_type: scenario_comparison
