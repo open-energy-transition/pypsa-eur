@@ -11,6 +11,7 @@ Release Notes
 Upcoming Open-TYNDP Release
 ================
 
+
 **Features**
 
 * Add CO2 emission prices configurable per planning horizon for sector-coupled models (https://github.com/open-energy-transition/open-tyndp/pull/198). The CO2 price is added as a marginal cost on the `co2 atmosphere` Store.
@@ -24,7 +25,9 @@ Upcoming Open-TYNDP Release
   building individual project networks, solving network optimizations, and computing CBA
   indicators.
 
-* Add the TYNDP hydrogen demand as an exogenously set demand (process data https://github.com/open-energy-transition/open-tyndp/pull/169)
+* Added the TYNDP hydrogen demand as an exogenously set demand (process data https://github.com/open-energy-transition/open-tyndp/pull/169)
+
+* Added TYNDP conventional thermal generation using PEMMDB capacities, must-runs and availabilities (https://github.com/open-energy-transition/open-tyndp/pull/195).
 
 * Add the TYNDP gas demand as an exogenously set demand (process data https://github.com/open-energy-transition/open-tyndp/pull/208)
 
