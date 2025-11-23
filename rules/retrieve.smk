@@ -303,6 +303,27 @@ rule retrieve_bidding_zones:
     retries: 2
     script:
         "../scripts/retrieve_bidding_zones.py"
+    
+if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_electricitymaps"))[
+    "source"
+] in [
+    "primary",
+]:
+    rule retrieve_bidding_zones_electricitymaps:
+        input:
+            gpd=storage(f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["url"]}/{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["version"]}/web/geo/world.geojson"),
+        output:
+            file=f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["folder"]}/bidding_zones_electricitymaps.geojson",
+        log:
+            "logs/retrieve_bidding_zones_electricitymaps.log",
+        resources:
+            mem_mb=1000,
+        retries: 2
+        run:
+            import geopandas as gpd
+            df=gpd.read_file(input.gpd)
+            df.to_file(output.file)
+    
 
 
 if (CUTOUT_DATASET := dataset_version("cutout"))["source"] in [
