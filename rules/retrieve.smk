@@ -323,7 +323,43 @@ if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_elec
             import geopandas as gpd
             df=gpd.read_file(input.gpd)
             df.to_file(output.file)
+            logger.info("Downloading electricitymaps-contrib zones... Done")
     
+
+if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))[
+    "source"
+] in [
+    "primary",
+]:
+
+    rule retrieve_bidding_zones_entsoepy:
+        output:
+            geojson=f"{BIDDING_ZONES_ENTSOEPY_DATASET['folder']}/bidding_zones_entsoepy.geojson",
+        log:
+            "logs/retrieve_bidding_zones_entsoepy.log",
+        resources:
+            mem_mb=1000,
+        retries: 2
+        run:
+            import entsoe
+            import geopandas as gpd  
+            from urllib.error import HTTPError
+
+            logger.info("Downloading entsoe-py zones...")
+            gdfs: list[gpd.GeoDataFrame] = []
+            url=BIDDING_ZONES_ENTSOEPY_DATASET['url']
+            for area in entsoe.Area:
+                name = area.name
+                try:
+                    file_url = f"{url}/{name}.geojson"
+                    gdfs.append(gpd.read_file(file_url))
+                except HTTPError:
+                    continue
+            shapes = pd.concat(gdfs, ignore_index=True)  # type: ignore
+
+            logger.info("Downloading entsoe-py zones... Done")
+
+            shapes.to_file(output.geojson)    
 
 
 if (CUTOUT_DATASET := dataset_version("cutout"))["source"] in [

@@ -104,3 +104,4 @@
 "seawater_temperature_copernicusmarine","archive","202311","['latest', 'supported']","https://zenodo.org/records/17491046/files/seawater_temperature.nc","Only the temperature data - not the salinity data - is retrieved"
 "seawater_temperature_copernicusmarine","build","202311","['latest', 'supported']","","copernicusmarine package is used to retrieve the dataset - login credentials required. Only the temperature data - not the salinity data - is retrieved"
 "bidding_zones_electricitymaps","primary","v1.238.0","['latest', 'supported']","https://raw.githubusercontent.com/electricitymaps/electricitymaps-contrib",""
+"bidding_zones_entsoepy","primary","unknown","['latest', 'supported']","https://raw.githubusercontent.com/EnergieID/entsoe-py/c03c604af36ef92e8ef6ee89dc57c56ca5e1dbac/entsoe/geo/geojson/",""

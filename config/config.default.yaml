@@ -1140,6 +1140,9 @@ data:
   bidding_zones_electricitymaps:
     source: "primary"
     version: "latest"
+  bidding_zones_entsoepy:
+    source: "primary"
+    version: "latest"
 
 secrets:
   corine: '' #Add API key here if primary source is used for retrieving corine dataset after registering in https://land.copernicus.eu/user/login
