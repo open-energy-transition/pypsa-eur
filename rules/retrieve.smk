@@ -1021,9 +1021,11 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
             copy2(input["lau_regions"], output["zip"])
 
 
-if (SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version("seawater_temperature_copernicusmarine"))[
-    "source"
-] in [
+if (
+    SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version(
+        "seawater_temperature_copernicusmarine"
+    )
+)["source"] in [
     "archive",
 ]:
 
