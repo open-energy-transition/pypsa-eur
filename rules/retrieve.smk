@@ -192,6 +192,8 @@ if config["enable"]["retrieve"] and config["enable"].get("retrieve_cutout", True
         run:
             move(input[0], output[0])
 
+    ruleorder: retrieve_additional_cutout > retrieve_cutout
+
 
 if config["enable"]["retrieve"]:
 
