@@ -291,10 +291,12 @@ if (EU_NUTS2021_DATASET := dataset_version("eu_nuts2021"))["source"] in [
             copy2(input["shapes"], output["zip_file"])
             unpack_archive(output["zip_file"], Path(output.shapes_level_3).parent)
 
-    
-if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_electricitymaps"))[
-    "source"
-] in [
+
+if (
+    BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version(
+        "bidding_zones_electricitymaps"
+    )
+)["source"] in [
     "primary",
 ]:
 
@@ -339,7 +341,7 @@ if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))
 
             logger.info("Downloading entsoe-py zones...")
             gdfs: list[gpd.GeoDataFrame] = []
-            url=f"{BIDDING_ZONES_ENTSOEPY_DATASET['url']}/{BIDDING_ZONES_ENTSOEPY_DATASET['version']}/entsoe/geo/geojson"
+            url = f"{BIDDING_ZONES_ENTSOEPY_DATASET['url']}/{BIDDING_ZONES_ENTSOEPY_DATASET['version']}/entsoe/geo/geojson"
             for area in entsoe.Area:
                 name = area.name
                 try:
