@@ -60,30 +60,30 @@ def build_cutout(
     year_range: (list),
     output_path: (str)
 ) -> None:
-"""
-Download seawater temperature data from Copernicus Marine Service.
+    """
+    Download seawater temperature data from Copernicus Marine Service.
 
-Parameters
-----
-dataset_id: str
-    ID of the Global Ocean Physics Reanalysis dataset (daily, 0.083° resolution)
-latitude: list
-    Min. and max. latitude
-longitude: list
-    Min. and max. longitude
-variables: list
-    Variables to download. "thetao" refers to temperature
-depth: list
-   Depth range
-year_range: list
-   Years for which to download data from Jan through Dec
-output_path: str
-    Output path to store temeperature data
+    Parameters
+    ----
+    dataset_id: str
+        ID of the Global Ocean Physics Reanalysis dataset (daily, 0.083° resolution)
+    latitude: list
+        Min. and max. latitude
+    longitude: list
+        Min. and max. longitude
+    variables: list
+        Variables to download. "thetao" refers to temperature
+    depth: list
+    Depth range
+    year_range: list
+    Years for which to download data from Jan through Dec
+    output_path: str
+        Output path to store temeperature data
 
-Notes
-----
-Requires login for Copernicusmarine API.
-"""
+    Notes
+    ----
+    Requires login for Copernicusmarine API.
+    """
     _=copernicusmarine.subset(
         dataset_id=dataset_id,
         start_datetime=f"{int(year_range[0])}-01-01",
@@ -134,16 +134,14 @@ if __name__ == "__main__":
 
     # Build cutout
     build_cutout(
-        dataset_id=snakemake.params.dataset_id, 
-        latitude=cutout_dict[cutout]["y"], 
-        longitude=cutout_dict[cutout]["x"], 
-        variables=snakemake.params.variables, 
-        depth=snakemake.params.depth, 
-        year_range=cutout_dict[cutout]["time"], 
+        dataset_id=snakemake.params.dataset_id,
+        latitude=cutout_dict[cutout]["y"],
+        longitude=cutout_dict[cutout]["x"],
+        variables=snakemake.params.variables,
+        depth=snakemake.params.depth,
+        year_range=cutout_dict[cutout]["time"],
         output_path=snakemake.output.seawater_temperature)
 
     logger.info(
-        f"Downloading seawater temperature data for year {year_range[0]}"
+        f"Downloading seawater temperature data for cutout '{cutout}' completed."
     )
-
-

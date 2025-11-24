@@ -1066,7 +1066,7 @@ if (
         input:
             data=storage(f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['url']}"),
         output:
-            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/{{cutout}}.nc",
         log:
             "logs/retrieve_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:
@@ -1075,18 +1075,18 @@ if (
             "../envs/environment.yaml"
         run:
             europe_cutout = params.cutout_dict["europe-2013-sarah3-era5"]
-            default_cutout = params.cutout_dict[wildcards.cutout]
+            requested_cutout = params.cutout_dict[wildcards.cutout]
 
             keys = ["x", "y", "time"]
-            # Check if the geometric bounds of the default cutout are within the geometric bounds of the European cutout from the archive
+            # Check if the geometric bounds of the requested cutout are within the geometric bounds of the default European cutout from the archive
             is_inside = all(
-                (default_cutout[k][0] >= europe_cutout[k][0])
-                and (default_cutout[k][1] <= europe_cutout[k][1])
+                (requested_cutout[k][0] >= europe_cutout[k][0])
+                and (requested_cutout[k][1] <= europe_cutout[k][1])
                 for k in keys
             )
 
             if is_inside:
-                move(input.data, output.seawater_temperature)
+                move(input.data, output.nc)
 
             else:
                 logger.error(
@@ -1110,7 +1110,7 @@ if (
             depth=config_provider("copernicusmarine", "depth"),
             variables=config_provider("copernicusmarine", "variables"),
         output:
-            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/seawater_temperature_copernicusmarine_{{cutout}}.nc",
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/{{cutout}}.nc",
         log:
             "logs/build_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:

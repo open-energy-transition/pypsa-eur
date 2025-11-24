@@ -549,37 +549,25 @@ def input_heat_source_temperature(
     }
 
 
-def input_seawater_temperature(w) -> dict[str, str]:
+def seawater_temperature_cutouts(w) -> list[str]:
     """
-    Generate input file paths for seawater temperature data.
-
-    Parameters
-    ----------
-    w : snakemake.io.Wildcards
-        Snakemake wildcards object.
-
-    Returns
-    -------
-    dict[str, str]
-        Dictionary mapping keys like "seawater_temperature_{year}" to NetCDF file paths.
+    Return a list of all relevant seawater temperature cutout files,
+    based on the selected dataset source in the config and configured cutouts.
     """
-
-    # Import here to avoid circular imports
-    from scripts._helpers import get_snapshots
-
-    # Get all snapshots and extract unique years
-    snapshots_config = config_provider("snapshots")(w)
-    snapshots = get_snapshots(snapshots_config)
-    unique_years = snapshots.year.unique()
-
+    # Select correct output rule based on data source
     if SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET["source"] == "build":
-        output = rules.build_seawater_temperature_copernicusmarine.output["nc"]
+        source_rule = rules.build_seawater_temperature_copernicusmarine
     else:
-        output = rules.retrieve_seawater_temperature_copernicusmarine.output["nc"]
+        source_rule = rules.retrieve_seawater_temperature_copernicusmarine
 
-    # Create dictionary with year-specific keys
-    return {f"seawater_temperature_{year}": output for year in unique_years}
+    # Both rules have same type of output, including a `cutout` wildcard
+    fn = source_rule.output["nc"]
 
+    # expand cutout wildcard based on current config
+    cutouts = config_provider("atlite", "default_cutout")(w)
+    fns = expand(fn, cutout=cutouts)
+
+    return fns
 
 rule build_sea_heat_potential:
     params:
@@ -589,8 +577,7 @@ rule build_sea_heat_potential:
             "sector", "district_heating", "dh_areas", "buffer"
         ),
     input:
-        # seawater_temperature=lambda w: input_seawater_temperature(w),
-        unpack(input_seawater_temperature),
+        seawater_temperature=lambda w: seawater_temperature_cutouts(w),
         regions_onshore=resources("regions_onshore_base_s_{clusters}.geojson"),
         dh_areas=resources("dh_areas_base_s_{clusters}.geojson"),
     output:
