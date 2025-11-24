@@ -291,18 +291,6 @@ if (EU_NUTS2021_DATASET := dataset_version("eu_nuts2021"))["source"] in [
             copy2(input["shapes"], output["zip_file"])
             unpack_archive(output["zip_file"], Path(output.shapes_level_3).parent)
 
-
-rule retrieve_bidding_zones:
-    output:
-        file_entsoepy="data/busshapes/bidding_zones_entsoepy.geojson",
-        file_electricitymaps="data/busshapes/bidding_zones_electricitymaps.geojson",
-    log:
-        "logs/retrieve_bidding_zones.log",
-    resources:
-        mem_mb=1000,
-    retries: 2
-    script:
-        "../scripts/retrieve_bidding_zones.py"
     
 if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_electricitymaps"))[
     "source"
@@ -347,7 +335,7 @@ if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))
 
             logger.info("Downloading entsoe-py zones...")
             gdfs: list[gpd.GeoDataFrame] = []
-            url=BIDDING_ZONES_ENTSOEPY_DATASET['url']
+            url=f"{BIDDING_ZONES_ENTSOEPY_DATASET['url']}/{BIDDING_ZONES_ENTSOEPY_DATASET['version']}/entsoe/geo/geojson"
             for area in entsoe.Area:
                 name = area.name
                 try:
