@@ -569,6 +569,7 @@ def seawater_temperature_cutouts(w) -> list[str]:
 
     return fns
 
+
 rule build_sea_heat_potential:
     params:
         drop_leap_day=config_provider("enable", "drop_leap_day"),
