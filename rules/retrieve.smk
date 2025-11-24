@@ -297,9 +297,12 @@ if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_elec
 ] in [
     "primary",
 ]:
+
     rule retrieve_bidding_zones_electricitymaps:
         input:
-            gpd=storage(f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["url"]}/{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["version"]}/web/geo/world.geojson"),
+            gpd=storage(
+                f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["url"]}/{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["version"]}/web/geo/world.geojson"
+            ),
         output:
             file=f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["folder"]}/bidding_zones_electricitymaps.geojson",
         log:
@@ -309,10 +312,11 @@ if (BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version("bidding_zones_elec
         retries: 2
         run:
             import geopandas as gpd
-            df=gpd.read_file(input.gpd)
+
+            df = gpd.read_file(input.gpd)
             df.to_file(output.file)
             logger.info("Downloading electricitymaps-contrib zones... Done")
-    
+
 
 if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))[
     "source"
@@ -330,7 +334,7 @@ if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))
         retries: 2
         run:
             import entsoe
-            import geopandas as gpd  
+            import geopandas as gpd
             from urllib.error import HTTPError
 
             logger.info("Downloading entsoe-py zones...")
@@ -347,7 +351,8 @@ if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))
 
             logger.info("Downloading entsoe-py zones... Done")
 
-            shapes.to_file(output.geojson)    
+            shapes.to_file(output.geojson)
+
 
 
 if (CUTOUT_DATASET := dataset_version("cutout"))["source"] in [
