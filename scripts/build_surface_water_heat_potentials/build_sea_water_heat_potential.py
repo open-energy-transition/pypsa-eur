@@ -28,7 +28,7 @@ Relevant Settings
 
 Inputs
 ------
-- `data/seawater_temperature.nc`: Sea water temperature data
+- `<seawater_temperature_folder>/{cutout}.nc`: Sea water temperature data
 - `resources/<run_name>/regions_onshore_base_s_{clusters}.geojson`: Onshore regions
 - `resources/<run_name>/dh_areas_base_s_{clusters}.geojson`: District heating areas
 
@@ -270,11 +270,7 @@ if __name__ == "__main__":
         # 3. Calculate temperature profiles using approximator
         results.append(
             get_regional_result(
-                seawater_temperature_fn=[
-                    val
-                    for key, val in dict(snakemake.input).items()
-                    if key.startswith("seawater_temperature")
-                ],
+                seawater_temperature_fn=snakemake.input.seawater_temperature,
                 region=region,
                 dh_areas=dh_areas,
                 snapshots=snapshots,

@@ -137,3 +137,18 @@ geothermal_heat_utilisation_potentials,,,
 jrc_ardeco,,,
 -- source,str,"{archive, primary}","Source of annual regional database for EU regions"
 -- version,str,,"Version of the JRC ARDECO dataset"
+hera,,,
+-- source,str,"{primary}","dataset to produce a longterm hydrological reanalysis with downscaled and bias-connected climate reanalysis"
+-- version,str,,"Version of hera dataset"
+hera_test_cutout,,,
+-- source,str,"{archive}","test dataset to produce a longterm hydrological reanalysis with downscaled and bias-connected climate reanalysis"
+-- version,str,,"Version of hera test cutout dataset"
+seawater_temperature,,,
+-- source,str,"{archive,build}","daily and monthly mean files for temperature, salinity, currents, sea level, mixed layer depth and ice parameters from the top to the bottom of the ocean".
+-- version,str,,"Version of seawater temperature dataset"
+bidding_zones_electricitymaps,,,
+-- source,str,"{primary}","Geospatial data defining bidding zones for electricity markets in Europe"
+-- version,str,,"Version of bidding zones electricitymaps dataset"
+bidding_zones_entsoepy,,,
+-- source,str,"{primary}","Geospatial data defining bidding zones for electricity markets in Europe"
+-- version,str,,"Version of bidding zones entsoepy dataset"
