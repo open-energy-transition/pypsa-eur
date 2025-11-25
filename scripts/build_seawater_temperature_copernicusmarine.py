@@ -39,6 +39,7 @@ For account setup and API access see this [documentation article](https://help.m
 
 import logging
 import os
+from datetime import datetime
 
 import copernicusmarine
 
@@ -52,13 +53,13 @@ logger = logging.getLogger(__name__)
 
 
 def build_cutout(
-    dataset_id: (str),
-    latitude: (list),
-    longitude: (list),
-    variables: (list),
-    depth: (list),
-    year_range: (list),
-    output_path: (str),
+    dataset_id: str,
+    latitude: list,
+    longitude: list,
+    variables: list,
+    depth: list,
+    time: list,
+    output_path: str,
 ) -> None:
     """
     Download seawater temperature data from Copernicus Marine Service.
@@ -74,9 +75,10 @@ def build_cutout(
     variables: list
         Variables to download. "thetao" refers to temperature
     depth: list
-    Depth range
-    year_range: list
-    Years for which to download data from Jan through Dec
+        Depth range
+    time: list[str]
+        Pandas-compatible timestamp strings or years for which to download data for.
+        If only years are given, Downloads data from January 1st of the first year to December 31st of the last year.
     output_path: str
         Output path to store temeperature data
 
@@ -84,10 +86,24 @@ def build_cutout(
     -----
     Requires login for Copernicusmarine API.
     """
+
+    # Use strftime to parse (or raise error if not matching expected format) and then format dates
+    if len(time[0]) == 4:
+        # Assume start year is full year if only year is given
+        time[0] = datetime.strptime(time[0], "%Y").strftime("%Y-01-01")
+    else:
+        time[0] = datetime.strptime(time[0], "%Y-%m-%d").strftime("%Y-%m-%d")
+    if len(time[1]) == 4:
+        # Assume end year is full year if only year is given
+        time[1] = datetime.strptime(time[1], "%Y").strftime("%Y-12-31")
+    else:
+        # check if the string can be parsed as a date, if not this raises an error
+        time[1] = datetime.strptime(time[1], "%Y-%m-%d").strftime("%Y-%m-%d")
+
     _ = copernicusmarine.subset(
         dataset_id=dataset_id,
-        start_datetime=f"{int(year_range[0])}-01-01",
-        end_datetime=f"{int(year_range[1])}-12-31",
+        start_datetime=time[0],
+        end_datetime=time[1],
         minimum_longitude=longitude[0],
         maximum_longitude=longitude[1],
         minimum_latitude=latitude[0],
@@ -138,7 +154,7 @@ if __name__ == "__main__":
         longitude=cutout_dict[cutout]["x"],
         variables=snakemake.params.variables,
         depth=snakemake.params.depth,
-        year_range=cutout_dict[cutout]["time"],
+        time=cutout_dict[cutout]["time"],
         output_path=snakemake.output.seawater_temperature,
     )
 
