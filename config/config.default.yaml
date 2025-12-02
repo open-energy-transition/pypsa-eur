@@ -181,6 +181,12 @@ atlite:
         monthly_requests: true
         tmpdir: "./cutouts_tmp/"
 
+# The latitude, longitude and time information is taken from the default atlite cutout used
+copernicusmarine:
+  dataset_id: "cmems_mod_glo_phy_my_0.083deg_P1D-m"
+  variables: ["thetao"]
+  depth: [5, 15]
+
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#renewable
 renewable:
   onwind:
@@ -1142,6 +1148,18 @@ data:
   jrc_ardeco:
     source: archive
     version: latest
+  hera:
+    source: "primary"
+    version: "latest"
+  seawater_temperature_copernicusmarine:
+    source: "build"
+    version: "latest"
+  bidding_zones_electricitymaps:
+    source: "primary"
+    version: "latest"
+  bidding_zones_entsoepy:
+    source: "primary"
+    version: "latest"
 
 secrets:
   corine: '' #Add API key here if primary source is used for retrieving corine dataset after registering in https://land.copernicus.eu/user/login

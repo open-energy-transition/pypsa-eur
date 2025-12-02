@@ -292,17 +292,69 @@ if (EU_NUTS2021_DATASET := dataset_version("eu_nuts2021"))["source"] in [
             unpack_archive(output["zip_file"], Path(output.shapes_level_3).parent)
 
 
-rule retrieve_bidding_zones:
-    output:
-        file_entsoepy="data/busshapes/bidding_zones_entsoepy.geojson",
-        file_electricitymaps="data/busshapes/bidding_zones_electricitymaps.geojson",
-    log:
-        "logs/retrieve_bidding_zones.log",
-    resources:
-        mem_mb=1000,
-    retries: 2
-    script:
-        "../scripts/retrieve_bidding_zones.py"
+if (
+    BIDDING_ZONES_ELECTRICITYMAPS_DATASET := dataset_version(
+        "bidding_zones_electricitymaps"
+    )
+)["source"] in [
+    "primary",
+]:
+
+    rule retrieve_bidding_zones_electricitymaps:
+        input:
+            gpd=storage(
+                f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["url"]}/{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["version"]}/web/geo/world.geojson"
+            ),
+        output:
+            file=f"{BIDDING_ZONES_ELECTRICITYMAPS_DATASET["folder"]}/bidding_zones_electricitymaps.geojson",
+        log:
+            "logs/retrieve_bidding_zones_electricitymaps.log",
+        resources:
+            mem_mb=1000,
+        retries: 2
+        run:
+            import geopandas as gpd
+
+            df = gpd.read_file(input.gpd)
+            df.to_file(output.file)
+            logger.info("Downloading electricitymaps-contrib zones... Done")
+
+
+if (BIDDING_ZONES_ENTSOEPY_DATASET := dataset_version("bidding_zones_entsoepy"))[
+    "source"
+] in [
+    "primary",
+]:
+
+    rule retrieve_bidding_zones_entsoepy:
+        output:
+            geojson=f"{BIDDING_ZONES_ENTSOEPY_DATASET['folder']}/bidding_zones_entsoepy.geojson",
+        log:
+            "logs/retrieve_bidding_zones_entsoepy.log",
+        resources:
+            mem_mb=1000,
+        retries: 2
+        run:
+            import entsoe
+            import geopandas as gpd
+            from urllib.error import HTTPError
+
+            logger.info("Downloading entsoe-py zones...")
+            gdfs: list[gpd.GeoDataFrame] = []
+            url = f"{BIDDING_ZONES_ENTSOEPY_DATASET['url']}/{BIDDING_ZONES_ENTSOEPY_DATASET['version']}/entsoe/geo/geojson"
+            for area in entsoe.Area:
+                name = area.name
+                try:
+                    file_url = f"{url}/{name}.geojson"
+                    gdfs.append(gpd.read_file(file_url))
+                except HTTPError:
+                    continue
+            shapes = pd.concat(gdfs, ignore_index=True)  # type: ignore
+
+            logger.info("Downloading entsoe-py zones... Done")
+
+            shapes.to_file(output.geojson)
+
 
 
 if (CUTOUT_DATASET := dataset_version("cutout"))["source"] in [
@@ -999,57 +1051,143 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
         run:
             copy2(input["lau_regions"], output["zip"])
 
-    rule retrieve_seawater_temperature:
-        params:
-            default_cutout=config_provider("atlite", "default_cutout"),
-        output:
-            seawater_temperature="data/seawater_temperature_{year}.nc",
-        log:
-            "logs/retrieve_seawater_temperature_{year}.log",
-        resources:
-            mem_mb=10000,
-        script:
-            "../scripts/retrieve_seawater_temperature.py"
 
-    rule retrieve_hera_data_test_cutout:
-        input:
-            hera_data_url=storage(
-                f"https://zenodo.org/records/15828866/files/hera_be_2013-03-01_to_2013-03-08.zip"
-            ),
-        output:
-            river_discharge=f"data/hera_be_2013-03-01_to_2013-03-08/river_discharge_be_2013-03-01_to_2013-03-08.nc",
-            ambient_temperature=f"data/hera_be_2013-03-01_to_2013-03-08/ambient_temp_be_2013-03-01_to_2013-03-08.nc",
+if (
+    SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version(
+        "seawater_temperature_copernicusmarine"
+    )
+)["source"] in [
+    "archive",
+]:
+
+    rule retrieve_seawater_temperature_copernicusmarine:
         params:
-            folder="data",
+            cutout_dict=config_provider("atlite", "cutouts"),
+        input:
+            data=storage(f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['url']}"),
+        output:
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/{{cutout}}.nc",
         log:
-            "logs/retrieve_hera_data_test_cutout.log",
+            "logs/retrieve_seawater_temperature_copernicusmarine_{cutout}.log",
         resources:
             mem_mb=10000,
-        retries: 2
+        conda:
+            "../envs/environment.yaml"
         run:
-            unpack_archive(input[0], params.folder)
+            europe_cutout = params.cutout_dict["europe-2013-sarah3-era5"]
+            requested_cutout = params.cutout_dict[wildcards.cutout]
+
+            keys = ["x", "y", "time"]
+            # Check if the geometric bounds of the requested cutout are within the geometric bounds of the default European cutout from the archive
+            is_inside = all(
+                (requested_cutout[k][0] >= europe_cutout[k][0])
+                and (requested_cutout[k][1] <= europe_cutout[k][1])
+                for k in keys
+            )
+
+            if is_inside:
+                move(input.data, output.nc)
+
+            else:
+                logger.error(
+                    f"A seawater temperature cutout dedicated to {wildcards.cutout} unavailable. Use build option to build the cutout."
+                )
+
+
+
+if (
+    SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET := dataset_version(
+        "seawater_temperature_copernicusmarine"
+    )
+)["source"] in [
+    "build",
+]:
+
+    rule build_seawater_temperature_copernicusmarine:
+        params:
+            cutout_dict=config_provider("atlite", "cutouts"),
+            dataset_id=config_provider("copernicusmarine", "dataset_id"),
+            depth=config_provider("copernicusmarine", "depth"),
+            variables=config_provider("copernicusmarine", "variables"),
+        output:
+            nc=f"{SEAWATER_TEMPERATURE_COPERNICUSMARINE_DATASET['folder']}/{{cutout}}.nc",
+        log:
+            "logs/build_seawater_temperature_copernicusmarine_{cutout}.log",
+        resources:
+            mem_mb=10000,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            "../scripts/build_seawater_temperature_copernicusmarine.py"
+
+
+if (HERA_DATASET := dataset_version("hera"))["source"] in [
+    "primary",
+]:
 
     rule retrieve_hera_data:
+        params:
+            cutout_dict=config_provider("atlite", "cutouts"),
+            default_cutout=config_provider("atlite", "default_cutout"),
         input:
             river_discharge=storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/river_discharge/dis.HERA{year}.nc"
+                f"{HERA_DATASET['url']}/river_discharge/dis.HERA{{year}}.nc"
             ),
             ambient_temperature=storage(
-                "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/CEMS-EFAS/HERA/VER1-0/Data/NetCDF/climate_inputs/ta6/ta6_{year}.nc"
+                f"{HERA_DATASET['url']}/climate_inputs/ta6/ta6_{{year}}.nc"
             ),
         output:
-            river_discharge="data/hera_{year}/river_discharge_{year}.nc",
-            ambient_temperature="data/hera_{year}/ambient_temp_{year}.nc",
-        params:
-            snapshot_year="{year}",
+            river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{year}}.nc",
+            ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{year}}.nc",
         log:
             "logs/retrieve_hera_data_{year}.log",
         resources:
             mem_mb=10000,
         retries: 2
         run:
-            move(input.river_discharge, output.river_discharge)
-            move(input.ambient_temperature, output.ambient_temperature)
+            import xarray as xr
+
+            latitude = params.cutout_dict[params.default_cutout]["y"]
+            latitude.reverse()
+            longitude = params.cutout_dict[params.default_cutout]["x"]
+
+            for parameter in ["river_discharge", "ambient_temperature"]:
+                full_cutout_path = output[parameter].replace(
+                    ".nc", "_full_cutout.nc"
+                )
+                copy2(input[parameter], full_cutout_path)
+
+                ds = xr.open_dataset(full_cutout_path)
+                ds_selected = ds.sel(lat=slice(*latitude), lon=slice(*longitude))
+                ds_selected.to_netcdf(output[parameter])
+
+
+
+if (HERA_DATASET := dataset_version("hera"))["source"] in [
+    "archive",
+]:
+
+    rule retrieve_hera_data:
+        input:
+            river_discharge=storage(
+                f"{HERA_DATASET['url']}river_discharge_{{cutout}}.nc"
+            ),
+            ambient_temperature=storage(
+                f"{HERA_DATASET['url']}ambient_temp_{{cutout}}.nc"
+            ),
+        output:
+            river_discharge=f"{HERA_DATASET['folder']}/river_discharge_{{cutout}}.nc",
+            ambient_temperature=f"{HERA_DATASET['folder']}/ambient_temp_{{cutout}}.nc",
+        log:
+            "logs/retrieve_hera_data_{cutout}.log",
+        resources:
+            mem_mb=10000,
+        retries: 2
+        run:
+            if wildcards.cutout in ["be-03-2013-era5", "europe-2013-sarah3-era5"]:
+                move(input.river_discharge, output.river_discharge)
+                move(input.ambient_temperature, output.ambient_temperature)
+
 
 
 if (JRC_ARDECO_DATASET := dataset_version("jrc_ardeco"))["source"] in [

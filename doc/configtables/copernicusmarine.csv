@@ -1,0 +1,4 @@
+,Unit,Values,Description
+dataset_id,--,str,"Defines the dataset id of the cutout to be downloaded from copernicusmarine python package"
+variables,--,list,"Defines the list of variables to download. For e.g., `thetao` refers to the seawater temperature at the configured `depth` levels"
+depth,--,list,"Defines the near-surface depth range (min and max) for heat pumps [m]"
