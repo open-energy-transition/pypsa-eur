@@ -1848,6 +1848,7 @@ def add_existing_pemmdb_capacities(
             carriers=tyndp_solar_onwind,
             extendable_carriers=extendable_carriers,
             trajectories=trajectories_solar_onwind,
+            planning_horizon=investment_year,
         )
 
     # Add existing conventional thermal capacities to already attached conventional technologies
