@@ -188,7 +188,8 @@ transmission_efficiency,,,Section to specify transmission losses or compression 
 -- -- efficiency_per_1000km,p.u. per 1000 km,float,Length-dependent transmission efficiency ($\eta^{\text{length}}$)
 -- -- compression_per_1000km,p.u. per 1000 km,float,Length-dependent electricity demand for compression ($\eta \cdot \text{length}$) implemented as multi-link to local electricity bus.
 H2_network,--,"{true, false}",Add option for new hydrogen pipelines
-h2_topology_tyndp,--,"{true, false}",Add option to use TYNDP h2 topology
+h2_topology_tyndp,--,"{true, false}",Add option to use TYNDP H2 topology
+h2_zones_tyndp,--,"{true, false}","Add option to split TYNDP H2 nodes into two zones (Z1, Z1), currently only available for DE/GA scenarios"
 gas_network,--,"{true, false}","Add existing natural gas infrastructure, incl. LNG terminals, production and entry-points. The existing gas network is added with a lossless transport model. A length-weighted `k-edge augmentation algorithm   <https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.connectivity.edge_augmentation.k_edge_augmentation.html#networkx.algorithms.connectivity.edge_augmentation.k_edge_augmentation>`_   can be run to add new candidate gas pipelines such that all regions of the model can be connected to the gas network. When activated, all the gas demands are regionally disaggregated as well."
 gas_demand_exogenously,--,"{true, false}",Add exogenous methane demand from the TYNDP 2024.
 H2_retrofit,--,"{true, false}",Add option for retrofiting existing pipelines to transport hydrogen.
