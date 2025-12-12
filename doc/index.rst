@@ -72,6 +72,8 @@ Each organisation in this open-source ecosystem remains fully independent of the
 
 |
 
+.. _development-status:
+
 Development status
 ==================
 
@@ -469,6 +471,7 @@ The PyPSA-Eur workflow is continuously tested for Linux, macOS and Windows (WSL 
    installation
    tutorial
    tutorial_sector
+   faq_troubleshooting
 
 .. toctree::
    :hidden:
