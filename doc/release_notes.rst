@@ -14,6 +14,10 @@ Upcoming Open-TYNDP Release
 
 **Features**
 
+* Add weekly rolling horizon optimization for CBA networks (https://github.com/open-energy-transition/open-tyndp/pull/217). Implements ``solve_cba_network`` rule for optimizing dispatch of TOOT and PINT reference and project networks.
+
+* Introduce calculation of B1 indicator in the Cost-Benefit Analysis (CBA) based on changes in total system costs (https://github.com/open-energy-transition/open-tyndp/pull/186).
+
 * Adjusted solid biomass and biogas potentials to match TYNDP assumptions across all planning horizons, removed unsustainable biomass and biogas shares from potential, and added configuration options to force biomass and biogas potentials (https://github.com/open-energy-transition/open-tyndp/pull/236)
 
 * Add CO2 emission prices configurable per planning horizon for sector-coupled models (https://github.com/open-energy-transition/open-tyndp/pull/198). The CO2 price is added as a marginal cost on the `co2 atmosphere` Store.
