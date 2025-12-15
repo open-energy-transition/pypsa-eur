@@ -65,6 +65,10 @@ Upcoming Open-TYNDP Release
 
 * Remove `wget` commands from `retrieve` rules to improve Windows compatibility (https://github.com/open-energy-transition/open-tyndp/pull/304).
 
+**Documentation**
+
+* Add more FAQ questions, set the default solver to HiGHS and fix the default temporal resolution to 52SEG (https://github.com/open-energy-transition/open-tyndp/pull/303).
+
 
 Upcoming PyPSA-Eur Release
 ================
