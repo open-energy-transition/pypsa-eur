@@ -15,6 +15,8 @@ Upcoming Open-TYNDP Release
 Upcoming PyPSA-Eur Release
 ================
 
+* Fix compatibility of rules `build_gas_input_locations` and `build_gas_network` with pyogrio >=0.12.0 (https://github.com/PyPSA/pypsa-eur/pull/1955).
+
 * Fix: ValueError with `cop_heat_pump` in `prepare_sector_network.py` if `tim_dep_hp_cop` is `false`.
 
 * Fixed OSM raw data cleaning to include `section` line relation role.
