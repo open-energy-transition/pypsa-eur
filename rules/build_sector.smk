@@ -1559,8 +1559,11 @@ rule prepare_sector_network:
         transport_data=resources("transport_data_s_{clusters}.csv"),
         avail_profile=resources("avail_profile_s_{clusters}.csv"),
         dsm_profile=resources("dsm_profile_s_{clusters}.csv"),
-        heat_dsm_profile=resources(
-            "residential_heat_dsm_profile_total_base_s_{clusters}.csv"
+        heat_dsm_profile=branch(
+            lambda w: config_provider("sector", "residential_heat", "dsm", "enable")(
+                w
+            ),
+            resources("residential_heat_dsm_profile_total_base_s_{clusters}.csv"),
         ),
         co2_totals_name=resources("co2_totals.csv"),
         co2="data/bundle/eea/UNFCCC_v23.csv",
