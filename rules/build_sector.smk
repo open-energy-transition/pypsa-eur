@@ -1560,9 +1560,7 @@ rule prepare_sector_network:
         avail_profile=resources("avail_profile_s_{clusters}.csv"),
         dsm_profile=resources("dsm_profile_s_{clusters}.csv"),
         heat_dsm_profile=branch(
-            lambda w: config_provider("sector", "residential_heat", "dsm", "enable")(
-                w
-            ),
+            config_provider("sector", "residential_heat", "dsm", "enable"),
             resources("residential_heat_dsm_profile_total_base_s_{clusters}.csv"),
         ),
         co2_totals_name=resources("co2_totals.csv"),
@@ -1580,30 +1578,30 @@ rule prepare_sector_network:
         busmap=resources("busmap_base_s_{clusters}.csv"),
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
         industrial_demand=branch(
-            lambda w: config_provider("sector", "industry")(w),
+            config_provider("sector", "industry"),
             resources(
                 "industrial_energy_demand_base_s_{clusters}_{planning_horizons}.csv"
             ),
         ),
         hourly_heat_demand_total=branch(
-            lambda w: config_provider("sector", "heating")(w),
+            config_provider("sector", "heating"),
             resources("hourly_heat_demand_total_base_s_{clusters}.nc"),
         ),
         industrial_production=branch(
-            lambda w: config_provider("sector", "industry")(w),
+            config_provider("sector", "industry"),
             resources(
                 "industrial_production_base_s_{clusters}_{planning_horizons}.csv"
             ),
         ),
         district_heat_share=branch(
-            lambda w: config_provider("sector", "heating")(w),
+            config_provider("sector", "heating"),
             resources("district_heat_share_base_s_{clusters}_{planning_horizons}.csv"),
         ),
         heating_efficiencies=resources("heating_efficiencies.csv"),
         temp_soil_total=resources("temp_soil_total_base_s_{clusters}.nc"),
         temp_air_total=resources("temp_air_total_base_s_{clusters}.nc"),
         cop_profiles=branch(
-            lambda w: config_provider("sector", "heating")(w),
+            config_provider("sector", "heating"),
             resources("cop_profiles_base_s_{clusters}_{planning_horizons}.nc"),
         ),
         ptes_e_max_pu_profiles=lambda w: (
@@ -1650,7 +1648,7 @@ rule prepare_sector_network:
             else []
         ),
         direct_heat_source_utilisation_profiles=branch(
-            lambda w: config_provider("sector", "heating")(w),
+            config_provider("sector", "heating"),
             resources(
                 "direct_heat_source_utilisation_profiles_base_s_{clusters}_{planning_horizons}.nc"
             ),
@@ -1696,11 +1694,11 @@ rule prepare_sector_network:
         ),
         carrier_mapping="data/tyndp_technology_map.csv",
         gas_demand=branch(
-            lambda w: config_provider("tyndp_scenario")(w),
+            config_provider("tyndp_scenario"),
             resources("gas_demand_tyndp_{planning_horizons}.csv"),
         ),
         h2_demand=branch(
-            lambda w: config_provider("tyndp_scenario")(w),
+            config_provider("tyndp_scenario"),
             resources("h2_demand_tyndp_{planning_horizons}.csv"),
         ),
         powerplants=resources("powerplants_s_{clusters}.csv"),
