@@ -19,10 +19,6 @@ Which specific data version is retrieve can be controlled in the `data configura
 Below some specific ``retrieve_<dataset>`` rules are documented.
 For more information on the datasets retrieved, see the `data sources <https://pypsa-eur.readthedocs.io/en/latest/data_sources.html>`__ and *Data inventory* section there in the documentation.
 
-Rule ``retrieve_tyndp_bundle``
-============================
-
-.. automodule:: retrieve_tyndp_bundle
 
 Rule ``retrieve_bidding_zones``
 =========================================
@@ -102,33 +98,3 @@ None.
 **Outputs**
 
 - ``data/countries_centroids.geojson``
-
-Rule ``retrieve_tyndp_pecd_data_raw``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data
-
-Rule ``retrieve_tyndp_pecd_data_prebuilt``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data
-
-Rule ``retrieve_tyndp_hydro_inflows``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data
-
-Rule ``retrieve_tyndp_pemmdb_data``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data
-
-Rule ``retrieve_tyndp_h2_data``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data
-
-Rule ``retrieve_tyndp_gas_data``
-====================================
-
-.. automodule:: retrieve_additional_tyndp_data

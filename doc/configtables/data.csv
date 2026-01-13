@@ -137,3 +137,27 @@ geothermal_heat_utilisation_potentials,,,
 jrc_ardeco,,,
 -- source,str,"{archive, primary}","Source of annual regional database for EU regions"
 -- version,str,,"Version of the JRC ARDECO dataset"
+cutout_additional,,,
+-- source,str,"{archive}","Source of the additional cutout data."
+-- version,str,,"Version of the additional cutout data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_pecd,,,
+-- source,str,"{archive, primary}","Source of the TYNDP PECD (Pan-European Climate Database) data."
+-- version,str,,"Version of the TYNDP PECD data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_hydro_inflows,,,
+-- source,str,"{archive, primary}","Source of the TYNDP Hydro Inflows data."
+-- version,str,,"Version of the TYNDP Hydro Inflows data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_pemmdb,,,
+-- source,str,"{archive, primary}","Source of the Pan-European Market Modelling Database (PEMMDB) data."
+-- version,str,,"Version of the TYNDP PEMMDB data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_supply_tool,,,
+-- source,str,"{archive, primary}","Source of the TYNDP Supply Tool data."
+-- version,str,,"Version of the TYNDP Supply Tool data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_benchmark,,,
+-- source,str,"{archive, primary}","Source of the TYNDP Benchmark data."
+-- version,str,,"Version of the TYNDP Benchmark data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_vis_plfm,,,
+-- source,str,"{archive, primary}","Source of the TYNDP Visualisation Platform data."
+-- version,str,,"Version of the TYNDP Visualisation Platform data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."
+tyndp_cba_projects,,,
+-- source,str,"{archive, primary}","Source of the TYNDP Cost-Benefit Analysis (CBA) projects data."
+-- version,str,,"Version of the TYNDP CBA projects data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source."

@@ -3,152 +3,164 @@
 # SPDX-License-Identifier: MIT
 
 
-import zipfile
-from shutil import move
 from scripts._helpers import safe_pyear
+from shutil import unpack_archive, rmtree, copy2
+
 
 # Retrieve
 ##########
 
-if config["enable"]["retrieve"] and config["enable"].get("retrieve_cutout", True):
+if (CUTOUT_ADDITIONAL_DATASET := dataset_version("cutout_additional"))["source"] in [
+    "archive"
+]:
 
     rule retrieve_additional_cutout:
         input:
-            storage("https://storage.googleapis.com/open-tyndp-data-store/{cutout}.nc"),
+            storage(CUTOUT_ADDITIONAL_DATASET["url"] + "{cutout}.nc"),
         output:
-            CDIR.joinpath("{cutout}.nc").as_posix(),
+            CUTOUT_DATASET["folder"] + "/{cutout}.nc",
         log:
-            Path("logs").joinpath(CDIR, "retrieve_cutout_{cutout}.log").as_posix(),
+            "logs/retrieve_additional_cutout/{cutout}.log",
         resources:
             mem_mb=5000,
         retries: 2
         run:
-            move(input[0], output[0])
+            copy2(input[0], output[0])
 
     ruleorder: retrieve_additional_cutout > retrieve_cutout
 
 
-if config["enable"]["retrieve"]:
+if (PECD_DATASET := dataset_version("tyndp_pecd"))["source"] in ["archive"]:
 
-    rule retrieve_tyndp_bundle:
+    rule retrieve_tyndp_pecd:
         input:
+            # TODO Integrate into Zenodo tyndp data bundle
             zip_file=storage(
-                "https://zenodo.org/records/14230568/files/TYNDP_2024_data_bundle.zip"
+                PECD_DATASET["url"] + f"PECD_{PECD_DATASET["version"]}.zip"
             ),
+            dir=rules.retrieve_tyndp.output.dir,
         output:
-            dir=directory("data/tyndp_2024_bundle"),
-            elec_reference_grid="data/tyndp_2024_bundle/Line data/ReferenceGrid_Electricity.xlsx",
-            buses="data/tyndp_2024_bundle/Nodes/LIST OF NODES.xlsx",
-            h2_reference_grid="data/tyndp_2024_bundle/Line data/ReferenceGrid_Hydrogen.xlsx",
-            electricity_demand=directory("data/tyndp_2024_bundle/Demand Profiles"),
-            h2_imports="data/tyndp_2024_bundle/Hydrogen/H2 IMPORTS GENERATORS PROPERTIES.xlsx",
-            offshore_nodes="data/tyndp_2024_bundle/Offshore hubs/NODE.xlsx",
-            offshore_grid="data/tyndp_2024_bundle/Offshore hubs/GRID.xlsx",
-            offshore_electrolysers="data/tyndp_2024_bundle/Offshore hubs/ELECTROLYSER.xlsx",
-            offshore_generators="data/tyndp_2024_bundle/Offshore hubs/GENERATOR.xlsx",
-            trajectories="data/tyndp_2024_bundle/Investment Datasets/TRAJECTORY.xlsx",
-        run:
-            with zipfile.ZipFile(snakemake.input.zip_file, "r") as zip_ref:
-                zip_ref.extractall(snakemake.output.dir)
-
-    rule retrieve_tyndp_pecd_data_raw:
-        params:
-            # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/PECD/PECD_{pecd_version}.zip",
-            source="PECD raw",
-        input:
-            "data/tyndp_2024_bundle",
-        output:
-            dir=directory("data/tyndp_2024_bundle/PECD/PECD_{pecd_version}"),
+            dir=directory(PECD_DATASET["folder"]),
         log:
-            "logs/retrieve_tyndp_pecd_data_raw_{pecd_version}.log",
-        retries: 2
-        wildcard_constraints:
-            pecd_version="(?!.*pre-built).*",  # Cannot be pre-built version
-        script:
-            "../scripts/sb/retrieve_additional_tyndp_data.py"
+            "logs/retrieve_tyndp_pecd.log",
+        run:
+            copy2(input["zip_file"], output["dir"] + ".zip")
+            unpack_archive(output["dir"] + ".zip", output["dir"])
+            os.remove(output["dir"] + ".zip")
 
-    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_hydro_inflows with:
-        params:
+
+if (TYNDP_HYDRO_INFLOWS_DATASET := dataset_version("tyndp_hydro_inflows"))[
+    "source"
+] in ["archive"]:
+
+    rule retrieve_tyndp_hydro_inflows:
+        input:
             # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/Hydro_Inflows.zip",
-            source="Hydro Inflows",
+            zip_file=storage(TYNDP_HYDRO_INFLOWS_DATASET["url"]),
+            dir="data/tyndp_2024_bundle",
         output:
-            dir=directory("data/tyndp_2024_bundle/Hydro Inflows"),
+            dir=directory(TYNDP_HYDRO_INFLOWS_DATASET["folder"]),
         log:
             "logs/retrieve_tyndp_hydro_inflows.log",
+        run:
+            copy2(input["zip_file"], output["dir"] + ".zip")
+            unpack_archive(output["dir"] + ".zip", output["dir"])
+            os.remove(output["dir"] + ".zip")
 
-    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_pemmdb_data with:
-        params:
+
+if (PEMMDB_DATASET := dataset_version("tyndp_pemmdb"))["source"] in ["archive"]:
+
+    rule retrieve_tyndp_pemmdb_data:
+        input:
             # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/PEMMDB.zip",
-            source="PEMMDB",
+            zip_file=storage(PEMMDB_DATASET["url"]),
+            dir="data/tyndp_2024_bundle",
         output:
-            dir=directory("data/tyndp_2024_bundle/PEMMDB2"),
+            dir=directory(PEMMDB_DATASET["folder"]),
         log:
             "logs/retrieve_tyndp_pemmdb_data.log",
+        run:
+            copy2(input["zip_file"], output["dir"] + ".zip")
+            unpack_archive(output["dir"] + ".zip", output["dir"])
+            os.remove(output["dir"] + ".zip")
 
-    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_supply_tool with:
-        params:
+
+if (SUPPLY_TOOL_DATASET := dataset_version("tyndp_supply_tool"))["source"] in [
+    "archive"
+]:
+
+    rule retrieve_tyndp_supply_tool:
+        input:
             # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/20240518-Supply-Tool.xlsm.zip",
-            source="Supply Tool",
+            zip_file=storage(SUPPLY_TOOL_DATASET["url"]),
+            dir="data/tyndp_2024_bundle",
         output:
-            dir=directory("data/tyndp_2024_bundle/Supply Tool"),
-            file="data/tyndp_2024_bundle/Supply Tool/20240518-Supply-Tool.xlsm",
+            dir=directory(SUPPLY_TOOL_DATASET["folder"]),
+            file=f"{SUPPLY_TOOL_DATASET["folder"]}/20240518-Supply-Tool.xlsm",
         log:
             "logs/retrieve_tyndp_supply_tool.log",
+        run:
+            copy2(input["zip_file"], output["dir"] + ".zip")
+            unpack_archive(output["dir"] + ".zip", output["dir"])
+            os.remove(output["dir"] + ".zip")
 
-    if config["electricity"]["pecd_renewable_profiles"]["pre_built"]["retrieve"]:
+            # Remove __MACOSX directory if it exists
+            macosx_dir = f"{output["dir"]}/__MACOSX"
+            rmtree(macosx_dir, ignore_errors=True)
 
-        use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_pecd_data_prebuilt with:
-            params:
-                url="https://storage.googleapis.com/open-tyndp-data-store/PECD/PECD_{pecd_prebuilt_version}.zip",
-                source="PECD prebuilt",
-            output:
-                dir=directory(
-                    "data/tyndp_2024_bundle/PECD/PECD_{pecd_prebuilt_version}"
-                ),
-            log:
-                "logs/retrieve_tyndp_pecd_data_raw_{pecd_prebuilt_version}.log",
 
-    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_benchmark with:
-        params:
+if (BENCHMARK_DATASET := dataset_version("tyndp_benchmark"))["source"] in ["archive"]:
+
+    rule retrieve_tyndp_benchmark:
+        input:
             # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
-            source="Benchmarks",
+            file=storage(BENCHMARK_DATASET["url"]),
+            dir="data/tyndp_2024_bundle",
         output:
-            dir=directory("data/tyndp_2024_bundle/TYNDP-2024-Scenarios-Package"),
-            file="data/tyndp_2024_bundle/TYNDP-2024-Scenarios-Package/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
+            dir=directory(BENCHMARK_DATASET["folder"]),
+            file=f"{BENCHMARK_DATASET["folder"]}/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
         log:
             "logs/retrieve_tyndp_benchmark.log",
+        run:
+            copy2(input["file"], output["file"])
 
-    use rule retrieve_tyndp_pecd_data_raw as retrieve_tyndp_vp_data with:
-        params:
+
+if (VIS_PLFM_DATASET := dataset_version("tyndp_vis_plfm"))["source"] in ["archive"]:
+
+    rule retrieve_tyndp_vp_data:
+        input:
             # TODO Integrate into Zenodo tyndp data bundle
-            url="https://storage.googleapis.com/open-tyndp-data-store/250117-TYNDP-2024-Visualisation-Platform.zip",
-            source="Visualisation Platform",
+            zip_file=storage(VIS_PLFM_DATASET["url"]),
+            dir="data/tyndp_2024_bundle",
         output:
-            dir=directory("data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform"),
-            elec_demand="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_Demand.xlsx",
-            elec_flex="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_Flexibility.xlsx",
-            elec_supply="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_SupplyMix.xlsx",
+            dir=directory(VIS_PLFM_DATASET["folder"]),
+            elec_demand=f"{VIS_PLFM_DATASET["folder"]}/250117_TYNDP2024Scenarios_Electricity_Demand.xlsx",
+            elec_flex=f"{VIS_PLFM_DATASET["folder"]}/250117_TYNDP2024Scenarios_Electricity_Flexibility.xlsx",
+            elec_supply=f"{VIS_PLFM_DATASET["folder"]}/250117_TYNDP2024Scenarios_Electricity_SupplyMix.xlsx",
         log:
             "logs/retrieve_tyndp_vp_data.log",
-
-    rule retrieve_countries_centroids:
-        output:
-            "data/countries_centroids.geojson",
-        log:
-            "logs/retrieve_countries_centroids.log",
         run:
-            from scripts._helpers import progress_retrieve
+            copy2(input["zip_file"], output["dir"] + ".zip")
+            unpack_archive(output["dir"] + ".zip", output["dir"])
+            os.remove(output["dir"] + ".zip")
 
-            progress_retrieve(
-                "https://cdn.jsdelivr.net/gh/gavinr/world-countries-centroids@v1.0.0/dist/countries.geojson",
-                output[0],
-                disable=True,
-            )
+
+# Versioning not implemented as the dataset is used only for plotting
+# License - MIT - Copyright (c) 2021 Gavin Rehkemper
+# Website: https://github.com/gavinr/world-countries-centroids
+rule retrieve_countries_centroids:
+    output:
+        "data/countries_centroids.geojson",
+    log:
+        "logs/retrieve_countries_centroids.log",
+    run:
+        from scripts._helpers import progress_retrieve
+
+        progress_retrieve(
+            "https://cdn.jsdelivr.net/gh/gavinr/world-countries-centroids@v1.0.0/dist/countries.geojson",
+            output[0],
+            disable=True,
+        )
 
 
 # Development
@@ -496,7 +508,7 @@ if config["sector"]["h2_topology_tyndp"]:
             snapshots=config_provider("snapshots"),
             scenario=config_provider("tyndp_scenario"),
         input:
-            tyndp_reference_grid="data/tyndp_2024_bundle/Line data/ReferenceGrid_Hydrogen.xlsx",
+            h2_reference_grid="data/tyndp_2024_bundle/Line data/ReferenceGrid_Hydrogen.xlsx",
         output:
             h2_grid_prepped=resources("h2_reference_grid_tyndp_{planning_horizons}.csv"),
             interzonal_prepped=resources("h2_interzonal_tyndp_{planning_horizons}.csv"),

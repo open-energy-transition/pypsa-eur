@@ -808,7 +808,10 @@ rule retrieve_monthly_fuel_prices:
         "../scripts/retrieve_monthly_fuel_prices.py"
 
 
-if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in ["primary", "archive"]:
+if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in [
+    "primary",
+    "archive",
+] and not config["tyndp_scenario"]:
 
     rule retrieve_tyndp:
         input:
@@ -817,7 +820,7 @@ if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in ["primary", "archive
         output:
             line_data_zip=f"{TYDNP_DATASET['folder']}/Line-data.zip",
             nodes_zip=f"{TYDNP_DATASET['folder']}/Nodes.zip",
-            reference_grid=f"{TYDNP_DATASET['folder']}/Line data/ReferenceGrid_Electricity.xlsx",
+            elec_reference_grid=f"{TYDNP_DATASET['folder']}/Line data/ReferenceGrid_Electricity.xlsx",
             nodes=f"{TYDNP_DATASET['folder']}/Nodes/LIST OF NODES.xlsx",
         log:
             "logs/retrieve_tyndp.log",
@@ -833,6 +836,31 @@ if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in ["primary", "archive
                 # Remove __MACOSX directory if it exists
                 macosx_dir = output_folder / "__MACOSX"
                 rmtree(macosx_dir, ignore_errors=True)
+
+
+
+if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in ["archive"] and config[
+    "tyndp_scenario"
+]:
+
+    rule retrieve_tyndp:
+        input:
+            zip_file=storage(TYDNP_DATASET["url"]),
+        output:
+            dir=directory(TYDNP_DATASET["folder"]),
+            elec_reference_grid=f"{TYDNP_DATASET['folder']}/Line data/ReferenceGrid_Electricity.xlsx",
+            nodes=f"{TYDNP_DATASET['folder']}/Nodes/LIST OF NODES.xlsx",
+            h2_reference_grid=f"{TYDNP_DATASET['folder']}/Line data/ReferenceGrid_Hydrogen.xlsx",
+            demand_profiles=directory(f"{TYDNP_DATASET['folder']}/Demand Profiles"),
+            h2_imports=f"{TYDNP_DATASET['folder']}/Hydrogen/H2 IMPORTS GENERATORS PROPERTIES.xlsx",
+            offshore_nodes=f"{TYDNP_DATASET['folder']}/Offshore hubs/NODE.xlsx",
+            offshore_grid=f"{TYDNP_DATASET['folder']}/Offshore hubs/GRID.xlsx",
+            offshore_electrolysers=f"{TYDNP_DATASET['folder']}/Offshore hubs/ELECTROLYSER.xlsx",
+            offshore_generators=f"{TYDNP_DATASET['folder']}/Offshore hubs/GENERATOR.xlsx",
+            trajectories=f"{TYDNP_DATASET['folder']}/Investment Datasets/TRAJECTORY.xlsx",
+        run:
+            with ZipFile(input["zip_file"], "r") as zip_ref:
+                zip_ref.extractall(output["dir"])
 
 
 
