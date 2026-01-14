@@ -57,7 +57,7 @@ if (TYNDP_HYDRO_INFLOWS_DATASET := dataset_version("tyndp_hydro_inflows"))[
         input:
             # TODO Integrate into Zenodo tyndp data bundle
             zip_file=storage(TYNDP_HYDRO_INFLOWS_DATASET["url"]),
-            dir="data/tyndp_2024_bundle",
+            dir=rules.retrieve_tyndp.output.dir,
         output:
             dir=directory(TYNDP_HYDRO_INFLOWS_DATASET["folder"]),
         log:
@@ -74,7 +74,7 @@ if (PEMMDB_DATASET := dataset_version("tyndp_pemmdb"))["source"] in ["archive"]:
         input:
             # TODO Integrate into Zenodo tyndp data bundle
             zip_file=storage(PEMMDB_DATASET["url"]),
-            dir="data/tyndp_2024_bundle",
+            dir=rules.retrieve_tyndp.output.dir,
         output:
             dir=directory(PEMMDB_DATASET["folder"]),
         log:
@@ -93,7 +93,7 @@ if (SUPPLY_TOOL_DATASET := dataset_version("tyndp_supply_tool"))["source"] in [
         input:
             # TODO Integrate into Zenodo tyndp data bundle
             zip_file=storage(SUPPLY_TOOL_DATASET["url"]),
-            dir="data/tyndp_2024_bundle",
+            dir=rules.retrieve_tyndp.output.dir,
         output:
             dir=directory(SUPPLY_TOOL_DATASET["folder"]),
             file=f"{SUPPLY_TOOL_DATASET["folder"]}/20240518-Supply-Tool.xlsm",
@@ -115,7 +115,7 @@ if (BENCHMARK_DATASET := dataset_version("tyndp_benchmark"))["source"] in ["arch
         input:
             # TODO Integrate into Zenodo tyndp data bundle
             file=storage(BENCHMARK_DATASET["url"]),
-            dir="data/tyndp_2024_bundle",
+            dir=rules.retrieve_tyndp.output.dir,
         output:
             dir=directory(BENCHMARK_DATASET["folder"]),
             file=f"{BENCHMARK_DATASET["folder"]}/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
@@ -131,7 +131,7 @@ if (VIS_PLFM_DATASET := dataset_version("tyndp_vis_plfm"))["source"] in ["archiv
         input:
             # TODO Integrate into Zenodo tyndp data bundle
             zip_file=storage(VIS_PLFM_DATASET["url"]),
-            dir="data/tyndp_2024_bundle",
+            dir=rules.retrieve_tyndp.output.dir,
         output:
             dir=directory(VIS_PLFM_DATASET["folder"]),
             elec_demand=f"{VIS_PLFM_DATASET["folder"]}/250117_TYNDP2024Scenarios_Electricity_Demand.xlsx",
@@ -202,11 +202,35 @@ if not config["electricity"]["pecd_renewable_profiles"]["pre_built"]["retrieve"]
 # Build electricity
 ###################
 
+if config["load"]["source"] == "tyndp":
+
+    rule clean_tyndp_electricity_demand:
+        params:
+            planning_horizons=config_provider("scenario", "planning_horizons"),
+            snapshots=config_provider("snapshots"),
+            scenario=config_provider("tyndp_scenario"),
+            available_years=config_provider("load", "available_years_tyndp"),
+        input:
+            electricity_demand=rules.retrieve_tyndp.output.demand_profiles,
+        output:
+            electricity_demand_prepped=resources("electricity_demand_raw_tyndp.csv"),
+        log:
+            logs("clean_tyndp_electricity_demand.log"),
+        benchmark:
+            benchmarks("clean_tyndp_electricity_demand")
+        threads: 4
+        resources:
+            mem_mb=4000,
+        conda:
+            "../envs/environment.yaml"
+        script:
+            "../scripts/sb/clean_tyndp_electricity_demand.py"
+
 
 use rule build_electricity_demand as build_electricity_demand_tyndp with:
     input:
         unpack(input_elec_demand),
-        reported=resources("electricity_demand_raw_tyndp.csv"),
+        reported=rules.clean_tyndp_electricity_demand.output.electricity_demand_prepped,
     output:
         resources("electricity_demand_{planning_horizons}.csv"),
     log:
@@ -242,7 +266,7 @@ rule clean_pecd_data:
         ),
     input:
         unpack(pecd_prebuilt_version),
-        offshore_buses="data/tyndp_2024_bundle/Offshore hubs/NODE.xlsx",
+        offshore_buses=rules.retrieve_tyndp.output.offshore_nodes,
         onshore_buses=resources("busmap_base_s_all.csv"),
     output:
         pecd_data_clean=resources("pecd_data_{technology}_{planning_horizons}.csv"),
@@ -311,7 +335,7 @@ rule build_pemmdb_data:
         ),
         tyndp_scenario=config_provider("tyndp_scenario"),
     input:
-        pemmdb_dir="data/tyndp_2024_bundle/PEMMDB2",
+        pemmdb_dir=rules.retrieve_tyndp_pemmdb_data.output.dir,
         carrier_mapping="data/tyndp_technology_map.csv",
         busmap=resources("busmap_base_s_all.csv"),
     output:
@@ -332,7 +356,7 @@ rule build_tyndp_trajectories:
     params:
         tyndp_scenario=config_provider("tyndp_scenario"),
     input:
-        trajectories="data/tyndp_2024_bundle/Investment Datasets/TRAJECTORY.xlsx",
+        trajectories=rules.retrieve_tyndp.output.trajectories,
         carrier_mapping="data/tyndp_technology_map.csv",
     output:
         tyndp_trajectories=resources("tyndp_trajectories.csv"),
@@ -353,7 +377,7 @@ rule clean_tyndp_hydro_inflows:
             "electricity", "pemmdb_hydro_profiles", "available_years"
         ),
     input:
-        hydro_inflows_dir="data/tyndp_2024_bundle/Hydro Inflows",
+        hydro_inflows_dir=rules.retrieve_tyndp_hydro_inflows.output.dir,
         busmap=resources("busmap_base_s_all.csv"),
     output:
         hydro_inflows_tyndp=resources(
@@ -432,31 +456,6 @@ use rule build_electricity_demand_base as build_electricity_demand_base_tyndp wi
         benchmarks("build_electricity_demand_base_s_{planning_horizons}")
 
 
-if config["load"]["source"] == "tyndp":
-
-    rule clean_tyndp_electricity_demand:
-        params:
-            planning_horizons=config_provider("scenario", "planning_horizons"),
-            snapshots=config_provider("snapshots"),
-            scenario=config_provider("tyndp_scenario"),
-            available_years=config_provider("load", "available_years_tyndp"),
-        input:
-            electricity_demand="data/tyndp_2024_bundle/Demand Profiles",
-        output:
-            electricity_demand_prepped=resources("electricity_demand_raw_tyndp.csv"),
-        log:
-            logs("clean_tyndp_electricity_demand.log"),
-        benchmark:
-            benchmarks("clean_tyndp_electricity_demand")
-        threads: 4
-        resources:
-            mem_mb=4000,
-        conda:
-            "../envs/environment.yaml"
-        script:
-            "../scripts/sb/clean_tyndp_electricity_demand.py"
-
-
 # Build sector
 ##############
 
@@ -466,7 +465,7 @@ rule build_tyndp_gas_demand:
         scenario=config_provider("tyndp_scenario"),
         planning_horizons=config_provider("scenario", "planning_horizons"),
     input:
-        supply_tool="data/tyndp_2024_bundle/Supply Tool/20240518-Supply-Tool.xlsm",
+        supply_tool=rules.retrieve_tyndp_supply_tool.output.file,
     output:
         gas_demand=resources("gas_demand_tyndp_{planning_horizons}.csv"),
     threads: 1
@@ -487,7 +486,7 @@ rule build_tyndp_h2_demand:
         snapshots=config_provider("snapshots"),
         scenario=config_provider("tyndp_scenario"),
     input:
-        h2_demand="data/tyndp_2024_bundle/Demand Profiles",
+        h2_demand=rules.retrieve_tyndp.output.demand_profiles,
     output:
         h2_demand=resources("h2_demand_tyndp_{planning_horizons}.csv"),
     threads: 1
@@ -508,7 +507,7 @@ if config["sector"]["h2_topology_tyndp"]:
             snapshots=config_provider("snapshots"),
             scenario=config_provider("tyndp_scenario"),
         input:
-            h2_reference_grid="data/tyndp_2024_bundle/Line data/ReferenceGrid_Hydrogen.xlsx",
+            h2_reference_grid=rules.retrieve_tyndp.output.h2_reference_grid,
         output:
             h2_grid_prepped=resources("h2_reference_grid_tyndp_{planning_horizons}.csv"),
             interzonal_prepped=resources("h2_interzonal_tyndp_{planning_horizons}.csv"),
@@ -526,8 +525,8 @@ if config["sector"]["h2_topology_tyndp"]:
 
     rule clean_tyndp_h2_imports:
         input:
-            import_potentials_raw="data/tyndp_2024_bundle/Hydrogen/H2 IMPORTS GENERATORS PROPERTIES.xlsx",
-            countries_centroids="data/countries_centroids.geojson",
+            import_potentials_raw=rules.retrieve_tyndp.output.h2_imports,
+            countries_centroids=rules.retrieve_countries_centroids.output,
         output:
             import_potentials_prepped=resources("h2_import_potentials_prepped.csv"),
         log:
@@ -546,7 +545,7 @@ if config["sector"]["h2_topology_tyndp"]:
         params:
             scenario=config_provider("tyndp_scenario"),
         input:
-            import_potentials_prepped=resources("h2_import_potentials_prepped.csv"),
+            import_potentials_prepped=rules.clean_tyndp_h2_imports.output.import_potentials_prepped,
         output:
             import_potentials_filtered=resources(
                 "h2_import_potentials_{planning_horizons}.csv"
@@ -575,10 +574,10 @@ if config["sector"]["offshore_hubs_tyndp"]["enable"]:
             extendable_carriers=config_provider("electricity", "extendable_carriers"),
             h2_zones_tyndp=config_provider("sector", "h2_zones_tyndp"),
         input:
-            nodes="data/tyndp_2024_bundle/Offshore hubs/NODE.xlsx",
-            grid="data/tyndp_2024_bundle/Offshore hubs/GRID.xlsx",
-            electrolysers="data/tyndp_2024_bundle/Offshore hubs/ELECTROLYSER.xlsx",
-            generators="data/tyndp_2024_bundle/Offshore hubs/GENERATOR.xlsx",
+            nodes=rules.retrieve_tyndp.output.offshore_nodes,
+            grid=rules.retrieve_tyndp.output.offshore_grid,
+            electrolysers=rules.retrieve_tyndp.output.offshore_electrolysers,
+            generators=rules.retrieve_tyndp.output.offshore_generators,
         output:
             offshore_buses=resources("offshore_buses.csv"),
             offshore_grid=resources("offshore_grid.csv"),
@@ -732,7 +731,7 @@ if config["benchmarking"]["enable"]:
             scenario=config_provider("tyndp_scenario"),
             snapshots=config_provider("snapshots"),
         input:
-            scenarios_figures="data/tyndp_2024_bundle/TYNDP-2024-Scenarios-Package/TYNDP_2024-Scenario-Report-Data-Figures_240522.xlsx",
+            scenarios_figures=rules.retrieve_tyndp_benchmark.output.file,
         output:
             benchmarks=RESULTS + "validation/resources/benchmarks_tyndp.csv",
         log:
@@ -751,9 +750,9 @@ if config["benchmarking"]["enable"]:
             snapshots=config_provider("snapshots"),
             unit_conversion=config_provider("benchmarking", "unit_conversion"),
         input:
-            elec_demand="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_Demand.xlsx",
-            elec_supplymix="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_SupplyMix.xlsx",
-            elec_flex="data/tyndp_2024_bundle/TYNDP-2024-Visualisation-Platform/250117_TYNDP2024Scenarios_Electricity_Flexibility.xlsx",
+            elec_demand=rules.retrieve_tyndp_vp_data.output.elec_demand,
+            elec_supplymix=rules.retrieve_tyndp_vp_data.output.elec_supply,
+            elec_flex=rules.retrieve_tyndp_vp_data.output.elec_flex,
         output:
             RESULTS + "validation/resources/vp_data_tyndp.csv",
         log:
@@ -939,7 +938,7 @@ def input_pemmdb_datas(w):
 rule build_pemmdb_and_trajectories:
     input:
         expand(
-            resources("pemmdb_capacities_{planning_horizons}.csv"),
+            rules.build_pemmdb_data.output.pemmdb_capacities,
             planning_horizons=input_pemmdb_datas,
             run=config["run"]["name"],
         ),
