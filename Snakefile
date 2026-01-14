@@ -71,8 +71,12 @@ include: "rules/solve_electricity.smk"
 include: "rules/postprocess.smk"
 include: "rules/development.smk"
 include: "rules/report.smk"
-include: "rules/cba.smk"
-include: "rules/sb.smk"
+
+
+if config["tyndp_scenario"]:
+
+    include: "rules/cba.smk"
+    include: "rules/sb.smk"
 
 
 if config["foresight"] == "overnight":
