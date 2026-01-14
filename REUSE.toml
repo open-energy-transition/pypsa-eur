@@ -43,6 +43,20 @@ SPDX-FileCopyrightText = [
 ]
 SPDX-License-Identifier = "CC0-1.0"
 
+[[annotations]]
+path = [
+    "report/**",
+]
+SPDX-FileCopyrightText = "Open Energy Transition gGmbH"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+    "utils/windows-installer/oet_logo.*",
+]
+SPDX-FileCopyrightText = "Open Energy Transition gGmbH"
+SPDX-License-Identifier = "CC-BY-4.0"
+
 
 # Make sure to keep in sync with: https://pypsa-eur.readthedocs.io/en/latest/data-repos.html
 
@@ -145,17 +159,3 @@ path = [
 ]
 SPDX-FileCopyrightText = "Wikipedia contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
-
-[[annotations]]
-path = [
-    "report/**",
-]
-SPDX-FileCopyrightText = "Open Energy Transition gGmbH"
-SPDX-License-Identifier = "MIT"
-
-[[annotations]]
-path = [
-    "utils/windows-installer/oet_logo.*",
-]
-SPDX-FileCopyrightText = "Open Energy Transition gGmbH"
-SPDX-License-Identifier = "CC-BY-4.0"
