@@ -165,14 +165,23 @@ rule retrieve_countries_centroids:
 
 # Development
 #############
+if not "pre-built" in PECD_DATASET["version"]:
 
-if not config["electricity"]["pecd_renewable_profiles"]["pre_built"]["retrieve"]:
-
-    def pecd_version(w):
-        version = config_provider("electricity", "pecd_renewable_profiles", "version")(
-            w
+    def get_pecd_prebuilt_version(increment_minor=True):
+        prebuilt_prefix = f"{PECD_DATASET["version"]}+pre-built."
+        major, minor = (
+            dataset_version("tyndp_pecd", all_versions=True)
+            .query("version.str.contains(@prebuilt_prefix, regex=False)")
+            .version.sort_values()
+            .iloc[-1]
+            .removeprefix(prebuilt_prefix)
+            .rsplit(".", 1)
         )
-        return {"pecd_raw": f"data/tyndp_2024_bundle/PECD/PECD_{version}"}
+
+        if increment_minor:
+            return f"{major}.{str(int(minor)+1)}"
+        else:
+            return f"{str(int(major)+1)}.0"
 
     rule prepare_pecd_release:
         params:
@@ -183,15 +192,15 @@ if not config["electricity"]["pecd_renewable_profiles"]["pre_built"]["retrieve"]
                 "electricity", "pecd_renewable_profiles", "available_years"
             ),
         input:
-            unpack(pecd_version),
+            pecd_raw=PECD_DATASET["folder"],
         output:
             pecd_prebuilt=directory(
-                "data/tyndp_2024_bundle/PECD/PECD_{pecd_prebuilt_version}"
+                f"{PECD_DATASET["folder"]}+pre-built.{get_pecd_prebuilt_version()}"
             ),
         log:
-            "logs/prepare_pecd_release_{pecd_prebuilt_version}.log",
+            "logs/prepare_pecd_release.log",
         benchmark:
-            "benchmarks/prepare_pecd_release_{pecd_prebuilt_version}"
+            "benchmarks/prepare_pecd_release"
         threads: 4
         resources:
             mem_mb=1000,
@@ -239,18 +248,6 @@ use rule build_electricity_demand as build_electricity_demand_tyndp with:
         benchmarks("build_electricity_demand_{planning_horizons}")
 
 
-def pecd_prebuilt_version(w):
-    pre_built_version = config_provider(
-        "electricity", "pecd_renewable_profiles", "pre_built", "pecd_prebuilt_version"
-    )(w)
-    pecd_raw_version = config_provider(
-        "electricity", "pecd_renewable_profiles", "version"
-    )(w)
-    return {
-        "pecd_prebuilt": f"data/tyndp_2024_bundle/PECD/PECD_{pecd_raw_version}+pre-built.{pre_built_version}"
-    }
-
-
 rule clean_pecd_data:
     params:
         snapshots=config_provider("snapshots"),
@@ -265,7 +262,11 @@ rule clean_pecd_data:
             "electricity", "pecd_renewable_profiles", "pre_built", "cyears"
         ),
     input:
-        unpack(pecd_prebuilt_version),
+        pecd_prebuilt=branch(
+            not "pre-built" in PECD_DATASET["version"],
+            rules.prepare_pecd_release.output.pecd_prebuilt,
+            rules.retrieve_tyndp_pecd.output.dir,
+        ),
         offshore_buses=rules.retrieve_tyndp.output.offshore_nodes,
         onshore_buses=resources("busmap_base_s_all.csv"),
     output:

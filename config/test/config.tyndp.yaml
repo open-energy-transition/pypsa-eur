@@ -77,10 +77,7 @@ electricity:
 
   pecd_renewable_profiles:
     enable: true
-    version: 3.1
     pre_built:
-      retrieve: true
-      pecd_prebuilt_version: 0.1
       cyears:
       - 1995
       - 2008

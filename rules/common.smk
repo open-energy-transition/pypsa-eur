@@ -108,6 +108,7 @@ def load_data_versions(file_path):
 
 def dataset_version(
     name: str,
+    all_versions: bool = False,
 ) -> pd.Series:
     """
     Return the dataset version information and url for a given dataset name.
@@ -118,6 +119,8 @@ def dataset_version(
     Parameters:
     name: str
         The name of the dataset to retrieve version information for.
+    all_versions: bool
+        Whether to return all supported versions instead of the configured one.
 
     Returns:
     pd.Series
@@ -137,13 +140,19 @@ def dataset_version(
         (data_versions["dataset"] == name)
         & (data_versions["source"] == dataset_config["source"])
         & (data_versions["supported"])  # Limit to supported versions only
-        & (
-            data_versions["version"] == dataset_config["version"]
-            if "latest" != dataset_config["version"]
-            else True
-        )
-        & (data_versions["latest"] if "latest" == dataset_config["version"] else True)
     ]
+
+    if not all_versions:
+        dataset = dataset.loc[
+            (
+                dataset["version"] == str(dataset_config["version"])
+                if "latest" != dataset_config["version"]
+                else True
+            )
+            & (dataset["latest"] if "latest" == dataset_config["version"] else True)
+        ]
+    else:
+        return dataset
 
     if dataset.empty:
         raise ValueError(
