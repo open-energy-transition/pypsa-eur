@@ -45,7 +45,7 @@ def input_clustered_network(w):
 
 checkpoint clean_projects:
     input:
-        dir="data/tyndp_2024_bundle/cba_projects",
+        dir=rules.retrieve_tyndp_cba_projects.output.dir,
         network=input_clustered_network,
     output:
         transmission_projects=resources("cba/transmission_projects.csv"),
