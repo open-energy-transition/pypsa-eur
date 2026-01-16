@@ -248,6 +248,13 @@ use rule build_electricity_demand as build_electricity_demand_tyndp with:
         benchmarks("build_electricity_demand_{planning_horizons}")
 
 
+def get_pecd_prebuilt(w):
+    if "pre-built" in PECD_DATASET["version"]:
+        return rules.retrieve_tyndp_pecd.output.dir
+    else:
+        return rules.prepare_pecd_release.output.pecd_prebuilt
+
+
 rule clean_pecd_data:
     params:
         snapshots=config_provider("snapshots"),
@@ -262,11 +269,7 @@ rule clean_pecd_data:
             "electricity", "pecd_renewable_profiles", "pre_built", "cyears"
         ),
     input:
-        pecd_prebuilt=branch(
-            not "pre-built" in PECD_DATASET["version"],
-            rules.prepare_pecd_release.output.pecd_prebuilt,
-            rules.retrieve_tyndp_pecd.output.dir,
-        ),
+        pecd_prebuilt=get_pecd_prebuilt,
         offshore_buses=rules.retrieve_tyndp.output.offshore_nodes,
         onshore_buses=resources("busmap_base_s_all.csv"),
     output:
