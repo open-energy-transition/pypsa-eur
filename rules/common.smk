@@ -109,7 +109,7 @@ def load_data_versions(file_path):
 def dataset_version(
     name: str,
     all_versions: bool = False,
-) -> pd.Series:
+) -> pd.Series | pd.DataFrame:
     """
     Return the dataset version information and url for a given dataset name.
 
@@ -122,9 +122,13 @@ def dataset_version(
     all_versions: bool
         Whether to return all supported versions instead of the configured one.
 
-    Returns:
-    pd.Series
-        A pandas Series containing the dataset version information, including source, version, tags, and URL
+    Returns
+    -------
+    pd.Series | pd.DataFrame
+        If `all_versions=False` (default), returns a pandas Series containing the dataset
+        version information for the configured version, including source, version, tags, and URL.
+        If `all_versions=True`, returns a pandas DataFrame containing version information
+        for all versions of the dataset.
     """
 
     dataset_config = config["data"][
