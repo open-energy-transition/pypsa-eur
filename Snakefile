@@ -98,7 +98,9 @@ if config["foresight"] == "perfect":
 
 def input_all_tyndp(w):
     files = []
-    if config_provider("sector", "H2_network")(w):
+    if config_provider("tyndp_scenario")(w) and config_provider("sector", "H2_network")(
+        w
+    ):
         files.extend(
             expand(
                 (
