@@ -169,14 +169,16 @@ if not "pre-built" in PECD_DATASET["version"]:
 
     def get_pecd_prebuilt_version(increment_minor=True):
         prebuilt_prefix = f"{PECD_DATASET["version"]}+pre-built."
-        major, minor = (
+        versions = (
             dataset_version("tyndp_pecd", all_versions=True)
             .query("version.str.contains(@prebuilt_prefix, regex=False)")
             .version.sort_values()
-            .iloc[-1]
-            .removeprefix(prebuilt_prefix)
-            .rsplit(".", 1)
         )
+
+        if versions.empty:
+            return "0.1"
+
+        major, minor = versions.iloc[-1].removeprefix(prebuilt_prefix).rsplit(".", 1)
 
         if increment_minor:
             return f"{major}.{str(int(minor)+1)}"
