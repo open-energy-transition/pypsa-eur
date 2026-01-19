@@ -30,6 +30,7 @@ gurobi.log
 /cutouts
 /tmp
 doc/_build
+_build
 
 
 /scripts/old
@@ -72,6 +73,8 @@ report/*.toc
 *.nc
 
 *~
+
+*.egg-info
 
 *.pyc
 
