@@ -839,9 +839,9 @@ if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in [
 
 
 
-if (TYDNP_DATASET := dataset_version("tyndp_bundle"))["source"] in ["archive"] and config[
-    "tyndp_scenario"
-]:
+if (TYDNP_DATASET := dataset_version("tyndp_bundle"))["source"] in [
+    "archive"
+] and config["tyndp_scenario"]:
 
     rule retrieve_tyndp:
         input:
