@@ -1196,6 +1196,9 @@ data:
   tyndp:
     source: archive
     version: latest
+  tyndp_bundle:
+    source: archive
+    version: latest
   powerplants:
     source: primary
     version: latest

@@ -839,7 +839,7 @@ if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in [
 
 
 
-if (TYDNP_DATASET := dataset_version("tyndp"))["source"] in ["archive"] and config[
+if (TYDNP_DATASET := dataset_version("tyndp_bundle"))["source"] in ["archive"] and config[
     "tyndp_scenario"
 ]:
 
