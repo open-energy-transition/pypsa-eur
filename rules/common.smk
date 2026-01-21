@@ -146,17 +146,22 @@ def dataset_version(
         & (data_versions["supported"])  # Limit to supported versions only
     ]
 
-    if not all_versions:
-        dataset = dataset.loc[
-            (
-                dataset["version"] == str(dataset_config["version"])
-                if "latest" != dataset_config["version"]
-                else True
-            )
-            & (dataset["latest"] if "latest" == dataset_config["version"] else True)
-        ]
-    else:
+    if dataset.empty:
+        raise ValueError(
+            f"Dataset '{name}' with source '{dataset_config['source']}' not found in data/versions.csv."
+        )
+
+    if all_versions:
         return dataset
+
+    dataset = dataset.loc[
+        (
+            dataset["version"] == str(dataset_config["version"])
+            if "latest" != dataset_config["version"]
+            else True
+        )
+        & (dataset["latest"] if "latest" == dataset_config["version"] else True)
+    ]
 
     if dataset.empty:
         raise ValueError(
