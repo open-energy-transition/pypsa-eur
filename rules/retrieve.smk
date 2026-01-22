@@ -1034,6 +1034,7 @@ if (LAU_REGIONS_DATASET := dataset_version("lau_regions"))["source"] in [
     rule retrieve_seawater_temperature:
         params:
             default_cutout=config_provider("atlite", "default_cutout"),
+            test_data_url=dataset_version("seawater_temperature")["url"],
         output:
             seawater_temperature="data/seawater_temperature_{year}.nc",
         log:
