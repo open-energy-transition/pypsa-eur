@@ -197,7 +197,7 @@ if not "pre-built" in PECD_DATASET["version"]:
             pecd_raw=PECD_DATASET["folder"],
         output:
             pecd_prebuilt=directory(
-                f"{PECD_DATASET["folder"]}+pre-built.{get_pecd_prebuilt_version(increment_minor=True)}"
+                f"{PECD_DATASET["folder"]}+pre-built.{get_pecd_prebuilt_version(increment_minor= True)}"
             ),
         log:
             "logs/prepare_pecd_release.log",
