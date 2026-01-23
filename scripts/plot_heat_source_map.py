@@ -46,6 +46,7 @@ data by creating empty placeholder maps.
 """
 
 import logging
+from typing import Optional
 
 import folium
 import geopandas as gpd
@@ -66,7 +67,7 @@ def plot_heat_source_map(
     longitude_name: str = "longitude",
     latitude_name: str = "latitude",
     onshore_region_name: str = "name",
-    title: str | None = None,
+    title: Optional[str] = None,
     cmap: str = "viridis",
     aggregate_type: str = "mean",  # 'mean' for temperature, 'sum' for energy
 ) -> folium.Map:

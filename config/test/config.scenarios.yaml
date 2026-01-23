@@ -12,6 +12,7 @@ run:
     enable: true
     file: "config/test/scenarios.yaml"
   disable_progressbar: true
+  shared_cutouts: true
 
 scenario:
   clusters:
