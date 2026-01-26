@@ -4607,6 +4607,11 @@
           "description": "Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel.",
           "type": "object"
         },
+        "keep_existing_capacities": {
+          "default": false,
+          "description": "Keep existing conventional carriers from the power model.",
+          "type": "boolean"
+        },
         "biomass_to_liquid": {
           "default": true,
           "description": "Add option for transforming solid biomass into liquid fuel with the same properties as oil.",
@@ -10716,6 +10721,11 @@
           },
           "description": "Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel.",
           "type": "object"
+        },
+        "keep_existing_capacities": {
+          "default": false,
+          "description": "Keep existing conventional carriers from the power model.",
+          "type": "boolean"
         },
         "biomass_to_liquid": {
           "default": true,

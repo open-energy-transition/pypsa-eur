@@ -883,6 +883,11 @@ class SectorConfig(BaseModel):
         description="Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel.",
     )
 
+    keep_existing_capacities: bool = Field(
+        False,
+        description="Keep existing conventional carriers from the power model.",
+    )
+
     biomass_to_liquid: bool = Field(
         True,
         description="Add option for transforming solid biomass into liquid fuel with the same properties as oil.",
