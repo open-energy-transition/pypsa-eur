@@ -226,8 +226,11 @@ rule collect_indicators:
 
 
 rule plot_indicators:
+    params:
+        plotting=config_provider("plotting"),
     input:
         indicators=rules.collect_indicators.output.indicators,
+        transmission_projects=rules.clean_projects.output.transmission_projects,
     output:
         plot_dir=directory(RESULTS + "cba/{cba_method}/plots_{planning_horizons}"),
     script:
