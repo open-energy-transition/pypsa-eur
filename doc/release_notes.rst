@@ -28,6 +28,8 @@ Upcoming Open-TYNDP Release
 
 * Add virtual TYNDP nodes for IT and LU to `clusted_pop_layout` to enable consistent use of its index when selecting modelled electricity nodes (https://github.com/open-energy-transition/open-tyndp/pull/360).
 
+* Feat: Set short-term storage to cyclic in CBA dispatch (https://github.com/open-energy-transition/open-tyndp/pull/385).
+
 
 **Features**
 
