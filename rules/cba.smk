@@ -234,15 +234,16 @@ rule collect_indicators:
         "../scripts/cba/collect_indicators.py"
 
 
-rule average_scenarios:
+rule average_indicators:
     input:
         indicators=lambda w: expand(
-            rules.collect_indicators.indicators,
+            rules.collect_indicators.output.indicators,
             run=config_provider("cba", "scenarios")(w),
             allow_missing=True,
         ),
     output:
-        indicators=RESULTS + "cba/{cba_method}/indicators_{planning_horizons}.csv",
+        indicators=RESULTS
+        + "cba/{cba_method}/ensemble_indicators_{planning_horizons}.csv",
     script:
         "../scripts/cba/average_indicators.py"
 
@@ -266,7 +267,7 @@ def cba_scenarios(w):
     return [
         name
         for name in config["run"]["name"]
-        if get_scenario_config(name).get("cba", {}).get("scenarios") is not None
+        if scenario_config(name).get("cba", {}).get("scenarios") is not None
     ]
 
 
