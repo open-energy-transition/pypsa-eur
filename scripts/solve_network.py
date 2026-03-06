@@ -1347,6 +1347,43 @@ def solve_network(
     kwargs["model_kwargs"] = cf_solving.get("model_kwargs", {})
     kwargs["keep_files"] = cf_solving.get("keep_files", False)
 
+    # Check if we only need to generate an LP/MPS file
+    mps_path = os.getenv("ONLY_GENERATE_PROBLEM_FILE", None)
+
+    if mps_path:
+        logger.info(f"ONLY_GENERATE_PROBLEM_FILE active: dumping MPS to: {mps_path}")
+
+        # Build minimal model: do NOT pass any solver or PyPSA kwargs
+        model = n.optimize.create_model()
+
+        # Export the model to a file (LP/MPS/etc)
+        model.to_file(mps_path)
+
+        logger.info("MPS file generation complete. Exiting without solving.")
+        return
+
+    # Remove keys unsupported by linopy.Model()
+    bad_keys = [
+        "log_fn",
+        "keep_files",
+        "assign_all_duals",
+        "io_api",
+        "solver_name",
+        "solver_options",
+        "extra_functionality",
+        "transmission_losses",
+        "linearized_unit_commitment",
+        "multi_investment_periods",
+        "rolling_horizon",
+        "skip_iterations",
+        "model_kwargs",
+    ]
+    for bad in bad_keys:
+        kwargs.pop(bad, None)
+
+    # Build and solve model normally
+    model = n.optimize.create_model(**kwargs)
+
     if kwargs["solver_name"] == "gurobi":
         logging.getLogger("gurobipy").setLevel(logging.CRITICAL)
 
