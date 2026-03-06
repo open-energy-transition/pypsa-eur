@@ -104,3 +104,6 @@ The code in PyPSA-Eur is released as free software under the
 [MIT License](https://opensource.org/licenses/MIT), see [`doc/licenses.rst`](doc/licenses.rst).
 However, different licenses and terms of use may apply to the various
 input data, see [`doc/data_sources.rst`](doc/data_sources.rst).
+
+# PyPSA benchmarks generator
+The `config` directory contains several `.yaml` files (`pypsa-eur-*.yaml`) to generate PyPSA-DE model (`countries: DE`) instances through `generate.py`. The current version of `generate.py` would only work with `--benchmark_name pypsa-eur-elec` and generate only `pypsa-eur-elec` benchmarks (all other `pypsa-eur-elec` options are commented out).  To get the desired temporal/spatial resolution, one just needs to change the defaults at lines 87 and 89 (currently set to 41 nodes and 1h). Then, run `python generate.py --benchmark_name pypsa-eur-elec --output_dir ~/pypsa-eur --file_extension .mps`
