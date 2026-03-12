@@ -128,8 +128,9 @@ rule identify_boundary_crossings:
         clustered_network=resources("networks/base_s_clustered.nc"),
         linemap=resources("linemap_base_s_clustered.csv"),
         etys_boundaries="data/gb-model/downloaded/gb-etys-boundaries.zip",
+        regions=resources("gb-model/merged_shapes.geojson"),
     output:
-        csv=resources("etys_boundary_crossings.csv"),
+        csv=resources("gb-model/etys_boundary_crossings.csv"),
     log:
         logs("identify_boundary_crossings.log"),
     script:
@@ -183,7 +184,7 @@ rule solve_constrained:
             if config["etys"]["use_future_capacities"]
             else []
         ),
-        boundary_crossings=resources("etys_boundary_crossings.csv"),
+        boundary_crossings=resources("gb-model/etys_boundary_crossings.csv"),
     output:
         network=RESULTS + "networks/{fes_scenario}/constrained_clustered/{year}.nc",
         config=RESULTS

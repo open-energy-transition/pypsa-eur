@@ -9,6 +9,11 @@
 Release Notes
 ##########################################
 
+Unreleased
+==========
+
+* Correctly align line/link flow directions when applying the boundary constraints (#259).
+
 v0.2.1 (2026-03-05)
 ===================
 
