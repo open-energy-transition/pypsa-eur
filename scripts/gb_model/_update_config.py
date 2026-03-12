@@ -155,6 +155,9 @@ class URLsConfig(GBBaseConfig):
         description="URL for European hydrogen demand data from the Clean Hydrogen Observatory",
         default="",
     )
+    dukes_fuel_prices: str = Field(
+        description="URL for historical gas prices in the UK from Dukes", default=""
+    )
 
 
 class RegionSplitConfig(GBBaseConfig):

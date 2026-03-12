@@ -86,6 +86,7 @@ rule calculate_bid_offer_multipliers:
     params:
         costs_config=config["fes_costs"],
         technology_mapping=config_provider("redispatch", "elexon", "technology_mapping"),
+        dukes_config=config["dukes-fuel-prices"],
     input:
         fes_power_costs=resources("gb-model/fes-costing/AS.1 (Power Gen).csv"),
         fes_carbon_costs=resources("gb-model/fes-costing/AS.7 (Carbon Cost).csv"),
@@ -95,6 +96,7 @@ rule calculate_bid_offer_multipliers:
             resources("gb-model/bids_and_offers/Elexon/{bod_year}.csv"),
             bod_year=config["redispatch"]["elexon"]["years"],
         ),
+        historical_fuel_price="data/gb-model/downloaded/dukes_fuel_prices.excel",
     output:
         csv=resources("gb-model/{fes_scenario}/bid_offer_multipliers.csv"),
     log:

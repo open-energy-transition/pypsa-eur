@@ -130,12 +130,18 @@ async def get_historical_bod(
     # BidOfferPairId is an indication of the bandwidth within which a BMunit can increase / decrease it's power output.
     # -ve pairId's indicate bids and +ve pairId's indicate offers
     # The bid / offer price can vary with the pairId - for simplicity an average of the prices over the pair id's is used here
-    df_bod_mean["bid"] = (
-        df_bod.query("bidOfferPairId < 0").groupby("carrier").bidPrice.mean()
+    df_bod.settlementDate = pd.to_datetime(df_bod.settlementDate)
+    df_bod_mean = (
+        df_bod.query("bidOfferPairId < 0")
+        .groupby([pd.Grouper(key="settlementDate", freq="QE"), "carrier"])["bidPrice"]
+        .mean()
     )
-    df_bod_mean["offer"] = (
-        df_bod.query("bidOfferPairId > 0").groupby("carrier").offerPrice.mean()
+    offer_price = (
+        df_bod.query("bidOfferPairId > 0")
+        .groupby([pd.Grouper(key="settlementDate", freq="QE"), "carrier"])["offerPrice"]
+        .mean()
     )
+    df_bod_mean = pd.DataFrame(df_bod_mean).join(pd.DataFrame(offer_price), how="inner")
 
     return df_bod_mean
 

@@ -320,6 +320,7 @@ urls:
   etys-chart-data: https://www.neso.energy/document/280936/download # ETYS November 2022 (uses the NOA 2022 recommendations)
   low-carbon-contracts: https://dp.lowcarboncontracts.uk/dataset/8e8ca0d5-c774-4dc8-a079-347f1c180c0f/resource/5279a55d-4996-4b1e-ba07-f411d8fd31f0/download/actual_cfd_generation_and_avoided_ghg_emissions.csv
   eur_H2_demand_today: https://observatory.clean-hydrogen.europa.eu/sites/default/files/2025-09/Hydrogen%20demand%202024%20%28Update%202025%29.xlsx # 2024 data
+  dukes_fuel_prices: https://assets.publishing.service.gov.uk/media/6942bb14501cdd438f4cf52e/table_321.xlsx
 
 target_crs: "EPSG:27700"
 
@@ -551,6 +552,25 @@ dukes-5.11:
     Technology:
       Pumped Hydro: Store
       Pumped hydro: Store
+
+dukes-fuel-prices:
+  sheet-config:
+    sheet_name: "3.2.1 (Real)"
+    usecols: "A:I"
+    skiprows: 14
+    header: 0
+  quarter_mapping:
+    "Jan to Mar": 1
+    "Apr to Jun": 2
+    "Jul to Sep": 3
+    "Oct to Dec": 4
+  column_mapping:
+    ? "Major power producers: Natural gas (pence per kWh)\n[Note 4]"
+    : "gas"
+    ? "Major power producers: Oil (pence per kWh)\n[Note 2, 3]"
+    : "oil"
+    ? "Major power producers: Coal (pence per kWh)\n[Note 1]"
+    : "coal"
 
 grid_supply_points:
   manual_mapping:

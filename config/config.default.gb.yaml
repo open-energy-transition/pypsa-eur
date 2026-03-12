@@ -1501,6 +1501,7 @@ urls:
   "etys-chart-data": ""
   "low-carbon-contracts": ""
   eur_H2_demand_today: ""
+  dukes_fuel_prices: ""
 
 # docs in https://gb-dispatch-model.readthedocs.io/en/latest/configuration.html#target_crs
 target_crs: "EPSG:27700"
