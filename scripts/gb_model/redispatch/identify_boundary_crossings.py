@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 def define_side_for_region(
-    etys_gdf: gpd.GeoDataFrame, region_gdf: gpd.GeoDataFrame
+    etys_gdf: gpd.GeoDataFrame,
+    region_gdf: gpd.GeoDataFrame,
+    buffer_mainland_m: float = 1000,
 ) -> pd.DataFrame:
     """
     Define a side for each model region relative to each ETYS boundary.
@@ -40,8 +42,17 @@ def define_side_for_region(
         That is, it indicates which side of the boundary the region is on, but not an absolute direction.
     """
     line_sides = {}
-    one_gb_gdf = region_gdf.dissolve().explode().reset_index(drop=True)
-    biggest_gb_geom = one_gb_gdf.loc[one_gb_gdf.geometry.area.idxmax()].geometry
+    # Create a buffer to get nearby islands into the same region as the mainland, using the unit of the region geometries.
+    region_units = region_gdf.crs.axis_info[0].unit_name
+    buffer = (
+        buffer_mainland_m if region_units == "metre" else buffer_mainland_m / 100000
+    )
+    one_gb_gdf = (
+        gpd.GeoSeries([region_gdf.buffer(buffer).union_all()])
+        .explode()
+        .reset_index(drop=True)
+    )
+    biggest_gb_geom = one_gb_gdf.loc[one_gb_gdf.area.idxmax()]
     region_points = region_gdf.set_index("name").representative_point().to_frame()
     for line in etys_gdf.itertuples():
         line_geom = line.geometry
@@ -163,12 +174,22 @@ if __name__ == "__main__":
     set_scenario_config(snakemake)
 
     etys_gdf = gpd.read_file(snakemake.input.etys_boundaries)
-    region_gdf = gpd.read_file(snakemake.input.regions)
+    relevant_boundaries = pd.read_csv(snakemake.input.relevant_boundaries)
+    etys_gdf = etys_gdf.query(
+        "Boundary_n in @to_keep",
+        local_dict={"to_keep": relevant_boundaries.boundary_name},
+    )
+    region_gdf = (
+        gpd.read_file(snakemake.input.regions)
+        .to_crs(etys_gdf.crs)
+        .query("country == 'GB'")
+    )
     n_base = pypsa.Network(snakemake.input.base_network)
     n_clustered = pypsa.Network(snakemake.input.clustered_network)
 
-    region_gdf = region_gdf.to_crs(etys_gdf.crs).query("country == 'GB'")
-    sides = define_side_for_region(etys_gdf, region_gdf)
+    sides = define_side_for_region(
+        etys_gdf, region_gdf, snakemake.params.buffer_mainland_m
+    )
 
     lines_gdf = (
         gpd.GeoSeries.from_wkt(n_base.lines.geometry, crs=4326)
@@ -184,7 +205,6 @@ if __name__ == "__main__":
         .to_frame()
         .to_crs(etys_gdf.crs)
     )
-    n_clustered = pypsa.Network(snakemake.input.clustered_network)
 
     link_boundary_df = links_boundaries(etys_gdf, links_gdf, n_clustered)
     all_crossings = (
@@ -203,5 +223,14 @@ if __name__ == "__main__":
     all_crossings["flow_direction"] = all_crossings.apply(
         set_flow_direction, sides=sides, n=n_clustered, axis=1
     )
+    if (zeros := all_crossings.flow_direction == 0).any():
+        logger.warning(
+            "Some lines/links are crossing unexpected boundaries based on their assigned start & end regions. "
+            "This may be caused by small branch lines, in which case you can ignore this issue. "
+            "However, it may also indicate an issue with region boundary placement.\n"
+            "Lines/links with zero flow direction across relevant boundaries:\n%s",
+            all_crossings[zeros].to_string(index=False),
+        )
+    all_crossings_cleaned = all_crossings[~zeros]
 
-    all_crossings.to_csv(snakemake.output.csv, index=False)
+    all_crossings_cleaned.to_csv(snakemake.output.csv, index=False)
