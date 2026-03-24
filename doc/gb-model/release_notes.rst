@@ -12,6 +12,7 @@ Release Notes
 Unreleased
 ==========
 
+* Fix missing lines in boundary crossings by using extended PyPSA base network for crossing identification.
 * Add option to scale boundary capabilities to reflect seasonal variations (#267).
 * Add option to subset FES scenarios to run.
 * Add FAQs to the docs (#221).
