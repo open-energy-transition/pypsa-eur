@@ -9,13 +9,18 @@
 Release Notes
 ##########################################
 
-Unreleased
-==========
+v0.2.2 (2026-03-24)
+===================
+
+This is a minor release that mostly includes workflow fixes and improved configuration validation.
+
+This version was synchronised with the upstream PyPSA-Eur repository on 2026-03-19.
 
 * Fix missing lines in boundary crossings by using extended PyPSA base network for crossing identification.
 * Add option to scale boundary capabilities to reflect seasonal variations (#267).
 * Add option to subset FES scenarios to run.
 * Add FAQs to the docs (#221).
+* Update all dependencies defined in `pixi.lock` without changing version pinning in `pixi.toml`.
 * Switch off optimisation "noisy costs" to avoid large negative contributions to the objective function value from bidirectional links.
 * Account for snapshot weighting and in redispatch version of the storage unit energy balance constraint.
 * Add data cleaning section into the docs, to describe some of our data processing steps in more detail.
