@@ -75,9 +75,15 @@ lines:
 
 
 solving:
+  oetc:
+    name: "electricity-test" # Arbitrary human readable job identifier
+    authentication_server_url: "https://oetc.openenergytransition.org"
+    orchestrator_server_url: "https://oetc.openenergytransition.org"
+    cpu_cores: 4
+    disk_space_gb: 20
   solver:
     name: highs
-    options: highs-default
+    options: highs-simplex
 
   check_objective:
     enable: false

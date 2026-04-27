@@ -60,9 +60,8 @@ Add an ``oetc`` subsection to enable cloud-based optimization:
       # ... other solving options ...
       oetc:
         name: "job-name" # Arbitrary human readable job identifier
-        authentication_server_url: "https://auth.oetc.example.com"
-        orchestrator_server_url: "https://orchestrator.oetc.example.com"
-        compute_provider: "GCP"  # Currently only GCP is supported
+        authentication_server_url: "https://oetc.openenergytransition.org"
+        orchestrator_server_url: "https://oetc.openenergytransition.org"
         cpu_cores: 4 # This also sets the amount of RAM by a factor 8
         disk_space_gb: 20
 
