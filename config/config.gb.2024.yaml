@@ -518,6 +518,7 @@ entsoe_unavailability:
     Waste: waste
 # [doc:entsoe-unavailability-config-end]
 
+# [doc:transmission-availability-config-start]
 transmission_availability:
   years: [2020, 2021, 2022, 2023, 2024]
   intra_gb:
@@ -537,6 +538,7 @@ transmission_availability:
     SPTL: 22
     SHETL: 33
     interconnectors: 44
+# [doc:transmission-availability-config-end]
 
 dukes-5.11:
   # list of major power producers
@@ -806,6 +808,7 @@ fes:
     # [doc:storage-battery-flx1-config-start]
     flexibility:
       carrier_mapping:
+        # [doc:storage-battery-flx1-config-start]
         battery:
           Data item: "Electricity storage energy storage potential"
           Detail: "Battery"
@@ -969,6 +972,7 @@ interconnectors:
   # Others are based on visual inspection of the TYNDP map.
 
   # Where the interconnection register provides a different import/export maximum, the value with one significant figure has been chosen (e.g. 1000 instead of 975, 700 instead of 730).
+  # [doc:interconnector-option-example-start]
   options:
   - name: Nemo
     neighbour: Belgium
@@ -978,6 +982,7 @@ interconnectors:
       year: [2016, 2018]
     lat: 51.31128166242589
     lon: 1.3452723677851797
+  # [doc:interconnector-option-example-end]
 
   - name: Cronos
     neighbour: Belgium
@@ -1214,6 +1219,7 @@ interconnectors:
       # https://www.nationalgrid.com/electricity-transmission/network-and-infrastructure/infrastructure-projects/creyke-beck-substation-extension
     lat: 53.81322
     lon: -0.41847
+  # [doc:interconnector-plan-start]
   plan:
     HT:
       2021: [BritNed, East-West, IFA, IFA2, NS Link (NSL), Nemo] # existing
@@ -1253,6 +1259,7 @@ interconnectors:
       2033: [NeuConnect, FAB Link] # NeuConnect could also be Aminth, Cronos, Tarchon; FAB could also be Gridlink, SENECA
       2034: [Cronos] # Could also be Aminth, NeuConnect, Tarchon
       2035: [MARES]
+  # [doc:interconnector-plan-end]
 
 
 redispatch:
