@@ -12,6 +12,7 @@ Release Notes
 Unreleased
 ==========
 
+* Add redispatch objective function penalty to mitigate unrealistic system revenue within redispatch, in which components with a favourable bid/offer spread can be offset against each other (#304).
 * Add line/link components documentation (#316).
 * Add storage components documentation (#315).
 * Add generation components documentation (#308).
