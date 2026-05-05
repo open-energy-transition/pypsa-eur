@@ -152,6 +152,9 @@ rule prepare_constrained_network:
             "redispatch", "unconstrain_lines_and_links"
         ),
         no_redispatch_carriers=config_provider("redispatch", "no_redispatch_carriers"),
+        bid_offer_multiplier_mapping=config_provider(
+            "redispatch", "bid_offer_multiplier_mapping"
+        ),
     input:
         network=resources("networks/{fes_scenario}/composed_clustered/{year}.nc"),
         unconstrained_result=RESULTS
