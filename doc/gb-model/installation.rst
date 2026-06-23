@@ -11,7 +11,7 @@ Installation
 ##########################################
 
 The subsequently described installation steps are demonstrated as shell commands.
-To use them in your shell, copy all but the initial ``$`` symbol.
+To use them in your shell, copy them individually.
 
 Clone the Repository
 ====================
@@ -20,7 +20,7 @@ First of all, clone the `gb-dispatch-model repository <https://github.com/open-e
 
 .. code:: console
 
-    $ git clone https://github.com/open-energy-transition/gb-dispatch-model.git
+    git clone https://github.com/open-energy-transition/gb-dispatch-model.git
 
 Create working environment
 ==========================
