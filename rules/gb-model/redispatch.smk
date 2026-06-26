@@ -8,7 +8,7 @@ Boundary constrained redispatch run rules.
 
 
 localrules:
-    fetch_bid_offer_data_elexon,
+    retrieve_bid_offer_data_elexon,
 
 
 rule process_CfD_strike_prices:
@@ -58,26 +58,53 @@ rule prepare_future_etys_caps:
         scripts("gb_model/redispatch/prepare_future_etys_caps.py")
 
 
-rule fetch_bid_offer_data_elexon:
+rule retrieve_bid_offer_data_elexon:
     message:
         "Get bid/offer data from Elexon"
     params:
-        technology_mapping=config_provider("redispatch", "elexon", "technology_mapping"),
-        api_bmu_fuel_map=config_provider("redispatch", "elexon", "api_bmu_fuel_map"),
         max_concurrent_requests=config_provider(
             "redispatch", "elexon", "max_concurrent_requests"
         ),
-    input:
-        bmu_fuel_map_path="data/gb-model/BMUFuelType.xlsx",
     output:
-        csv=resources("gb-model/bids_and_offers/Elexon/{bod_year}.csv"),
+        csv="data/gb-model/Elexon/{bod_year}.csv",
     resources:
         # Used to avoid the same rule running simultaneously (and exceeding max concurrent requests).
         parallel_elexon_download=1,
     log:
-        logs("fetch_bid_offer_data_elexon_{bod_year}.log"),
+        logs("retrieve_bid_offer_data_elexon_{bod_year}.log"),
     script:
-        scripts("gb_model/redispatch/fetch_bid_offer_data_elexon.py")
+        scripts("gb_model/redispatch/retrieve_bid_offer_data_elexon.py")
+
+
+rule retrieve_elexon_bm_units:
+    message:
+        "Retrieve Balancing mechanism units from Elexon"
+    params:
+        api_bmu_fuel_map=config_provider("redispatch", "elexon", "api_bmu_fuel_map"),
+    input:
+        bmu_fuel_map_path="data/gb-model/BMUFuelType.xlsx",
+    output:
+        csv="data/gb-model/Elexon/bm_units.csv",
+    log:
+        logs("fetch_elexon_bm_units.log"),
+    script:
+        scripts("gb_model/redispatch/retrieve_elexon_bm_units.py")
+
+
+rule map_carrier_bm_units:
+    message:
+        "Map carrier to the Elexon BM units"
+    params:
+        technology_mapping=config_provider("redispatch", "elexon", "technology_mapping"),
+    input:
+        bm_units_path="data/gb-model/Elexon/bm_units.csv",
+        bod_path="data/gb-model/Elexon/{bod_year}.csv",
+    output:
+        csv=resources("gb-model/Elexon/{bod_year}.csv"),
+    log:
+        logs("map_carrier_bm_units_{bod_year}.log"),
+    script:
+        scripts("gb_model/redispatch/map_carrier_bm_units.py")
 
 
 rule calculate_bid_offer_multipliers:
@@ -94,7 +121,7 @@ rule calculate_bid_offer_multipliers:
         fes_carbon_costs=resources("gb-model/fes-costing/AS.7 (Carbon Cost).csv"),
         powerplants=resources("gb-model/{fes_scenario}/fes_powerplants.csv"),
         bid_offer_data=expand(
-            resources("gb-model/bids_and_offers/Elexon/{bod_year}.csv"),
+            resources("gb-model/Elexon/{bod_year}.csv"),
             bod_year=config["redispatch"]["elexon"]["years"],
         ),
         historical_fuel_price="data/gb-model/downloaded/dukes_fuel_prices.xlsx",
