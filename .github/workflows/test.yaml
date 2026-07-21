@@ -27,7 +27,7 @@ jobs:
         shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v7.0.0
+    - uses: actions/checkout@v7.0.1
 
     - name: Setup Pixi
       uses: prefix-dev/setup-pixi@v0.10.0
@@ -54,7 +54,7 @@ jobs:
         shell: bash -l {0}
 
     steps:
-    - uses: actions/checkout@v7.0.0
+    - uses: actions/checkout@v7.0.1
 
     - uses: dorny/paths-filter@v4
       id: filter
