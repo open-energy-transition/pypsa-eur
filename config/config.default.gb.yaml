@@ -1569,8 +1569,8 @@ transmission_availability:
     sample_hourly: true
   random_seeds: {}
 
-# docs in https://gb-dispatch-model.readthedocs.io/en/latest/configuration.html#dukes_5.11
-"dukes-5.11":
+# docs in https://gb-dispatch-model.readthedocs.io/en/latest/configuration.html#dukes_power_producers
+"dukes-power-producers":
   "sheet-config":
     sheet_name: ""
     usecols: ""

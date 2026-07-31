@@ -262,7 +262,7 @@
 
     If you want to modify a gb-dispatch-model dataset, referenced under the `urls` key in the configuration, you can provide a new URL.
     However, you should be aware that other configuration options may need to be updated to process this new entry into the correct format.
-    For instance, a new DUKES table 5.11 dataset may need a different set of options passed to the CSV reader to capture the data in the sheet of interest (under `dukes-5.11.sheet-config` configuration option).
+    For instance, a new DUKES table 5.11 dataset may need a different set of options passed to the CSV reader to capture the data in the sheet of interest (under `dukes-power-producers.sheet-config` configuration option).
 
 ## Results & Output
 

@@ -126,9 +126,9 @@ def define_env(env):
         return _cache[source]
 
     @env.macro
-    def schema_table(path):
+    def schema_table(path, source: str = "schema.default.json"):
         """Render the config schema at ``path`` as a Property/Type/Default/Description table."""
-        node = _schema()
+        node = _schema(source)
         for part in path.split("."):
             node = node["properties"][part]
         props = node.get("properties", {})

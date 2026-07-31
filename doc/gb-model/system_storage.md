@@ -66,7 +66,7 @@ Compressed/liquid air storage is defined as an "other" building block and is dis
 
 The **Digest of UK Energy Statistics (DUKES) table 5.11** provides current PHS installed capacity and is used to anchor the spatial distribution of PHS plant where FES provides only Transmission Operator (TO) level data.
 
-Carrier assignment from DUKES uses the `dukes-5.11.carrier_mapping` configuration section.
+Carrier assignment from DUKES uses the `dukes-power-producers.carrier_mapping` configuration section.
 
 ### FES ES2 — European Capacity Data
 

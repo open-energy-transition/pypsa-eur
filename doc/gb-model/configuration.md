@@ -124,14 +124,14 @@ Target coordinate reference system (e.g., `EPSG:27700`).
 {{ yaml_section("transmission_availability", source="config.default.gb.yaml") }}
 ```
 
-## `dukes-5.11` {#dukes_5_11_cf}
+## `dukes-power-producers` {#dukes_power_producers_cf}
 
-{{ schema_table("dukes-5.11", source="schema.default.gb.json") }}
+{{ schema_table("dukes-power-producers", source="schema.default.gb.json") }}
 
 **YAML Syntax**
 
 ```yaml
-{{ yaml_section("dukes-5.11", source="config.default.gb.yaml") }}
+{{ yaml_section("dukes-power-producers", source="config.default.gb.yaml") }}
 ```
 
 ## `grid_supply_points` {#grid_supply_points_cf}

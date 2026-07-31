@@ -522,7 +522,7 @@ transmission_availability:
     interconnectors: 44
 # [doc:transmission-availability-config-end]
 
-dukes-5.11:
+dukes-power-producers:
   # list of major power producers
   sheet-config:
     sheet_name: "DUKES 2023" # compromise sheet as it has both coal and pumped hydro data

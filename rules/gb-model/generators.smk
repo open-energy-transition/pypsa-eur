@@ -37,7 +37,7 @@ rule generator_monthly_availability_fraction:
         start_date=config["entsoe_unavailability"]["start_date"],
         end_date=config["entsoe_unavailability"]["end_date"],
         max_unavailable_days=config["entsoe_unavailability"]["max_unavailable_days"],
-        dukes_config=config["dukes-5.11"],
+        dukes_config=config["dukes-power-producers"],
         default_set=config["fes"]["default_set"],
     message:
         "Combine outage data with DUKES current technology capacities to get monthly outage fractions per carrier"
@@ -57,7 +57,7 @@ rule create_powerplants_table:
     params:
         gb_config=config["fes"]["gb"]["generators_and_storage"],
         eur_config=config["fes"]["eur"]["generators_and_storage"],
-        dukes_config=config["dukes-5.11"],
+        dukes_config=config["dukes-power-producers"],
         default_set=config["fes"]["default_set"],
     message:
         "Tabulate powerplant data GSP-wise from FES workbook sheet BB1 and EU supply data"

@@ -68,7 +68,7 @@ It is used to:
 1. Anchor the spatial distribution of generators where FES does not provide GSP-level data, only Transmission Operator (TO) level data.
 2. Provide current-year capacity baselines that are blended with FES future projections for the distribution step
 
-Carrier assignment from DUKES uses the `dukes-5.11.carrier_mapping` and `dukes-5.11.set_mapping` configuration sections.
+Carrier assignment from DUKES uses the `dukes-power-producers.carrier_mapping` and `dukes-power-producers.set_mapping` configuration sections.
 
 ### ENTSO-E Transparency Platform — Outage Data
 

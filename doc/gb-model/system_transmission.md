@@ -213,7 +213,7 @@ Unavailability is averaged across all projects and report years to produce a sin
 
     - [Dispatch and Redispatch Modelling](system_dispatch_redispatch.md) - Network constraints and redispatch using transmission capacity
     - [Generation Components](system_generators.md) - Generation assets connected to the same AC buses
-    - [Configuration](configuration.md#model_config_gb) - Full configuration reference
+    - [Configuration](./configuration.md#model_config_gb) - Full configuration reference
 
     **External Resources**:
 

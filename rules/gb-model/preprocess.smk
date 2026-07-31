@@ -133,7 +133,7 @@ rule process_dukes_current_capacities:
     log:
         logs("process_dukes_current_capacities.log"),
     params:
-        sheet_config=config["dukes-5.11"]["sheet-config"],
+        sheet_config=config["dukes-power-producers"]["sheet-config"],
         target_crs=config["target_crs"],
     message:
         "Assign current capacities to GB model regions and PyPSA-Eur carriers"
