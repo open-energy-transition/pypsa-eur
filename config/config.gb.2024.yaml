@@ -91,6 +91,12 @@ clustering:
     to_substations: false
     remove_stubs: false
     remove_stubs_across_borders: false
+  cluster_network:
+    # GB's custom busmap intentionally merges offshore wind stub buses (DC) into
+    # their nearest onshore region (AC) - see doc/gb-model/data_cleaning.md.
+    # Splitting those merged clusters by carrier breaks the shared bus-name
+    # index between regions_onshore_base_s_*.geojson and regions_offshore_base_s_*.geojson.
+    allow_ac_dc_mixing_in_bus_clusters: true
 
 # see https://docs.pypsa.org/latest/api/networks/cluster/#pypsa.Network.cluster.temporal for options
 time_aggregation: []
@@ -244,7 +250,8 @@ low_carbon_register:
 solving:
   options:
     clip_p_max_pu: 1.e-2
-    load_shedding: false
+    load_shedding:
+      enable: false
     curtailment_mode: false
     noisy_costs: false
     skip_iterations: true
@@ -515,7 +522,7 @@ transmission_availability:
     interconnectors: 44
 # [doc:transmission-availability-config-end]
 
-dukes-5.11:
+dukes-power-producers:
   # list of major power producers
   sheet-config:
     sheet_name: "DUKES 2023" # compromise sheet as it has both coal and pumped hydro data

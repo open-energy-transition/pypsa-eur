@@ -144,7 +144,9 @@ class URLsConfig(GBBaseConfig):
         default="",
     )
     dukes_5_11: str = Field(
-        alias="dukes-5.11", description="URL for DUKES 5.11 data", default=""
+        alias="dukes-5.11",
+        description="URL for DUKES major power producers data (table 5.11)",
+        default="",
     )
     gsp_coordinates: str = Field(
         alias="gsp-coordinates", description="URL for GSP coordinates", default=""
@@ -922,11 +924,11 @@ class GBConfigUpdater(ConfigUpdater):
             "etys": ETYSConfig,
             "entsoe_unavailability": EntsoeUnavailabilityConfig,
             "transmission_availability": TransmissionAvailabilityConfig,
-            "dukes_5_11": (
+            "dukes_power_producers": (
                 DukesConfig,
                 Field(
-                    alias="dukes-5.11",
-                    description="DUKES 5.11 data configuration",
+                    alias="dukes-power-producers",
+                    description="DUKES Major Power Producers (table 5.11) data configuration",
                     default_factory=DukesConfig,
                 ),
             ),
