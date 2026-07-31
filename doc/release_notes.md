@@ -37,6 +37,8 @@
 
 **Bugfixes and Compatibility**
 
+* Fix: split project-level cost and length evenly across lines for multi-link transmission projects, avoiding inflated values ([#793](https://github.com/open-energy-transition/open-tyndp/pull/793)).
+
 * Use `overnight` foresight in MSV network preparation instead of `perfect` ([#813](https://github.com/open-energy-transition/open-tyndp/pull/813)).
   
 * Rename bus for `t339` project (Tyrrhenian) from ITSI to ITVI ([#751](https://github.com/open-energy-transition/open-tyndp/pull/751)).
@@ -93,9 +95,13 @@
 ## Upcoming PyPSA-Eur Release
 
 * fix: update stale contribution docs (linting and formatting ruff)
+
 * feat: data version CSV / YAML file can be specified separately or extended by the user in the `data.version_files` config entry ([#2016](https://github.com/PyPSA/pypsa-eur/issues/2016)).
+
 * Fix: Resolve plotting crashes from missing `tech_colors` entries by adding `heat dsm` color and implementing upfront validation for missing keys in `plot_summary.py` ([#2108](https://github.com/PyPSA/pypsa-eur/issues/2108)).
+
 * Fix: Retry interrupted WDPA and WDPA-marine downloads ([#2138](https://github.com/PyPSA/pypsa-eur/issues/2138)).
+
 * feat: Make the default target rule configurable (defaults to "all" for backwards compatibility)
 
 * Fix: Keep unset `p_set` (NaN) as NaN when aggregating components in `cluster_heat_buses`, required for [PyPSA#1703](https://github.com/PyPSA/PyPSA/pull/1703).
