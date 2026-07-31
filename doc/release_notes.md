@@ -87,6 +87,8 @@
 
 * Reduce dependency on upstream retrieves ([#798](https://github.com/open-energy-transition/open-tyndp/pull/798)).
 
+* Sort functions in `clean_projects` into a logical order ([#803](https://github.com/open-energy-transition/open-tyndp/pull/803)).
+
 
 ## Upcoming PyPSA-Eur Release
 
