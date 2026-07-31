@@ -85,8 +85,6 @@ def _resolve(data, path):
     return node
 
 
-<<<<<<< HEAD
-=======
 def _split_path(node, path, children_of):
     """
     Split a dotted ``path`` into keys, preferring the longest literal key match at
@@ -113,7 +111,6 @@ def _split_path(node, path, children_of):
     return parts
 
 
->>>>>>> daf84bac ([pre-commit.ci] auto fixes from pre-commit.com hooks)
 def define_env(env):
     _cache = {}
 
@@ -144,8 +141,6 @@ def define_env(env):
         return header + "\n" + "\n".join(_schema_rows(props))
 
     @env.macro
-<<<<<<< HEAD
-=======
     def yaml_snippet(source, start, end, prepend=None):
         """
         Return the raw text of ``source`` between the lines containing ``start`` and
@@ -162,21 +157,16 @@ def define_env(env):
         return f"{prepend}\n{body}" if prepend else body
 
     @env.macro
->>>>>>> daf84bac ([pre-commit.ci] auto fixes from pre-commit.com hooks)
     def yaml_section(*paths, source="config", with_key=True):
         data = _load(source)
 
         if not paths:
             return _dump(data)
 
-<<<<<<< HEAD
-        parts_list = [p.split(".") for p in paths]
-=======
         parts_list = [
             _split_path(data, p, lambda n: n if isinstance(n, dict) else {})
             for p in paths
         ]
->>>>>>> daf84bac ([pre-commit.ci] auto fixes from pre-commit.com hooks)
 
         if len(paths) == 1:
             parts = parts_list[0]
