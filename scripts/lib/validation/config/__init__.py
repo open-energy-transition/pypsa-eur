@@ -62,7 +62,9 @@ def generate_config_defaults(path: str = "config/config.{configname}.yaml") -> d
     def str_representer(dumper, data):
         """Use block style for multiline, quotes for special chars, plain otherwise."""
         TAG = "tag:yaml.org,2002:str"
-        data = str(data)  # Ensure it's a plain string (not e.g. Path)
+        # as_posix() keeps generated output deterministic across OSes; str() on a
+        # Path renders with the native separator (e.g. backslashes on Windows).
+        data = data.as_posix() if isinstance(data, pathlib.PurePath) else str(data)
         if "\n" in data:
             return dumper.represent_scalar(TAG, data, style="|")
         if data == "" or any(c in data for c in ":{}[]&*#?|-<>=!%@"):
