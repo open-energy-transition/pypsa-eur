@@ -91,6 +91,8 @@
 
 * Sort functions in `clean_projects` into a logical order ([#803](https://github.com/open-energy-transition/open-tyndp/pull/803)).
 
+* Apply minor fixes to CBA MSV rule definition related to resources for remote execution ([#827](https://github.com/open-energy-transition/open-tyndp/pull/827)).
+
 
 ## Upcoming PyPSA-Eur Release
 
