@@ -61,6 +61,8 @@
 
 * Bump `cryptography` to 50.0.0 to fix a Bleichenbacher oracle in PKCS#7 decryption ([CVE-2026-69247](https://advisories.gitlab.com/pypi/cryptography/CVE-2026-69247/), [#833](https://github.com/open-energy-transition/open-tyndp/pull/833)).
 
+* Fix pandas version (allowed versions >= 2.1 and < 3) ([#829](https://github.com/open-energy-transition/open-tyndp/pull/829)).
+
 **Documentation**
 
 * Update benchmarking documentation tables and figures for v0.7.1 ([#711](https://github.com/open-energy-transition/open-tyndp/pull/711)).
