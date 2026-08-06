@@ -13,12 +13,22 @@ when no capacity is reported in either direction.
 
 Storage project extraction is not yet implemented and returns an empty DataFrame.
 
+Custom PINT transmission projects can be configured using `data/custom_cba_transmission_projects.csv`. With it,
+the user can modify existing projects and add new ones. Transmission capacities are in MW.
+
+- Using an existing PINT combination (`project_id`, `bus0`, `bus1`), the user can overwrite any
+  field of an existing project with a custom value. Not all fields need to be specified; leaving
+  a field empty keeps its existing value.
+
+- New projects must use a new `project_id` and are added as PINT links.
+
 **Inputs**
 
 - `data/tyndp_2024_bundle/cba_projects/20250312_export_transmission.xlsx`: Excel file containing CBA transmission projects
 - `data/tyndp_2024_bundle/cba_projects/20250312_export_storage.xlsx`: Excel file containing CBA storage projects (not yet processed)
 - `rules.retrieve_tyndp.output.nodes`: TYNDP electricity node list used to validate borders
 - `rules.retrieve_cba_guidelines_reference_projects.output.file`: Table of projects as defined in the Implementation Guidelines Appendix B.1
+- `data/custom_cba_transmission_projects.csv`: File used to configure custom transmission projects. With it, the user can modify existing projects and add new ones.
 
 **Outputs**
 
@@ -65,8 +75,100 @@ OFFSHORE_ELEMENT_TYPES = {
 }
 
 
+def read_tyndp_electricity_buses(buses_fn: str) -> pd.Index:
+    """
+    Read node list for electricity from tyndp data input.
+
+    Parameters
+    ----------
+    buses_fn : str
+        Path to "LIST OF NODES.xlsx" from the TYNDP bundle.
+
+    Returns
+    -------
+    pd.Index
+        Index of electricity buses as used in Open-TYNDP.
+
+    See Also
+    --------
+    build_tyndp_network.build_buses
+    """
+    buses = pd.Index(
+        pd.read_excel(buses_fn)
+        .replace("UK", "GB", regex=True)
+        .rename({"NODE": "bus_id"}, axis=1)["bus_id"]
+    )
+
+    # Manually add Italian virtual nodes and Corsica
+    buses = buses.union(["ITCO", "ITVI", "FR15"])
+
+    return buses
+
+
+def remove_unclear_border(
+    projects: pd.DataFrame, existing_buses: pd.Index
+) -> pd.DataFrame:
+    """
+    Remove projects defined by unclear borders from the list of projects.
+
+    Parameters
+    ----------
+    projects : pd.DataFrame
+        List of projects to assess.
+    existing_buses : pd.Index
+        List of existing buses.
+
+    Returns
+    -------
+    pd.DataFrame
+        Curated list of projects that only use existing buses.
+    """
+    unclear_border = ~(
+        projects["bus0"].isin(existing_buses) & projects["bus1"].isin(existing_buses)
+    )
+    if unclear_border.sum() > 0:
+        logger.warning(
+            "%d out of %d extensions do not follow the simple <bus0>-<bus1> format or are not defined in the base network, ignoring them:\n%s",
+            unclear_border.sum(),
+            len(unclear_border),
+            projects.loc[
+                unclear_border, ["project_id", "project_name", "border"]
+            ].to_string(index=False, max_colwidth=40, line_width=100),
+        )
+
+    return projects.loc[~unclear_border]
+
+
+def remove_no_capacity(projects: pd.DataFrame) -> pd.DataFrame:
+    """
+    Remove projects with no capacity from the list of projects.
+
+    Parameters
+    ----------
+    projects : pd.DataFrame
+        List of projects to clean.
+
+    Returns
+    -------
+    pd.DataFrame
+        Curated list of projects with a defined capacity.
+    """
+    empty_capacity = projects["p_nom 0->1"].isna() & projects["p_nom 1->0"].isna()
+    if empty_capacity.sum() > 0:
+        logger.warning(
+            "%d out of %d extensions have no capacity, ignoring them:\n%s",
+            empty_capacity.sum(),
+            len(empty_capacity),
+            projects.loc[
+                empty_capacity, ["project_id", "project_name", "border"]
+            ].to_string(index=False, max_colwidth=40, line_width=100),
+        )
+
+    return projects.loc[~empty_capacity]
+
+
 def extract_transmission_projects(
-    excel_path: Path, existing_buses: pd.Index
+    transmission_path: Path, existing_buses: pd.Index
 ) -> pd.DataFrame:
     """
     Read and clean the transmission projects from the "Trans.Projects" sheet.
@@ -77,7 +179,7 @@ def extract_transmission_projects(
 
     Parameters
     ----------
-    excel_path : Path
+    transmission_path : Path
         Path to the Excel export defining the transmission projects.
     existing_buses : pd.Index
         Electricity buses as used in Open-TYNDP.
@@ -89,7 +191,7 @@ def extract_transmission_projects(
     """
     projects = (
         pd.read_excel(
-            excel_path,
+            transmission_path,
             sheet_name="Trans.Projects",
             skiprows=1,
             usecols=list(TRANSMISSION_PROJECTS_COLUMN_MAP),
@@ -129,29 +231,9 @@ def extract_transmission_projects(
         }
     )
 
-    unclear_border = ~(
-        projects["bus0"].isin(existing_buses) & projects["bus1"].isin(existing_buses)
-    )
-    logger.warning(
-        "%d out of %d extensions do not follow the simple <bus0>-<bus1> format or are not defined in the base network, ignoring them:\n%s",
-        unclear_border.sum(),
-        len(unclear_border),
-        projects.loc[
-            unclear_border, ["project_id", "project_name", "border"]
-        ].to_string(index=False, max_colwidth=40, line_width=100),
-    )
-
-    empty_capacity = projects["p_nom 0->1"].isna() & projects["p_nom 1->0"].isna()
-    logger.warning(
-        "%d out of %d extensions have no capacity, ignoring them:\n%s",
-        empty_capacity.sum(),
-        len(empty_capacity),
-        projects.loc[
-            empty_capacity, ["project_id", "project_name", "border"]
-        ].to_string(index=False, max_colwidth=40, line_width=100),
-    )
-
-    projects = projects.loc[~(empty_capacity | unclear_border)]
+    # Clean the project list by removing projects with unclear borders or no capacity
+    projects = remove_unclear_border(projects, existing_buses)
+    projects = remove_no_capacity(projects)
 
     # Several projects have capacities with "Up to ..."
     up_to_projects = set()
@@ -167,6 +249,66 @@ def extract_transmission_projects(
         )
 
     return projects
+
+
+def extract_custom_transmission_projects(
+    custom_transmission_path: Path, existing_buses: pd.Index
+) -> pd.DataFrame:
+    """
+    Extract custom transmission projects.
+
+    Parameters
+    ----------
+    custom_transmission_path : Path
+        File path to custom transmission projects.
+    existing_buses : pd.Index
+        List of existing buses.
+
+    Returns
+    -------
+    pd.DataFrame
+        Curated list of custom projects.
+    """
+    custom_transmission_projects = (
+        pd.read_csv(
+            custom_transmission_path,
+        )
+        .assign(border=lambda df: df.bus0 + "-" + df.bus1)
+        .drop(["source", "further description"], axis=1, errors="ignore")
+    )
+
+    # Remove unclear borders
+    custom_transmission_projects = remove_unclear_border(
+        custom_transmission_projects, existing_buses
+    )
+
+    # Remove projects without capacity
+    custom_transmission_projects = remove_no_capacity(custom_transmission_projects)
+
+    # Remove projects without project_id
+    mask_null = custom_transmission_projects.project_id.notnull()
+    null_projects = custom_transmission_projects[~mask_null]
+    if not null_projects.empty:
+        logger.warning(
+            f"Some custom projects have no project_id (mandatory field), ignoring them:\n{null_projects.to_string(index=False)}"
+        )
+    custom_transmission_projects = custom_transmission_projects[mask_null]
+    custom_transmission_projects["project_id"] = custom_transmission_projects[
+        "project_id"
+    ].astype(int)
+
+    # Remove projects with two identical buses
+    mask_dup_buses = (
+        custom_transmission_projects.bus0 != custom_transmission_projects.bus1
+    )
+    dup_projects = custom_transmission_projects[~mask_dup_buses]
+    if not dup_projects.empty:
+        logger.warning(
+            f"Some custom projects have identical bus0 and bus1, ignoring them:\n{dup_projects.to_string(index=False)}"
+        )
+    custom_transmission_projects = custom_transmission_projects[mask_dup_buses]
+
+    return custom_transmission_projects
 
 
 def extract_investment_attributes(excel_path: Path) -> pd.DataFrame:
@@ -218,129 +360,6 @@ def extract_investment_attributes(excel_path: Path) -> pd.DataFrame:
     return agg
 
 
-def extract_storage_projects(
-    excel_path: Path, existing_buses: pd.Index
-) -> pd.DataFrame:
-    """
-    Stub method to extract storage projects.
-
-    Returns an empty DataFrame with the expected column structure.
-    TODO: Implement actual storage project extraction from Excel file.
-    """
-    logger.info(
-        "Storage project extraction not yet implemented, returning empty DataFrame"
-    )
-    return pd.DataFrame(columns=["project_id", "project_name"])
-
-
-def normalize_yes_no(value: str) -> str:
-    return str(value).strip().lower()
-
-
-def compute_method(flag: str) -> str:
-    return "TOOT" if flag == "yes" else "PINT"
-
-
-def build_method_assignments(
-    guidelines: pd.DataFrame, projects: pd.DataFrame
-) -> pd.DataFrame:
-    """
-    Define the assignment method of the project. Can be TOOT (Take Out One at a Time) or PINT (Put IN one at a Time).
-    Leverage the Implementation Guidelines to define the method.
-
-    Parameters
-    ----------
-    guidelines : pd.DataFrame
-        Table of projects as defined in the Implementation Guidelines Appendix B.1.
-    projects: pd.DataFrame
-        List of projects with their detailed characteristics.
-
-    Returns
-    -------
-    pd.DataFrame
-        Table defining the assignment method of each project.
-    """
-    guidelines = guidelines.rename(
-        columns={
-            "ID": "project_id",
-            "Project_name": "project_name",
-            "In_ref_grid_2030": "in_ref_2030",
-            "In_ref_grid_2040": "in_ref_2040",
-        }
-    )
-
-    for col in ["in_ref_2030", "in_ref_2040"]:
-        if col in guidelines.columns:
-            guidelines[col] = guidelines[col].map(normalize_yes_no)
-
-    base = guidelines[["project_id", "project_name", "in_ref_2030", "in_ref_2040"]]
-    base = base.dropna(subset=["project_id"])
-
-    agg = base.groupby("project_id", as_index=False).agg(
-        project_name=("project_name", "first"),
-        in_ref_2030=("in_ref_2030", lambda s: "yes" if (s == "yes").any() else "no"),
-        in_ref_2040=("in_ref_2040", lambda s: "yes" if (s == "yes").any() else "no"),
-    )
-
-    all_project_ids = projects["project_id"].unique()
-    assigned = []
-    for horizon, col in [(2030, "in_ref_2030"), (2040, "in_ref_2040")]:
-        rows = agg[["project_id", "in_ref_2030", "in_ref_2040"]].copy()
-        rows["planning_horizon"] = horizon
-        rows["method"] = rows[col].map(compute_method)
-        rows = rows.rename(
-            columns={
-                "in_ref_2030": "in_ref_grid_2030",
-                "in_ref_2040": "in_ref_grid_2040",
-            }
-        )
-
-        missing_ids = set(all_project_ids) - set(rows["project_id"])
-        if missing_ids:
-            missing_rows = pd.DataFrame(
-                {
-                    "project_id": list(missing_ids),
-                    "in_ref_grid_2030": "no",
-                    "in_ref_grid_2040": "no",
-                    "planning_horizon": horizon,
-                    "method": "PINT",
-                }
-            )
-            rows = pd.concat([rows, missing_rows], ignore_index=True)
-        assigned.append(rows)
-
-    assigned = pd.concat(assigned, ignore_index=True)
-    return projects.merge(assigned, on="project_id", how="left")
-
-
-def read_tyndp_electricity_buses(buses_fn: str):
-    """
-    Read node list for electricity from tyndp data input.
-
-    Parameters
-    ----------
-        - buses_fn (str): Path to "LIST OF NODES.xlsx" from tyndp bundle
-
-    Returns
-    -------
-        - buses: Index of electricity buses as used in Open-TYNDP
-
-    See Also
-    --------
-        build_tyndp_network.py : build_buses
-    """
-    buses = pd.Index(
-        pd.read_excel(buses_fn)
-        .replace("UK", "GB", regex=True)
-        .rename({"NODE": "bus_id"}, axis=1)["bus_id"]
-    )
-
-    # Manually add Italian virtual nodes
-    buses = buses.union(["ITCO", "ITVI"])
-
-    return buses
-
-
 def split_investment_attributes_per_line(
     investment_attrs: pd.DataFrame, transmission_projects: pd.DataFrame
 ) -> pd.DataFrame:
@@ -371,6 +390,183 @@ def split_investment_attributes_per_line(
     )
 
 
+def extract_storage_projects(
+    excel_path: Path, existing_buses: pd.Index
+) -> pd.DataFrame:
+    """
+    Stub method to extract storage projects.
+
+    Returns an empty DataFrame with the expected column structure.
+    TODO: Implement actual storage project extraction from Excel file.
+    """
+    logger.info(
+        "Storage project extraction not yet implemented, returning empty DataFrame"
+    )
+    return pd.DataFrame(columns=["project_id", "project_name"])
+
+
+def normalize_yes_no(value: str) -> str:
+    return str(value).strip().lower()
+
+
+def compute_method(flag: str) -> str:
+    return "toot" if flag == "yes" else "pint"
+
+
+def build_method_assignments(
+    guidelines_fn: str,
+    projects: pd.DataFrame,
+    custom_transmission_projects: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Determine the CBA assessment method for each project. The method is PINT (default) or TOOT and
+    depends on the planning horizon (2030 or 2040).
+
+    Parameters
+    ----------
+    guidelines_fn : str
+        Path to the table of projects as defined in the Implementation Guidelines Appendix B.1.
+    projects: pd.DataFrame
+        List of projects with their detailed characteristics.
+    custom_transmission_projects: pd.DataFrame
+        List of custom projects with their detailed characteristics.
+
+    Returns
+    -------
+    pd.DataFrame
+        Table defining the assignment method of each project.
+    """
+    guidelines = pd.read_csv(guidelines_fn).rename(
+        columns={
+            "ID": "project_id",
+            "Project_name": "project_name",
+            "In_ref_grid_2030": "in_ref_2030",
+            "In_ref_grid_2040": "in_ref_2040",
+        }
+    )
+
+    for col in ["in_ref_2030", "in_ref_2040"]:
+        if col in guidelines.columns:
+            guidelines[col] = guidelines[col].map(normalize_yes_no)
+
+    base = guidelines[["project_id", "project_name", "in_ref_2030", "in_ref_2040"]]
+    base = base.dropna(subset=["project_id"])
+
+    agg = base.groupby("project_id", as_index=False).agg(
+        project_name=("project_name", "first"),
+        in_ref_2030=("in_ref_2030", lambda s: "yes" if (s == "yes").any() else "no"),
+        in_ref_2040=("in_ref_2040", lambda s: "yes" if (s == "yes").any() else "no"),
+    )
+
+    all_project_ids = set(projects["project_id"]).union(
+        set(custom_transmission_projects["project_id"])
+    )
+    assigned = []
+    for horizon, col in [(2030, "in_ref_2030"), (2040, "in_ref_2040")]:
+        rows = agg[["project_id", "in_ref_2030", "in_ref_2040"]].copy()
+        rows["planning_horizon"] = horizon
+        rows["method"] = rows[col].map(compute_method)
+        rows = rows.rename(
+            columns={
+                "in_ref_2030": "in_ref_grid_2030",
+                "in_ref_2040": "in_ref_grid_2040",
+            }
+        )
+
+        missing_ids = all_project_ids - set(rows["project_id"])
+        if missing_ids:
+            missing_rows = pd.DataFrame(
+                {
+                    "project_id": list(missing_ids),
+                    "in_ref_grid_2030": "no",
+                    "in_ref_grid_2040": "no",
+                    "planning_horizon": horizon,
+                    "method": "pint",
+                }
+            )
+            rows = pd.concat([rows, missing_rows], ignore_index=True)
+        assigned.append(rows)
+
+    assigned = pd.concat(assigned, ignore_index=True).query(
+        "project_id in @projects.project_id or project_id in @custom_transmission_projects.project_id"
+    )
+    return assigned
+
+
+def apply_custom_projects(
+    projects: pd.DataFrame, custom_projects: pd.DataFrame, methods: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Apply custom PINT project modifications to a list of projects.
+
+    Parameters
+    ----------
+    projects : pd.DataFrame
+        Base list of projects.
+    custom_projects : pd.DataFrame
+        Custom project modifications.
+    methods : pd.DataFrame
+        DataFrame of projects with the corresponding method to apply.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated list of projects with custom project modifications applied (if applicable).
+    """
+
+    # Validate inputs
+    if custom_projects.empty:
+        return projects
+
+    idx = ["project_id", "bus0", "bus1"]
+
+    mask_toot = custom_projects["project_id"].isin(
+        methods.query("method=='toot'").project_id
+    )
+    custom_toot = custom_projects[mask_toot]
+    custom_projects = custom_projects[~mask_toot]
+    if not custom_toot.empty:
+        logger.warning(
+            f"Custom projects must refer to PINT projects. The following rows are ignored "
+            f"because they refer to TOOT projects in at least one planning horizon:\n"
+            f"{custom_toot[idx].to_string(index=False)}"
+        )
+
+    def set_valid_index(df: pd.DataFrame, is_custom: bool) -> pd.DataFrame:
+        try:
+            return df.set_index(idx, verify_integrity=True).sort_index()
+        except ValueError as e:
+            malformed = df.loc[df[idx].duplicated(), idx].to_string(index=False)
+            label = "Custom projects" if is_custom else "Projects"
+            raise ValueError(
+                f"{label} must define a unique set of project_id, bus0 and bus1, but the "
+                f"following rows have duplicated keys:\n{malformed}"
+            ) from e
+
+    custom_projects = set_valid_index(custom_projects, is_custom=True)
+    projects = set_valid_index(projects, is_custom=False)
+
+    # Identify existing and new projects
+    new_projects = custom_projects.index.difference(projects.index)
+    existing_projects = custom_projects.index.intersection(projects.index)
+
+    # Fill missing values using existing projects
+    custom_projects = custom_projects.reindex(columns=projects.columns).fillna(projects)
+    custom_projects["is_crossborder"] = (
+        custom_projects["is_crossborder"].fillna(True).astype(bool)
+    )
+    custom_projects = custom_projects.fillna(0).infer_objects(copy=False)
+
+    # Overwrite unique pairs of (project_id, bus0, bus1)
+    projects.loc[existing_projects] = custom_projects.loc[existing_projects]
+
+    # Add projects that don't already exist
+    if len(new_projects) > 0:
+        projects = pd.concat([projects, custom_projects.loc[new_projects]])
+
+    return projects.reset_index()
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -382,13 +578,21 @@ if __name__ == "__main__":
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
+    transmission_path = Path(snakemake.input.dir, "20250312_export_transmission.xlsx")
+    storage_path = Path(snakemake.input.dir, "20250312_export_storage.xlsx")
+    custom_transmission_path = Path(snakemake.input.custom_transmission)
+
     existing_buses = read_tyndp_electricity_buses(snakemake.input.buses)
 
-    excel_path = Path(snakemake.input.dir) / "20250312_export_transmission.xlsx"
+    # Transmission projects
+    transmission_projects = extract_transmission_projects(
+        transmission_path, existing_buses
+    )
+    custom_transmission_projects = extract_custom_transmission_projects(
+        custom_transmission_path, existing_buses
+    )
 
-    transmission_projects = extract_transmission_projects(excel_path, existing_buses)
-
-    investment_attrs = extract_investment_attributes(excel_path)
+    investment_attrs = extract_investment_attributes(transmission_path)
 
     investment_attrs_per_line = split_investment_attributes_per_line(
         investment_attrs, transmission_projects
@@ -398,14 +602,22 @@ if __name__ == "__main__":
         investment_attrs_per_line, on="project_id", how="left"
     )
 
+    # Storage projects
+    storage_projects = extract_storage_projects(storage_path, existing_buses)
+
+    # Method definition (PINT / TOOT)
+    methods = build_method_assignments(
+        snakemake.input.guidelines, transmission_projects, custom_transmission_projects
+    )
+
+    # Apply custom projects
+    transmission_projects = apply_custom_projects(
+        transmission_projects, custom_transmission_projects, methods
+    )
+
     transmission_projects.to_csv(snakemake.output.transmission_projects, index=False)
 
-    storage_projects = extract_storage_projects(
-        Path(snakemake.input.dir) / "20250312_export_storage.xlsx",
-        existing_buses,
-    )
+    # TODO Add overwrite_projects for storage projects
     storage_projects.to_csv(snakemake.output.storage_projects, index=False)
 
-    guidelines = pd.read_csv(snakemake.input.guidelines)
-    methods = build_method_assignments(guidelines, transmission_projects)
     methods.to_csv(snakemake.output.methods, index=False)
