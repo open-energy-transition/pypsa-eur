@@ -2849,6 +2849,29 @@
             "config_path",
             "version"
           ]
+        },
+        "hydropower": {
+          "description": "Configuration for a module addressed by scenario.",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            },
+            "scenario": {
+              "default": "default",
+              "description": "Scenario to use for the module.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
         }
       }
     },
@@ -3887,6 +3910,15 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
+            "source": {
+              "default": "legacy",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "enum": [
+                "legacy",
+                "module"
+              ],
+              "type": "string"
+            },
             "cutout": {
               "anyOf": [
                 {
@@ -6624,6 +6656,15 @@
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
+        "source": {
+          "default": "legacy",
+          "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+          "enum": [
+            "legacy",
+            "module"
+          ],
+          "type": "string"
+        },
         "cutout": {
           "anyOf": [
             {
@@ -8259,6 +8300,29 @@
       "description": "Configuration for modules.",
       "properties": {
         "geo_boundaries": {
+          "description": "Configuration for a module addressed by scenario.",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            },
+            "scenario": {
+              "default": "default",
+              "description": "Scenario to use for the module.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
+        },
+        "hydropower": {
           "description": "Configuration for a module addressed by scenario.",
           "properties": {
             "config_path": {
@@ -10016,6 +10080,15 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
+            "source": {
+              "default": "legacy",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "enum": [
+                "legacy",
+                "module"
+              ],
+              "type": "string"
+            },
             "cutout": {
               "anyOf": [
                 {

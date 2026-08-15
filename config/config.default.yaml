@@ -24,6 +24,10 @@ modules:
     config_path: config/modules/geo_boundaries.yaml
     version: v1.0.1
     scenario: default
+  hydropower:
+    config_path: config/modules/hydropower.yaml
+    version: v0.2.2
+    scenario: default
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
@@ -413,6 +417,7 @@ renewable:
     excluder_resolution: 100
     clip_p_max_pu: 0.01
   hydro:
+    source: legacy
     cutout: default
     carriers:
     - ror

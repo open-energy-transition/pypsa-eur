@@ -738,6 +738,7 @@ def attach_hydro(
     profile_hydro: str,
     hydro_capacities: str,
     carriers: list,
+    hydro_source: str = "legacy",
     **params,
 ):
     """
@@ -757,6 +758,9 @@ def attach_hydro(
         Path to the hydro capacities data.
     carriers : list
         List of hydro energy carriers.
+    hydro_source : str
+        Either "legacy" (per-country runoff) or "module" (per-bus inflow from
+        `module_hydropower`).
     **params :
         Additional parameters for hydro units.
     """
@@ -772,26 +776,59 @@ def attach_hydro(
     inflow_idx = ror.index.union(hydro.index)
     inflow_t = pd.DataFrame()
     if not inflow_idx.empty:
-        dist_key = ppl.loc[inflow_idx, "p_nom"].groupby(country).transform(normed)
+        units = ppl.loc[inflow_idx]
+        if hydro_source == "module":
+            with xr.open_dataarray(profile_hydro) as inflow:
+                missing_b = (
+                    pd.Index(units["bus"]).unique().difference(inflow.indexes["bus"])
+                )
+                inflow = inflow.reindex(
+                    bus=inflow.indexes["bus"].append(missing_b), fill_value=0.0
+                )
+                dist_key = (
+                    units["p_nom"]
+                    .groupby([units["bus"], units["carrier"]])
+                    .transform(normed)
+                )
+                inflow_t = (
+                    inflow.sel(
+                        bus=xr.DataArray(units["bus"].to_numpy(), dims="name"),
+                        carrier=xr.DataArray(units["carrier"].to_numpy(), dims="name"),
+                    )
+                    .assign_coords(name=inflow_idx)
+                    .transpose("time", "name")
+                    .to_pandas()
+                    .multiply(dist_key, axis=1)
+                )
 
-        with xr.open_dataarray(profile_hydro) as inflow:
-            inflow_countries = pd.Index(country[inflow_idx])
-            missing_c = inflow_countries.unique().difference(
-                inflow.indexes["countries"]
-            )
-            assert missing_c.empty, (
-                f"'{profile_hydro}' is missing "
-                f"inflow time-series for at least one country: {', '.join(missing_c)}"
-            )
+            dry = inflow_t.columns[inflow_t.to_numpy().sum(axis=0) == 0]
+            if not dry.empty:
+                logger.warning(
+                    f"'{profile_hydro}' has no inflow for {len(dry)} of "
+                    f"{len(inflow_idx)} hydro units "
+                    f"({units.loc[dry, 'p_nom'].sum() / 1e3:.1f} GW): {list(dry)}"
+                )
+        else:
+            dist_key = units["p_nom"].groupby(country).transform(normed)
 
-            inflow_t = (
-                inflow.sel(countries=inflow_countries)
-                .rename({"countries": "name"})
-                .assign_coords(name=inflow_idx)
-                .transpose("time", "name")
-                .to_pandas()
-                .multiply(dist_key, axis=1)
-            )
+            with xr.open_dataarray(profile_hydro) as inflow:
+                inflow_countries = pd.Index(country[inflow_idx])
+                missing_c = inflow_countries.unique().difference(
+                    inflow.indexes["countries"]
+                )
+                assert missing_c.empty, (
+                    f"'{profile_hydro}' is missing "
+                    f"inflow time-series for at least one country: {', '.join(missing_c)}"
+                )
+
+                inflow_t = (
+                    inflow.sel(countries=inflow_countries)
+                    .rename({"countries": "name"})
+                    .assign_coords(name=inflow_idx)
+                    .transpose("time", "name")
+                    .to_pandas()
+                    .multiply(dist_key, axis=1)
+                )
 
     if "ror" in carriers and not ror.empty:
         n.add(
@@ -1283,6 +1320,7 @@ if __name__ == "__main__":
     if "hydro" in renewable_carriers:
         p = params.renewable["hydro"]
         carriers = p.pop("carriers", [])
+        hydro_source = p.pop("source", "legacy")
         attach_hydro(
             n,
             costs,
@@ -1290,6 +1328,7 @@ if __name__ == "__main__":
             snakemake.input.profile_hydro,
             snakemake.input.hydro_capacities,
             carriers,
+            hydro_source=hydro_source,
             **p,
         )
 
