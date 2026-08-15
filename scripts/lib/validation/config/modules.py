@@ -26,20 +26,20 @@ class _ModuleConfig(ConfigModel):
     )
 
 
-class _GeoBoundariesModuleConfig(_ModuleConfig):
-    """Configuration for module settings"""
+class _ScenarioModuleConfig(_ModuleConfig):
+    """Configuration for a module addressed by scenario."""
 
     scenario: str = Field(
         default="default",
-        description="Scenario to use for the geo_boundaries module.",
+        description="Scenario to use for the module.",
     )
 
 
 class ModulesConfig(ConfigModel):
     """Configuration for modules."""
 
-    geo_boundaries: _GeoBoundariesModuleConfig = Field(
-        default=_GeoBoundariesModuleConfig(
+    geo_boundaries: _ScenarioModuleConfig = Field(
+        default=_ScenarioModuleConfig(
             config_path=Path("config/modules/geo_boundaries.yaml"), version="v1.0.1"
         ),
         description="Configuration for the geo_boundaries module.",

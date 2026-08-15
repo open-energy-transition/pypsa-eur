@@ -2828,7 +2828,7 @@
       "description": "Configuration for modules.",
       "properties": {
         "geo_boundaries": {
-          "description": "Configuration for module settings",
+          "description": "Configuration for a module addressed by scenario.",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -2841,7 +2841,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the geo_boundaries module.",
+              "description": "Scenario to use for the module.",
               "type": "string"
             }
           },
@@ -6621,29 +6621,6 @@
         }
       }
     },
-    "_GeoBoundariesModuleConfig": {
-      "description": "Configuration for module settings",
-      "properties": {
-        "config_path": {
-          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
-          "format": "file-path",
-          "type": "string"
-        },
-        "version": {
-          "description": "Module version to use.",
-          "type": "string"
-        },
-        "scenario": {
-          "default": "default",
-          "description": "Scenario to use for the geo_boundaries module.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "config_path",
-        "version"
-      ]
-    },
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
@@ -7563,6 +7540,29 @@
         }
       }
     },
+    "_ScenarioModuleConfig": {
+      "description": "Configuration for a module addressed by scenario.",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        },
+        "scenario": {
+          "default": "default",
+          "description": "Scenario to use for the module.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
+    },
     "_ScenariosConfig": {
       "description": "Configuration for `run.scenarios` level.",
       "properties": {
@@ -8259,7 +8259,7 @@
       "description": "Configuration for modules.",
       "properties": {
         "geo_boundaries": {
-          "description": "Configuration for module settings",
+          "description": "Configuration for a module addressed by scenario.",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -8272,7 +8272,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the geo_boundaries module.",
+              "description": "Scenario to use for the module.",
               "type": "string"
             }
           },
