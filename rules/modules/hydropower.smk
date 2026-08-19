@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: MIT
 
+# Module repository: https://github.com/modelblocks-org/module_hydropower
+# (see also https://www.modelblocks.org/modules/)
+
 from scripts._helpers import get_snapshots
 
 MODULE_NAME = "hydropower"
