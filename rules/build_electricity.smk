@@ -510,6 +510,9 @@ rule build_hydro_profile_module:
     threads: 1
     resources:
         mem_mb=8000,
+    params:
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
     message:
         "Aggregating module_hydropower plant inflow onto {wildcards.clusters} buses"
     script:

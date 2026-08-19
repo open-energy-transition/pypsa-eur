@@ -10,23 +10,23 @@ HYDRO_SCENARIO = config["modules"][MODULE_NAME]["scenario"]
 HYDRO_SHAPES = f"{HYDRO_DIR}/{HYDRO_SCENARIO}_shapes.parquet"
 
 
-def validate_hydropower_years():
-    if config["renewable"]["hydro"]["source"] != "module":
-        return
-    years = module_config(MODULE_NAME)["years"]
+def hydropower_module_config() -> dict:
+    """Module configuration with `years` derived from the pypsa-eur snapshots.
+
+    The module requires the years to cover the snapshot period. `end` is exclusive,
+    hence the +1; disjoint snapshot ranges are covered by taking the full span.
+    The years are cast to plain Python ints because numpy integers fail the
+    module's jsonschema-based configuration validation.
+    """
     snapshot_years = get_snapshots(
         config["snapshots"], config["enable"]["drop_leap_day"]
     ).year.unique()
-    missing = sorted(set(snapshot_years) - set(range(years["start"], years["end"])))
-    if missing:
-        raise ValueError(
-            f"module_hydropower covers {years['start']}-{years['end'] - 1} but the "
-            f"snapshots need {missing}. Adjust `years` in "
-            f"{config['modules'][MODULE_NAME]['config_path']}."
-        )
-
-
-validate_hydropower_years()
+    module_cfg = module_config(MODULE_NAME)
+    module_cfg["years"] = dict(
+        start=int(snapshot_years.min()),
+        end=int(snapshot_years.max()) + 1,
+    )
+    return module_cfg
 
 
 module hydropower:
@@ -44,7 +44,7 @@ module hydropower:
             tag=config["modules"][MODULE_NAME]["version"],
         )
     config:
-        module_config(MODULE_NAME)
+        hydropower_module_config()
 
 
 use rule * from hydropower exclude all as hydropower_*

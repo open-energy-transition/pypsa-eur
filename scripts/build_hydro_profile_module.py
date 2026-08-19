@@ -24,7 +24,7 @@ import geopandas as gpd
 import pandas as pd
 import xarray as xr
 
-from scripts._helpers import configure_logging, set_scenario_config
+from scripts._helpers import configure_logging, get_snapshots, set_scenario_config
 from scripts.build_powerplants import fill_unoccupied_holes, map_to_country_bus
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,11 @@ CARRIER = {"Run-Of-River": "ror", "Reservoir": "hydro"}
 
 
 def build_hydro_profile_module(
-    inflow_mwh_fn: str, powerplants_fn: str, regions_fn: str, output_fn: str
+    inflow_mwh_fn: str,
+    powerplants_fn: str,
+    regions_fn: str,
+    output_fn: str,
+    snapshots: pd.DatetimeIndex,
 ) -> None:
     regions = gpd.read_file(regions_fn).dissolve("name")
     regions["geometry"] = fill_unoccupied_holes(regions)
@@ -68,6 +72,8 @@ def build_hydro_profile_module(
     )
     profile.attrs = {"long_name": "Hydropower inflow", "units": "MW"}
 
+    profile = profile.sel(time=snapshots)
+
     profile.to_netcdf(output_fn)
     logger.info(
         f"Wrote inflow for {profile.sizes['bus']} buses "
@@ -83,9 +89,14 @@ if __name__ == "__main__":
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
+    snapshots = get_snapshots(
+        snakemake.params.snapshots, snakemake.params.drop_leap_day
+    )
+
     build_hydro_profile_module(
         snakemake.input.inflow_mwh,
         snakemake.input.powerplants,
         snakemake.input.regions_onshore,
         snakemake.output.profile,
+        snapshots,
     )

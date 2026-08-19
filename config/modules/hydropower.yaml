@@ -9,9 +9,9 @@
 
 pfafstetter_level: "06"  # matches the ~30 km resolution of the ERA5 input
 
-years:
-  start: 2013
-  end: 2014
+years:  # Is derived from the pypsa-eur snapshots in general configuration (see hydropower_module_config)
+  start: 0
+  end: 0
 
 powerplants:
   technology_mapping:
