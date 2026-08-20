@@ -1465,12 +1465,14 @@ def add_generation(
             * costs.at[generator, "VOM"],  # NB: VOM is per MWel
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
-            p_nom_extendable=True
-            if generator
-            in snakemake.params.electricity.get("extendable_carriers", dict()).get(
-                "Generator", list()
-            )
-            else False,
+            p_nom_extendable=(
+                True
+                if generator
+                in snakemake.params.electricity.get("extendable_carriers", dict()).get(
+                    "Generator", list()
+                )
+                else False
+            ),
             p_nom=existing_capacities[generator] if not existing_capacities == 0 else 0,
             p_nom_min=existing_capacities[generator]
             if not existing_capacities == 0
