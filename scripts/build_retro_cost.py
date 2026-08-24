@@ -161,7 +161,7 @@ def prepare_building_stock_data():
     building_data = pd.read_csv(snakemake.input.building_stock, usecols=list(range(13)))
 
     # standardize data
-    building_data["type"].replace(
+    building_data["type"] = building_data["type"].replace(
         {
             "Covered area: heated  [Mm²]": "Heated area [Mm²]",
             "Windows ": "Window",
@@ -171,22 +171,19 @@ def prepare_building_stock_data():
             "Roof ": "Roof",
             "Floor ": "Floor",
         },
-        inplace=True,
     )
-    building_data["feature"].replace(
+    building_data["feature"] = building_data["feature"].replace(
         {
             "Construction features (U-value)": "Construction features (U-values)",
         },
-        inplace=True,
     )
 
     building_data.country_code = building_data.country_code.str.upper()
-    building_data["subsector"].replace(
-        {"Hotels and Restaurants": "Hotels and restaurants"}, inplace=True
+    building_data["subsector"] = building_data["subsector"].replace(
+        {"Hotels and Restaurants": "Hotels and restaurants"}
     )
-    building_data["sector"].replace(
-        {"Residential sector": "residential", "Service sector": "services"},
-        inplace=True,
+    building_data["sector"] = building_data["sector"].replace(
+        {"Residential sector": "residential", "Service sector": "services"}
     )
 
     # extract u-values
@@ -270,7 +267,9 @@ def prepare_building_stock_data():
 
     # u_values for Poland are missing -> take them from eurostat -----------
     u_values_PL = pd.read_csv(snakemake.input.u_values_PL)
-    u_values_PL.component.replace({"Walls": "Wall", "Windows": "Window"}, inplace=True)
+    u_values_PL["component"] = u_values_PL["component"].replace(
+        {"Walls": "Wall", "Windows": "Window"}
+    )
     area_PL = area.loc["Poland"].reset_index()
     data_PL = pd.DataFrame(columns=u_values.columns, index=area_PL.index)
     data_PL["country"] = "Poland"
@@ -464,7 +463,7 @@ def prepare_building_topology(u_values, same_building_topology=True):
     missing_ct = (
         missing_ct.unstack().unstack().fillna(missing_ct.unstack().unstack().mean())
     )
-    data_tabula = missing_ct.stack(level=[-1, -2, -3], dropna=False)
+    data_tabula = missing_ct.stack(level=[-1, -2, -3])
 
     # sets for different countries same building topology which only depends on
     # build year and subsector (MFH, SFH, AB)
