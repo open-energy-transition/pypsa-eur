@@ -1464,7 +1464,7 @@ def add_generation(
             marginal_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "VOM"],  # NB: VOM is per MWel
             capital_cost=(
-                costs.at[generator, "efficiency"] * costs.at[generator, "fixed"]
+                costs.at[generator, "efficiency"] * costs.at[generator, "capital_cost"]
             ),  # NB: fixed cost is per MWel
             p_nom_extendable=(
                 True
@@ -3842,7 +3842,7 @@ def add_heat(
                 f = 1 - urban_fraction[node]
 
             node_name = " ".join(name.split(" ")[2::])
-            n.madd(
+            n.add(
                 "Generator",
                 [node],
                 suffix=" WWHRS " + node_name,
