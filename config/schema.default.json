@@ -2827,6 +2827,21 @@
     "ModulesConfig": {
       "description": "Configuration for modules.",
       "properties": {
+        "crs": {
+          "description": "Configuration for `modules.crs` settings.",
+          "properties": {
+            "projected": {
+              "default": "epsg:3035",
+              "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+              "type": "string"
+            },
+            "geographic": {
+              "default": "epsg:4326",
+              "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+              "type": "string"
+            }
+          }
+        },
         "geo_boundaries": {
           "description": "Configuration for module settings",
           "properties": {
@@ -2842,6 +2857,29 @@
             "scenario": {
               "default": "default",
               "description": "Scenario to use for the geo_boundaries module.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
+        },
+        "hydropower": {
+          "description": "Configuration for module settings",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            },
+            "scenario": {
+              "default": "default",
+              "description": "Scenario to use for the hydropower module.",
               "type": "string"
             }
           },
@@ -3887,6 +3925,15 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
+            "source": {
+              "default": "legacy",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "enum": [
+                "legacy",
+                "module"
+              ],
+              "type": "string"
+            },
             "cutout": {
               "anyOf": [
                 {
@@ -6027,6 +6074,21 @@
         "grid_codes"
       ]
     },
+    "_CrsConfig": {
+      "description": "Configuration for `modules.crs` settings.",
+      "properties": {
+        "projected": {
+          "default": "epsg:3035",
+          "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+          "type": "string"
+        },
+        "geographic": {
+          "default": "epsg:4326",
+          "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+          "type": "string"
+        }
+      }
+    },
     "_CutoutConfig": {
       "description": "Configuration for a single cutout in `atlite.cutouts`.",
       "properties": {
@@ -6647,6 +6709,15 @@
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
+        "source": {
+          "default": "legacy",
+          "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+          "enum": [
+            "legacy",
+            "module"
+          ],
+          "type": "string"
+        },
         "cutout": {
           "anyOf": [
             {
@@ -6726,6 +6797,29 @@
           "type": "boolean"
         }
       }
+    },
+    "_HydropowerModuleConfig": {
+      "description": "Configuration for module settings",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        },
+        "scenario": {
+          "default": "default",
+          "description": "Scenario to use for the hydropower module.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
     },
     "_ImportsConfig": {
       "description": "Configuration for `sector.imports` settings.",
@@ -8258,6 +8352,21 @@
     "modules": {
       "description": "Configuration for modules.",
       "properties": {
+        "crs": {
+          "description": "Configuration for `modules.crs` settings.",
+          "properties": {
+            "projected": {
+              "default": "epsg:3035",
+              "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+              "type": "string"
+            },
+            "geographic": {
+              "default": "epsg:4326",
+              "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+              "type": "string"
+            }
+          }
+        },
         "geo_boundaries": {
           "description": "Configuration for module settings",
           "properties": {
@@ -8273,6 +8382,29 @@
             "scenario": {
               "default": "default",
               "description": "Scenario to use for the geo_boundaries module.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
+        },
+        "hydropower": {
+          "description": "Configuration for module settings",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            },
+            "scenario": {
+              "default": "default",
+              "description": "Scenario to use for the hydropower module.",
               "type": "string"
             }
           },
@@ -10016,6 +10148,15 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
+            "source": {
+              "default": "legacy",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "enum": [
+                "legacy",
+                "module"
+              ],
+              "type": "string"
+            },
             "cutout": {
               "anyOf": [
                 {

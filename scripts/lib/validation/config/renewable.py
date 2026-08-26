@@ -8,6 +8,8 @@ Renewable energy configuration.
 See docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#renewable
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from scripts.lib.validation.config._base import ConfigModel
@@ -261,6 +263,10 @@ class _SolarConfig(BaseModel):
 class _HydroConfig(BaseModel):
     """Configuration for hydropower."""
 
+    source: Literal["legacy", "module"] = Field(
+        "legacy",
+        description="Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+    )
     cutout: str | list[str] = Field(
         "default", description="Specifies the weather data cutout file(s) to use."
     )
