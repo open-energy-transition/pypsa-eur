@@ -14,12 +14,11 @@ HYDRO_SHAPES = f"{HYDRO_DIR}/{HYDRO_SCENARIO}_shapes.parquet"
 
 
 def hydropower_module_config() -> dict:
-    """Module configuration with `years` derived from the pypsa-eur snapshots.
+    """Module configuration with the keys left `null` in the module config filled in.
 
-    The module requires the years to cover the snapshot period. `end` is exclusive,
-    hence the +1; disjoint snapshot ranges are covered by taking the full span.
-    The years are cast to plain Python ints because numpy integers fail the
-    module's jsonschema-based configuration validation.
+    `years` is derived from the pypsa-eur snapshots, and `crs` is taken from
+    `modules.crs`, so it is defined once for every composed module rather than
+    repeated in each module config.
     """
     snapshot_years = get_snapshots(
         config["snapshots"], config["enable"]["drop_leap_day"]
@@ -29,6 +28,7 @@ def hydropower_module_config() -> dict:
         start=int(snapshot_years.min()),
         end=int(snapshot_years.max()) + 1,
     )
+    module_cfg["crs"] = dict(config["modules"]["crs"])
     return module_cfg
 
 

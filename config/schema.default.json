@@ -2827,8 +2827,23 @@
     "ModulesConfig": {
       "description": "Configuration for modules.",
       "properties": {
+        "crs": {
+          "description": "Configuration for `modules.crs` settings.",
+          "properties": {
+            "projected": {
+              "default": "epsg:3035",
+              "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+              "type": "string"
+            },
+            "geographic": {
+              "default": "epsg:4326",
+              "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+              "type": "string"
+            }
+          }
+        },
         "geo_boundaries": {
-          "description": "Configuration for a module addressed by scenario.",
+          "description": "Configuration for module settings",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -2841,7 +2856,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the module.",
+              "description": "Scenario to use for the geo_boundaries module.",
               "type": "string"
             }
           },
@@ -2851,7 +2866,7 @@
           ]
         },
         "hydropower": {
-          "description": "Configuration for a module addressed by scenario.",
+          "description": "Configuration for module settings",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -2864,7 +2879,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the module.",
+              "description": "Scenario to use for the hydropower module.",
               "type": "string"
             }
           },
@@ -6059,6 +6074,21 @@
         "grid_codes"
       ]
     },
+    "_CrsConfig": {
+      "description": "Configuration for `modules.crs` settings.",
+      "properties": {
+        "projected": {
+          "default": "epsg:3035",
+          "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+          "type": "string"
+        },
+        "geographic": {
+          "default": "epsg:4326",
+          "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+          "type": "string"
+        }
+      }
+    },
     "_CutoutConfig": {
       "description": "Configuration for a single cutout in `atlite.cutouts`.",
       "properties": {
@@ -6653,6 +6683,29 @@
         }
       }
     },
+    "_GeoBoundariesModuleConfig": {
+      "description": "Configuration for module settings",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        },
+        "scenario": {
+          "default": "default",
+          "description": "Scenario to use for the geo_boundaries module.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
+    },
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
@@ -6744,6 +6797,29 @@
           "type": "boolean"
         }
       }
+    },
+    "_HydropowerModuleConfig": {
+      "description": "Configuration for module settings",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        },
+        "scenario": {
+          "default": "default",
+          "description": "Scenario to use for the hydropower module.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
     },
     "_ImportsConfig": {
       "description": "Configuration for `sector.imports` settings.",
@@ -7581,29 +7657,6 @@
         }
       }
     },
-    "_ScenarioModuleConfig": {
-      "description": "Configuration for a module addressed by scenario.",
-      "properties": {
-        "config_path": {
-          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
-          "format": "file-path",
-          "type": "string"
-        },
-        "version": {
-          "description": "Module version to use.",
-          "type": "string"
-        },
-        "scenario": {
-          "default": "default",
-          "description": "Scenario to use for the module.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "config_path",
-        "version"
-      ]
-    },
     "_ScenariosConfig": {
       "description": "Configuration for `run.scenarios` level.",
       "properties": {
@@ -8299,8 +8352,23 @@
     "modules": {
       "description": "Configuration for modules.",
       "properties": {
+        "crs": {
+          "description": "Configuration for `modules.crs` settings.",
+          "properties": {
+            "projected": {
+              "default": "epsg:3035",
+              "description": "Projected coordinate reference system handed to the modules, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+              "type": "string"
+            },
+            "geographic": {
+              "default": "epsg:4326",
+              "description": "Geographic coordinate reference system handed to the modules, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+              "type": "string"
+            }
+          }
+        },
         "geo_boundaries": {
-          "description": "Configuration for a module addressed by scenario.",
+          "description": "Configuration for module settings",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -8313,7 +8381,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the module.",
+              "description": "Scenario to use for the geo_boundaries module.",
               "type": "string"
             }
           },
@@ -8323,7 +8391,7 @@
           ]
         },
         "hydropower": {
-          "description": "Configuration for a module addressed by scenario.",
+          "description": "Configuration for module settings",
           "properties": {
             "config_path": {
               "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
@@ -8336,7 +8404,7 @@
             },
             "scenario": {
               "default": "default",
-              "description": "Scenario to use for the module.",
+              "description": "Scenario to use for the hydropower module.",
               "type": "string"
             }
           },

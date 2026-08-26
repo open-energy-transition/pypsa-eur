@@ -20,6 +20,9 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#modules
 modules:
+  crs:
+    projected: "epsg:3035"
+    geographic: "epsg:4326"
   geo_boundaries:
     config_path: config/modules/geo_boundaries.yaml
     version: v1.0.1
