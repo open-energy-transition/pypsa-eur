@@ -1445,6 +1445,7 @@ def add_generation(
 
     for generator, carrier in conventionals.items():
         carrier_nodes = vars(spatial)[carrier].nodes
+        link_names = nodes + " " + generator
 
         add_carrier_buses(
             n=n,
@@ -1455,9 +1456,26 @@ def add_generation(
             cf_industry=cf_industry,
         )
 
+        # Existing gens only cover a subset of nodes; reindex to all link names
+        # so p_nom/efficiency align with n.add (required by newer PyPSA).
+        if existing_capacities != 0:
+            caps = existing_capacities[generator].reindex(link_names).fillna(0.0)
+            effs = (
+                existing_efficiencies[generator]
+                .reindex(link_names)
+                .fillna(costs.at[generator, "efficiency"])
+            )
+            p_nom = caps / effs  # existing capacities are MWel
+            p_nom_min = caps
+            efficiency = effs
+        else:
+            p_nom = 0
+            p_nom_min = 0
+            efficiency = costs.at[generator, "efficiency"]
+
         n.add(
             "Link",
-            nodes + " " + generator,
+            link_names,
             bus0=carrier_nodes,
             bus1=nodes,
             bus2="co2 atmosphere",
@@ -1474,23 +1492,13 @@ def add_generation(
                 )
                 else False
             ),
-            p_nom=(
-                existing_capacities[generator] / existing_efficiencies[generator]
-                if not existing_capacities == 0
-                else 0
-            ),  # NB: existing capacities are MWel
+            p_nom=p_nom,
             p_max_pu=0.7
             if carrier == "uranium"
             else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
-            p_nom_min=existing_capacities[generator]
-            if not existing_capacities == 0
-            else 0,
+            p_nom_min=p_nom_min,
             carrier=generator,
-            efficiency=(
-                existing_efficiencies[generator]
-                if existing_efficiencies is not None
-                else costs.at[generator, "efficiency"]
-            ),
+            efficiency=efficiency,
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
