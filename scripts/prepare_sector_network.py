@@ -23,6 +23,7 @@ from scipy.stats import beta
 
 from scripts._helpers import (
     configure_logging,
+    generate_periodic_profiles,
     get,
     load_costs,
     set_scenario_config,
@@ -1395,6 +1396,8 @@ def add_generation(
     spatial: SimpleNamespace,
     options: dict,
     cf_industry: dict,
+    existing_capacities: pd.Series,
+    existing_efficiencies: pd.Series | None = None,
 ) -> None:
     """
     Add conventional electricity generation to the network.
@@ -1420,6 +1423,10 @@ def add_generation(
         Configuration dictionary containing settings for the model
     cf_industry : dict
         Dictionary of industrial conversion factors, needed for carrier buses
+    existing_capacities : pd.Series
+        Capacities for the generators that were previously assigned in add_electricity
+    existing_efficiencies : pd.Series | None
+        Efficiencies for the generators that were previously assigned in add_electricity
 
     Returns
     -------
@@ -1438,6 +1445,7 @@ def add_generation(
 
     for generator, carrier in conventionals.items():
         carrier_nodes = vars(spatial)[carrier].nodes
+        link_names = nodes + " " + generator
 
         add_carrier_buses(
             n=n,
@@ -1448,19 +1456,49 @@ def add_generation(
             cf_industry=cf_industry,
         )
 
+        # Existing gens only cover a subset of nodes; reindex to all link names
+        # so p_nom/efficiency align with n.add (required by newer PyPSA).
+        if existing_capacities != 0:
+            caps = existing_capacities[generator].reindex(link_names).fillna(0.0)
+            effs = (
+                existing_efficiencies[generator]
+                .reindex(link_names)
+                .fillna(costs.at[generator, "efficiency"])
+            )
+            p_nom = caps / effs  # existing capacities are MWel
+            p_nom_min = caps
+            efficiency = effs
+        else:
+            p_nom = 0
+            p_nom_min = 0
+            efficiency = costs.at[generator, "efficiency"]
+
         n.add(
             "Link",
-            nodes + " " + generator,
+            link_names,
             bus0=carrier_nodes,
             bus1=nodes,
             bus2="co2 atmosphere",
             marginal_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "VOM"],  # NB: VOM is per MWel
-            capital_cost=costs.at[generator, "efficiency"]
-            * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
-            p_nom_extendable=True,
+            capital_cost=(
+                costs.at[generator, "efficiency"] * costs.at[generator, "capital_cost"]
+            ),  # NB: fixed cost is per MWel
+            p_nom_extendable=(
+                True
+                if generator
+                in snakemake.params.electricity.get("extendable_carriers", dict()).get(
+                    "Generator", list()
+                )
+                else False
+            ),
+            p_nom=p_nom,
+            p_max_pu=0.7
+            if carrier == "uranium"
+            else 1,  # be conservative for nuclear (maintenance or unplanned shut downs)
+            p_nom_min=p_nom_min,
             carrier=generator,
-            efficiency=costs.at[generator, "efficiency"],
+            efficiency=efficiency,
             efficiency2=costs.at[carrier, "CO2 intensity"],
             lifetime=costs.at[generator, "lifetime"],
         )
@@ -1694,7 +1732,14 @@ def insert_electricity_distribution_grid(
             suffix=" rooftop",
             bus=n.generators.loc[solar, "bus"] + " low voltage",
             carrier="solar rooftop",
-            p_nom_extendable=True,
+            p_nom_extendable=(
+                True
+                if "solar"
+                in snakemake.params.electricity.get("extendable_carriers", dict()).get(
+                    "Generator", list()
+                )
+                else False
+            ),  # solar rooftop only extendable if solar is extendable
             p_nom_max=potential.loc[solar],
             marginal_cost=n.generators.loc[solar, "marginal_cost"],
             capital_cost=costs.at["solar-rooftop", "capital_cost"],
@@ -3583,6 +3628,9 @@ def add_heat(
                     lifetime=costs.at["central gas CHP", "lifetime"],
                 )
 
+                if not options["chp"]["cc"]:
+                    continue
+
                 n.add(
                     "Link",
                     nodes + f" urban central {fuel} CHP CC",
@@ -3688,17 +3736,26 @@ def add_heat(
             # get sector name ("residential"/"services"/or both "tot" for urban central)
             if "services" in name:
                 sec = "services"
+                sec_floor = ["services"]
             elif "residential" in name:
                 sec = "residential"
+                if options["retrofitting"]["disaggregate_building_types"]:
+                    sec_floor = set(
+                        ["residential AB", "residential MFH", "residential SFH"]
+                    )
+                    sec_floor = list(
+                        set(floor_area_file.loc[ct, "value"].index).intersection(
+                            sec_floor
+                        )
+                    )
+                else:
+                    sec_floor = ["residential"]
             elif "urban central" in name:
                 sec = "tot"
+                sec_floor = ["tot"]
             else:
                 raise ValueError(f"Unknown sector in {name}")
 
-            # get floor aread at node and region (urban/rural) in m^2
-            floor_area_node = (
-                pop_layout.loc[node].fraction * floor_area_file.loc[ct, "value"] * 10**6
-            ).loc[sec] * f
             # total heat demand at node [MWh]
             demand = n.loads_t.p_set[name]
 
@@ -3712,51 +3769,127 @@ def add_heat(
                 .fillna(0)
             )
 
-            # minimum heat demand 'dE' after retrofitting in units of original heat demand (values between 0-1)
-            dE = retro_data.loc[(ct, sec), ("dE")]
-            # get additional energy savings 'dE_diff' between the different retrofitting strengths/generators at one node
-            dE_diff = abs(dE.diff()).fillna(1 - dE.iloc[0])
-            # convert costs Euro/m^2 -> Euro/MWh
-            capital_cost = (
-                retro_data.loc[(ct, sec), ("cost")]
-                * floor_area_node
-                / ((1 - dE) * space_heat_demand.max())
-            )
-            if space_heat_demand.max() == 0:
-                capital_cost = capital_cost.apply(lambda b: 0 if b == np.inf else b)
-
-            # number of possible retrofitting measures 'strengths' (set in list at config.yaml 'l_strength')
-            # given in additional insulation thickness [m]
-            # for each measure, a retrofitting generator is added at the node
-            strengths = retro_data.columns.levels[1]
-
-            # check that ambitious retrofitting has higher costs per MWh than moderate retrofitting
-            if (capital_cost.diff() < 0).sum():
-                logger.warning(f"Costs are not linear for {ct} {sec}")
-                s = capital_cost[(capital_cost.diff() < 0)].index
-                strengths = strengths.drop(s)
-
-            # reindex normed time profile of space heat demand back to hourly resolution
-            space_pu = space_pu.reindex(index=heat_demand.index).ffill()
-
-            # add for each retrofitting strength a generator with heat generation profile following the profile of the heat demand
-            for strength in strengths:
-                node_name = " ".join(name.split(" ")[2::])
-                n.add(
-                    "Generator",
-                    [node],
-                    suffix=" retrofitting " + strength + " " + node_name,
-                    bus=name,
-                    carrier="retrofitting",
-                    p_nom_extendable=True,
-                    p_nom_max=dE_diff[strength]
-                    * space_heat_demand.max(),  # maximum energy savings for this renovation strength
-                    p_max_pu=space_pu,
-                    p_min_pu=space_pu,
-                    country=ct,
-                    capital_cost=capital_cost[strength]
-                    * options["retrofitting"]["cost_factor"],
+            for sec_i in sec_floor:
+                # get floor aread at node and region (urban/rural) in m^2
+                floor_area_node = (
+                    pop_layout.loc[node].fraction
+                    * floor_area_file.loc[ct, "value"]
+                    * 10**6
+                ).loc[sec_i] * f
+                # minimum heat demand 'dE' after retrofitting in units of original heat demand (values between 0-1)
+                dE = retro_data.loc[(ct, sec_i), ("dE")]
+                # get additional energy savings 'dE_diff' between the different retrofitting strengths/generators at one node
+                dE_diff = abs(dE.diff()).fillna(1 - dE.iloc[0])
+                # convert costs Euro/m^2 -> Euro/MWh
+                capital_cost = (
+                    retro_data.loc[(ct, sec_i), ("cost")]
+                    * floor_area_node
+                    / ((1 - dE) * space_heat_demand.max())
                 )
+                if space_heat_demand.max() == 0:
+                    capital_cost = capital_cost.apply(lambda b: 0 if b == np.inf else b)
+
+                # number of possible retrofitting measures 'strengths' (set in list at config.yaml 'l_strength')
+                # given in additional insulation thickness [m]
+                # for each measure, a retrofitting generator is added at the node
+                strengths = retro_data.columns.levels[1]
+
+                # check that ambitious retrofitting has higher costs per MWh than moderate retrofitting
+                if (capital_cost.diff() < 0).sum():
+                    logger.warning(f"Costs are not linear for {ct} {sec_i}")
+                    s = capital_cost[(capital_cost.diff() < 0)].index
+                    strengths = strengths.drop(s)
+
+                # reindex normed time profile of space heat demand back to hourly resolution
+                space_pu = space_pu.reindex(index=heat_demand.index).ffill()
+
+                # add for each retrofitting strength a generator with heat generation profile following the profile of the heat demand
+                for strength in strengths:
+                    if len(sec_floor) > 1 and "residential" in name:
+                        node_name = (
+                            " ".join(name.split(" ")[2::]) + " " + sec_i.split(" ")[1]
+                        )
+                    else:
+                        node_name = " ".join(name.split(" ")[2::])
+                    n.add(
+                        "Generator",
+                        [node],
+                        suffix=" retrofitting " + strength + " " + node_name,
+                        bus=name,
+                        carrier="retrofitting",
+                        p_nom_extendable=True,
+                        p_nom_max=dE_diff[strength]
+                        * space_heat_demand.max(),  # maximum energy savings for this renovation strength
+                        p_max_pu=space_pu,
+                        p_min_pu=space_pu,
+                        country=ct,
+                        capital_cost=capital_cost[strength]
+                        * options["retrofitting"]["cost_factor"],
+                    )
+
+    if options["retrofitting"]["WWHR_endogen"]:
+        WWHR_costs = pd.read_csv(snakemake.input.WWHR_cost, index_col=0)
+        heat_demand_shape = (
+            xr.open_dataset(snakemake.input.hourly_heat_demand_total)
+            .to_dataframe()
+            .unstack(level=1)
+        )
+
+        name = "residential water"
+
+        hotwaterprofile = (
+            heat_demand_shape[name] / heat_demand_shape[name].sum()
+        ).multiply(pop_weighted_energy_totals[f"total {name}"]) * 1e6
+
+        # 80% of hot water is used for showers
+        # 35% is the assumed reduction of demand due to WWHR technology
+        WWHR_profile = generate_periodic_profiles(
+            dt_index=pd.date_range(freq="h", **snakemake.params.snapshots, tz="UTC"),
+            nodes=hotwaterprofile.columns,
+            weekly_profile=0.8 * 0.35 * np.ones((24 * 7,)),
+        )
+
+        limit_WWHRS = get(options["reduce_hot_water_factor"], investment_year)
+        logger.info(
+            f"Assumed hot water heat reduction in up to {limit_WWHRS:.2%} of households"
+        )
+
+        heat_systems_residential_water = [
+            "residential rural",
+            "residential urban decentral",
+            "urban central",
+        ]
+
+        for name in n.loads[
+            n.loads.carrier.isin([x + " heat" for x in heat_systems_residential_water])
+        ].index:
+            node = n.buses.loc[name, "location"]
+            ct = pop_layout.loc[node, "ct"]
+
+            if "urban central" in name:
+                f = dist_fraction[node]
+            elif "urban decentral" in name:
+                f = urban_fraction[node] - dist_fraction[node]
+            else:
+                f = 1 - urban_fraction[node]
+
+            node_name = " ".join(name.split(" ")[2::])
+            n.add(
+                "Generator",
+                [node],
+                suffix=" WWHRS " + node_name,
+                bus=name,
+                carrier="WWHRS",
+                p_nom_extendable=True,
+                p_nom_max=limit_WWHRS
+                * f
+                * hotwaterprofile[node].max(),  # maximum energy savings
+                p_max_pu=pd.DataFrame(WWHR_profile[node]),
+                p_min_pu=pd.DataFrame(WWHR_profile[node]),
+                country=ct,
+                # convert costs Euro -> Euro/MW
+                capital_cost=WWHR_costs.loc[node].max() / hotwaterprofile[node].max(),
+            )
 
 
 def add_methanol(
@@ -3923,10 +4056,28 @@ def add_biomass(
             "unsustainable biogas"
         ].sum()
 
+    if not options["industry"]:
+        # if the industry is not modelled, remove industrial demand from biomass potentials
+        industrial_demand = (
+            pd.read_csv(snakemake.input.industrial_demand, index_col=0) * 1e6
+        ) * nyears
+        if options.get("biomass_spatial", options["biomass_transport"]):
+            e_set = industrial_demand.loc[
+                spatial.biomass.locations, "solid biomass"
+            ].rename(index=lambda x: x + " solid biomass")
+        else:
+            e_set = industrial_demand["solid biomass"].sum()
+    else:
+        # if the industry is modelled, keep full biomass potentials
+        e_set = 0
+
     if options.get("biomass_spatial", options["biomass_transport"]):
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].rename(
-            index=lambda x: x + " solid biomass"
-        )
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].rename(
+                index=lambda x: x + " solid biomass"
+            )
+            - e_set
+        ).clip(0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].rename(index=lambda x: x + " municipal solid waste")
@@ -3938,7 +4089,9 @@ def add_biomass(
         ].rename(index=lambda x: x + " unsustainable bioliquids")
 
     else:
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].sum()
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].sum() - e_set
+        ).clip(0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].sum()
@@ -4342,6 +4495,12 @@ def add_biomass(
             lifetime=costs.at[key, "lifetime"],
         )
 
+    if (
+        not urban_central.empty
+        and options["chp"]["enable"]
+        and ("solid biomass" in options["chp"]["fuel"])
+        and options["chp"]["cc"]
+    ):
         n.add(
             "Link",
             urban_central + " urban central solid biomass CHP CC",
@@ -6374,6 +6533,30 @@ def add_import_options(
         )
 
 
+def get_capacities_from_elec(n, carriers, component):
+    """
+    Gets capacities and efficiencies for {carrier} in n.{component}
+    that were previously assigned in add_electricity.
+    """
+    component_list = ["generators", "storage_units", "links", "stores"]
+    component_dict = {name: getattr(n, name) for name in component_list}
+    e_nom_carriers = ["stores"]
+    nom_col = {x: "e_nom" if x in e_nom_carriers else "p_nom" for x in component_list}
+    eff_col = "efficiency"
+
+    capacity_dict = {}
+    efficiency_dict = {}
+    for carrier in carriers:
+        capacity_dict[carrier] = component_dict[component].query("carrier in @carrier")[
+            nom_col[component]
+        ]
+        efficiency_dict[carrier] = component_dict[component].query(
+            "carrier in @carrier"
+        )[eff_col]
+
+    return capacity_dict, efficiency_dict
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -6413,6 +6596,15 @@ if __name__ == "__main__":
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
 
+    if options.get("keep_existing_capacities", False):
+        existing_capacities, existing_efficiencies = get_capacities_from_elec(
+            n,
+            carriers=options.get("conventional_generation").keys(),
+            component="generators",
+        )
+    else:
+        existing_capacities, existing_efficiencies = 0, None
+
     fn = snakemake.input.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0)
 
@@ -6435,7 +6627,7 @@ if __name__ == "__main__":
 
     spatial = define_spatial(pop_layout.index, options)
 
-    if snakemake.params.foresight in ["myopic", "perfect"]:
+    if snakemake.params.foresight in ["overnight", "myopic", "perfect"]:
         add_lifetime_wind_solar(n, costs)
 
         conventional = snakemake.params.conventional_carriers
@@ -6475,6 +6667,8 @@ if __name__ == "__main__":
         spatial=spatial,
         options=options,
         cf_industry=cf_industry,
+        existing_capacities=existing_capacities,
+        existing_efficiencies=existing_efficiencies,
     )
 
     add_h2_gas_infrastructure(

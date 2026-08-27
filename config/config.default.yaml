@@ -811,8 +811,16 @@ sector:
     2040: 0.16
     2045: 0.21
     2050: 0.29
+  reduce_hot_water_factor: # WWHRS is extremely cost competititve, thus we limit the expansion
+    2030: 0.05
+    2035: 0.1
+    2040: 0.2
+    2045: 0.4
+    2050: 0.6
   retrofitting:
     retro_endogen: false
+    WWHR_endogen: false # Waste Water Heat Recovery
+    disaggregate_building_types: false # true separates AB, SFH and MFH
     cost_factor: 1.0
     interest_rate: 0.04
     annualise_cost: true
@@ -832,6 +840,7 @@ sector:
     - solid biomass
     - gas
     micro_chp: false
+    cc: true
   solar_thermal: true
   solar_cf_correction: 0.788457
   methanation: true
@@ -947,6 +956,7 @@ sector:
   conventional_generation:
     OCGT: gas
     CCGT: gas
+  keep_existing_capacities: false
   biomass_to_liquid: true
   biomass_to_liquid_cc: false
   electrobiofuels: true

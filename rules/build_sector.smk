@@ -1322,9 +1322,11 @@ rule build_retro_cost:
         clustered_pop_layout=resources("pop_layout_base_s_{clusters}.csv"),
         cost_germany="data/retro/retro_cost_germany.csv",
         window_assumptions="data/retro/window_assumptions.csv",
+        households="data/retro/households.csv",
     output:
         retro_cost=resources("retro_cost_base_s_{clusters}.csv"),
         floor_area=resources("floor_area_base_s_{clusters}.csv"),
+        WWHR_costs=resources("WWHR_costs_elec_s_{clusters}.csv"),
     log:
         logs("build_retro_cost_{clusters}.log"),
     benchmark:
@@ -1609,6 +1611,11 @@ rule prepare_sector_network:
             if config_provider("sector", "retrofitting", "retro_endogen")(w)
             else []
         ),
+        WWHR_cost=lambda w: (
+            resources("WWHR_costs_elec_s_{clusters}.csv")
+            if config_provider("sector", "retrofitting", "WWHR_endogen")(w)
+            else []
+        ),
         floor_area=lambda w: (
             resources("floor_area_base_s_{clusters}.csv")
             if config_provider("sector", "retrofitting", "retro_endogen")(w)
@@ -1770,6 +1777,7 @@ rule prepare_sector_network:
         temperature_limited_stores=config_provider(
             "sector", "district_heating", "temperature_limited_stores"
         ),
+        snapshots=config_provider("snapshots"),
     message:
         "Preparing integrated sector-coupled energy network for {wildcards.clusters} clusters, {wildcards.planning_horizons} planning horizon, {wildcards.opts} electric options and {wildcards.sector_opts} sector options"
     script:
