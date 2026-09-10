@@ -26,6 +26,9 @@ The energy savings calculations are based on the
       - tabula https://episcope.eu/fileadmin/tabula/public/calc/tabula-calculator.xlsx
 
 
+The energy savings for hot water are based on this report by the University of Innsbruck:
+https://diglib.uibk.ac.at/ulbtirolfodok/content/titleinfo/7640369
+
 Basic Equations
 ---------------
 
@@ -125,7 +128,10 @@ rename_sectors = {
 
 
 # additional insulation thickness, determines maximum possible savings [m]
-l_strength = ["0.07", "0.075", "0.08", "0.1", "0.15", "0.22", "0.24", "0.26"]
+# the assumed values correspond to standard thickness values of Dupont styrofoam product sheet
+# source: https://www.dupont.com/content/dam/dupont/amer/us/en/performance-building-solutions/public/documents/en/styrofoam-brand-square-edge-st-100-pis-43-d100996-enus.pdf
+# 3 inch and 3.5inch + 4inch
+l_strength = ["0.076", "0.1905"]
 
 
 # (ii) --- FUNCTIONS ----------------------------------------------------------
@@ -182,6 +188,24 @@ def prepare_building_stock_data():
     building_data["sector"] = building_data["sector"].replace(
         {"Residential sector": "residential", "Service sector": "services"}
     )
+    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
+        building_data["sector"] = building_data.apply(
+            lambda b: (
+                "residential SFH"
+                if b.subsector == "Single family- Terraced houses"
+                else "residential AB"
+                if b.subsector in "Appartment blocks"
+                else "residential MFH"
+                if b.subsector == "Multifamily houses"
+                else "residential mixed"
+                if b.subsector
+                in [
+                    "Residential sector",
+                ]
+                else b.sector
+            ),
+            axis=1,
+        )
 
     # extract u-values
     u_values = building_data[
@@ -189,7 +213,7 @@ def prepare_building_stock_data():
         & (building_data.subsector != "Total")
     ]
 
-    components = list(u_values.type.unique())
+    # components = list(u_values.type.unique())
 
     country_iso_dic = building_data.set_index("country")["country_code"].to_dict()
 
@@ -231,10 +255,17 @@ def prepare_building_stock_data():
     # add for some missing countries floor area from other data sources
     area_missing = pd.read_csv(
         snakemake.input.floor_area_missing,
-        index_col=[0, 1],
+        index_col=[0],
         usecols=[0, 1, 2, 3],
         encoding="ISO-8859-1",
     )
+    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
+        area_missing.sector = area_missing.apply(
+            lambda b: "residential AB" if b.sector == "residential" else b.sector,
+            axis=1,
+        )
+    area_missing = area_missing.reset_index().set_index(["country", "sector"])
+
     area_tot = pd.concat([area_tot, area_missing.unstack(level=-1).dropna().stack()])
     area_tot = area_tot.loc[~area_tot.index.duplicated(keep="last")]
 
@@ -267,6 +298,12 @@ def prepare_building_stock_data():
     u_values_PL["component"] = u_values_PL["component"].replace(
         {"Walls": "Wall", "Windows": "Window"}
     )
+
+    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
+        u_values_PL["sector"] = u_values_PL["sector"].replace(
+            {"residential": "residential AB"}
+        )
+
     area_PL = area.loc["Poland"].reset_index()
     data_PL = pd.DataFrame(columns=u_values.columns, index=area_PL.index)
     data_PL["country"] = "Poland"
@@ -277,7 +314,7 @@ def prepare_building_stock_data():
     data_PL["btype"] = area_PL["subsector"]
 
     data_PL_final = pd.DataFrame()
-    for component in components:
+    for component in []:
         data_PL["type"] = component
         data_PL["value"] = data_PL.apply(
             lambda x: u_values_PL[
@@ -725,9 +762,16 @@ def map_to_lstrength(l_strength, df):
     Renames column names from a pandas dataframe to map tabula retrofitting
     strengths [2 = moderate, 3 = ambitious] to l_strength.
     """
-    middle = len(l_strength) // 2
+    middle = len(l_strength) - 1  # only 26 mm is ambitious
+    logger.warning(
+        "Warning: Refurbishment state is currently chosen as strong refurbishment"
+    )
+    # reflects in capital costs, otherwise moderate cost assumptions are too high,
+    # compared to ambitious ones (this setting lowers them by approx. 10%)
+    # previously: middle = len(l_strength) // 2
     map_to_l = pd.MultiIndex.from_arrays(
-        [middle * [2] + len(l_strength[middle:]) * [3], l_strength]
+        [middle * [3] + len(l_strength[middle:]) * [3], l_strength]
+        # previously: [middle * [2] + len(l_strength[middle:]) * [3], l_strength]
     )
     l_strength_df = (
         df.stack(-2)
@@ -975,6 +1019,11 @@ def sample_dE_costs_area(
         .set_index(["country_code", "subsector", "bage"])
     )
 
+    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
+        sub_to_sector_dict["AB"] = "residential AB"
+        sub_to_sector_dict["MFH"] = "residential MFH"
+        sub_to_sector_dict["SFH"] = "residential SFH"
+
     cost_dE = (
         pd.concat([costs, dE_space], axis=1)
         .mul(area_reordered.weight, axis=0)
@@ -1009,6 +1058,12 @@ def sample_dE_costs_area(
     cost_dE = cost_dE.reindex(countries, level=0)
     # get share of residential and service floor area
     sec_w = area_tot.div(area_tot.groupby(level=0).transform("sum"))
+    if snakemake.params["retrofitting"]["disaggregate_building_types"]:
+        missing = list(set(cost_dE.index) - set(sec_w.index))
+        sec_w = pd.concat([sec_w, pd.DataFrame(index=missing)]).loc[
+            cost_dE.index
+        ]  # .fillna(0)
+
     # get the total cost-energy-savings weight by sector area
     tot = (
         # sec_w has columns "estimated" and "value"
@@ -1039,7 +1094,7 @@ def sample_dE_costs_area(
         [moderate_dE_cost.columns, ["moderate"]]
     )
 
-    ambitious_dE_cost = cost_dE.xs("0.26", level=1, axis=1)
+    ambitious_dE_cost = cost_dE.xs("0.1905", level=1, axis=1)
     ambitious_dE_cost.columns = pd.MultiIndex.from_product(
         [ambitious_dE_cost.columns, ["ambitious"]]
     )
@@ -1047,6 +1102,36 @@ def sample_dE_costs_area(
     cost_dE_new = pd.concat([moderate_dE_cost, ambitious_dE_cost], axis=1)
 
     return cost_dE_new, area_tot
+
+
+def WWHR_costs(households):
+    """
+    Calculates the costs for waste water heat recovery (WWHR) based on the number of households per region
+    """
+    pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
+    housholds_spatial = pd.merge(
+        pop_layout.reset_index(), households, on="ct"
+    ).set_index("name")
+    housholds_spatial = (
+        housholds_spatial.fraction * housholds_spatial["Households (thousands)"] * 1000
+    )  # number in thousands
+    costs_WWHR = (
+        pd.read_csv(snakemake.input.cost_germany, index_col=0, usecols=[0, 1, 2, 3])
+        .loc["hot water (WWHRS)"]
+        .astype(float)
+    )
+
+    if annualise_cost:
+        if interest_rate > 0:
+            costs_WWHR = interest_rate / (
+                1.0 - 1.0 / (1.0 + interest_rate) ** costs_WWHR.loc["life_time"]
+            )
+        else:
+            costs_WWHR = 1 / costs_WWHR.loc["life_time"]
+
+    costs_WWHR = costs_WWHR * housholds_spatial
+
+    return costs_WWHR
 
 
 if __name__ == "__main__":
@@ -1062,6 +1147,10 @@ if __name__ == "__main__":
     set_scenario_config(snakemake)
 
     #  ********  config  *********************************************************
+
+    households = pd.read_csv(snakemake.input.households).rename(
+        columns={"Country": "ct"}
+    )
 
     retro_opts = snakemake.params.retrofitting
     interest_rate = retro_opts["interest_rate"]
@@ -1110,6 +1199,10 @@ if __name__ == "__main__":
         area, area_tot, costs, dE_space, countries, construction_index, tax_weighting
     )
 
+    # Calculare the costs for waste water heat recovery
+    WWHR_costs = WWHR_costs(households)
+
     #   save *********************************************************************
     cost_dE.to_csv(snakemake.output.retro_cost)
     area_tot.to_csv(snakemake.output.floor_area)
+    WWHR_costs.to_csv(snakemake.output.WWHR_costs)
