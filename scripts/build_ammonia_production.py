@@ -44,9 +44,9 @@ if __name__ == "__main__":
 
     ammonia.index = cc.convert(ammonia.index, to="iso2")
 
-    years = [str(i) for i in range(2019, 2024)]
-
-    ammonia = ammonia.rename(columns=lambda x: str(x))[years]
+    years = [str(i) for i in range(2013, 2024)]
+    ammonia = ammonia.rename(columns=str)
+    ammonia = ammonia[ammonia.columns.intersection(years)]
 
     # convert from ktonN to ktonNH3
     ammonia *= 17 / 14
