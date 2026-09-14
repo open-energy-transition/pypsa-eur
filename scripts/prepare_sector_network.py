@@ -3689,9 +3689,9 @@ def add_biomass(
         ) * nyears
         if options.get("biomass_spatial", options["biomass_transport"]):
             p_set = (
-                industrial_demand.loc[spatial.biomass.locations, "solid biomass"].rename(
-                    index=lambda x: x + " solid biomass for industry"
-                )
+                industrial_demand.loc[
+                    spatial.biomass.locations, "solid biomass"
+                ].rename(index=lambda x: x + " solid biomass for industry")
                 / nhours
             )
         else:
@@ -3700,11 +3700,13 @@ def add_biomass(
         # if the industry is modelled, keep full biomass potentials
         p_set = 0
 
-
     if options.get("biomass_spatial", options["biomass_transport"]):
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].rename(
-            index=lambda x: x + " solid biomass"
-        ) - p_set
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].rename(
+                index=lambda x: x + " solid biomass"
+            )
+            - p_set
+        )
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].rename(index=lambda x: x + " municipal solid waste")
@@ -3716,7 +3718,9 @@ def add_biomass(
         ].rename(index=lambda x: x + " unsustainable bioliquids")
 
     else:
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].sum() - p_set
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].sum() - p_set
+        )
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].sum()
