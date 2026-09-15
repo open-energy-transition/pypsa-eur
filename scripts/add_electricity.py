@@ -764,10 +764,9 @@ def attach_hydro(
     n: pypsa.Network,
     costs: pd.DataFrame,
     ppl: pd.DataFrame,
-    profile_hydro: str,
+    profile_hydro: dict[str, str],
     hydro_capacities: str,
     carriers: list,
-    hydro_source: str = "legacy",
     **params,
 ):
     """
@@ -781,16 +780,12 @@ def attach_hydro(
         DataFrame containing the cost data.
     ppl : pd.DataFrame
         DataFrame containing the power plant data.
-    profile_hydro : str | dict[str, str]
-        Path to the hydro profile data. For `hydro_source="module"` this is a
-        mapping of carrier to the module's per-bus, per-unit inflow parquet.
+    profile_hydro : dict[str, str]
+        Mapping of carrier to the module's per-bus, per-unit inflow parquet.
     hydro_capacities : str
         Path to the hydro capacities data.
     carriers : list
         List of hydro energy carriers.
-    hydro_source : str
-        Either "legacy" (per-country runoff) or "module" (per-bus inflow from
-        `module_hydropower`).
     **params :
         Additional parameters for hydro units.
     """
@@ -801,49 +796,25 @@ def attach_hydro(
     phs = ppl.query('carrier == "PHS"')
     hydro = ppl.query('carrier == "hydro"')
 
-    country = ppl["bus"].map(n.buses.country).rename("country")
-
     inflow_idx = ror.index.union(hydro.index)
     inflow_t = pd.DataFrame()
     if not inflow_idx.empty:
         units = ppl.loc[inflow_idx]
-        if hydro_source == "module":
-            inflow_t = pd.concat(
-                [
-                    module_inflow(profile_hydro[carrier], group, n.snapshots)
-                    for carrier, group in units.groupby("carrier")
-                ],
-                axis="columns",
-            ).reindex(columns=inflow_idx)
+        inflow_t = pd.concat(
+            [
+                module_inflow(profile_hydro[carrier], group, n.snapshots)
+                for carrier, group in units.groupby("carrier")
+            ],
+            axis="columns",
+        ).reindex(columns=inflow_idx)
 
-            dry = inflow_t.columns[inflow_t.to_numpy().sum(axis=0) == 0]
-            if not dry.empty:
-                logger.warning(
-                    f"module_hydropower reports no inflow for {len(dry)} of "
-                    f"{len(inflow_idx)} hydro units "
-                    f"({units.loc[dry, 'p_nom'].sum() / 1e3:.1f} GW): {list(dry)}"
-                )
-        else:
-            dist_key = units["p_nom"].groupby(country).transform(normed)
-
-            with xr.open_dataarray(profile_hydro) as inflow:
-                inflow_countries = pd.Index(country[inflow_idx])
-                missing_c = inflow_countries.unique().difference(
-                    inflow.indexes["countries"]
-                )
-                assert missing_c.empty, (
-                    f"'{profile_hydro}' is missing "
-                    f"inflow time-series for at least one country: {', '.join(missing_c)}"
-                )
-
-                inflow_t = (
-                    inflow.sel(countries=inflow_countries)
-                    .rename({"countries": "name"})
-                    .assign_coords(name=inflow_idx)
-                    .transpose("time", "name")
-                    .to_pandas()
-                    .multiply(dist_key, axis=1)
-                )
+        dry = inflow_t.columns[inflow_t.to_numpy().sum(axis=0) == 0]
+        if not dry.empty:
+            logger.warning(
+                f"module_hydropower reports no inflow for {len(dry)} of "
+                f"{len(inflow_idx)} hydro units "
+                f"({units.loc[dry, 'p_nom'].sum() / 1e3:.1f} GW): {list(dry)}"
+            )
 
     if "ror" in carriers and not ror.empty:
         n.add(
@@ -1335,16 +1306,12 @@ if __name__ == "__main__":
     if "hydro" in renewable_carriers:
         p = params.renewable["hydro"]
         carriers = p.pop("carriers", [])
-        hydro_source = p.pop("source", "legacy")
-        if hydro_source == "module":
-            # One aggregated per-unit file per module plant type, keyed by the
-            # carrier it supplies (see `HYDRO_PLANT_TYPES` in the module rules).
-            profile_hydro = {
-                carrier: snakemake.input[f"profile_hydro_{carrier}"]
-                for carrier in ("ror", "hydro")
-            }
-        else:
-            profile_hydro = snakemake.input.profile_hydro
+        # One aggregated per-unit file per module plant type, keyed by the
+        # carrier it supplies (see `HYDRO_PLANT_TYPES` in the module rules).
+        profile_hydro = {
+            carrier: snakemake.input[f"profile_hydro_{carrier}"]
+            for carrier in ("ror", "hydro")
+        }
         attach_hydro(
             n,
             costs,
@@ -1352,7 +1319,6 @@ if __name__ == "__main__":
             profile_hydro,
             snakemake.input.hydro_capacities,
             carriers,
-            hydro_source=hydro_source,
             **p,
         )
 

@@ -1704,26 +1704,6 @@
             }
           }
         },
-        "country_runoff": {
-          "description": "Configuration for a single data source.",
-          "properties": {
-            "source": {
-              "default": "archive",
-              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
-              "enum": [
-                "archive",
-                "primary",
-                "build"
-              ],
-              "type": "string"
-            },
-            "version": {
-              "default": "latest",
-              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
-              "type": "string"
-            }
-          }
-        },
         "country_hdd": {
           "description": "Configuration for a single data source.",
           "properties": {
@@ -3920,30 +3900,6 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
-            "source": {
-              "default": "legacy",
-              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
-              "enum": [
-                "legacy",
-                "module"
-              ],
-              "type": "string"
-            },
-            "cutout": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              ],
-              "default": "default",
-              "description": "Specifies the weather data cutout file(s) to use."
-            },
             "carriers": {
               "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
               "items": {
@@ -3979,33 +3935,6 @@
               "default": 0.2,
               "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
               "type": "number"
-            },
-            "clip_min_inflow": {
-              "default": 1.0,
-              "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-              "type": "number"
-            },
-            "eia_norm_year": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "integer"
-                }
-              ],
-              "default": false,
-              "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-            },
-            "eia_correct_by_capacity": {
-              "default": false,
-              "description": "Correct EIA annual hydro generation data by installed capacity.",
-              "type": "boolean"
-            },
-            "eia_approximate_missing": {
-              "default": false,
-              "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-              "type": "boolean"
             }
           }
         }
@@ -6704,30 +6633,6 @@
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
-        "source": {
-          "default": "legacy",
-          "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
-          "enum": [
-            "legacy",
-            "module"
-          ],
-          "type": "string"
-        },
-        "cutout": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          ],
-          "default": "default",
-          "description": "Specifies the weather data cutout file(s) to use."
-        },
         "carriers": {
           "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
           "items": {
@@ -6763,33 +6668,6 @@
           "default": 0.2,
           "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
           "type": "number"
-        },
-        "clip_min_inflow": {
-          "default": 1.0,
-          "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-          "type": "number"
-        },
-        "eia_norm_year": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "integer"
-            }
-          ],
-          "default": false,
-          "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-        },
-        "eia_correct_by_capacity": {
-          "default": false,
-          "description": "Correct EIA annual hydro generation data by installed capacity.",
-          "type": "boolean"
-        },
-        "eia_approximate_missing": {
-          "default": false,
-          "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-          "type": "boolean"
         }
       }
     },
@@ -10133,30 +10011,6 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
-            "source": {
-              "default": "legacy",
-              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
-              "enum": [
-                "legacy",
-                "module"
-              ],
-              "type": "string"
-            },
-            "cutout": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              ],
-              "default": "default",
-              "description": "Specifies the weather data cutout file(s) to use."
-            },
             "carriers": {
               "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
               "items": {
@@ -10192,33 +10046,6 @@
               "default": 0.2,
               "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
               "type": "number"
-            },
-            "clip_min_inflow": {
-              "default": 1.0,
-              "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-              "type": "number"
-            },
-            "eia_norm_year": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "integer"
-                }
-              ],
-              "default": false,
-              "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-            },
-            "eia_correct_by_capacity": {
-              "default": false,
-              "description": "Correct EIA annual hydro generation data by installed capacity.",
-              "type": "boolean"
-            },
-            "eia_approximate_missing": {
-              "default": false,
-              "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-              "type": "boolean"
             }
           }
         }
@@ -13663,26 +13490,6 @@
           }
         },
         "costs": {
-          "description": "Configuration for a single data source.",
-          "properties": {
-            "source": {
-              "default": "archive",
-              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
-              "enum": [
-                "archive",
-                "primary",
-                "build"
-              ],
-              "type": "string"
-            },
-            "version": {
-              "default": "latest",
-              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
-              "type": "string"
-            }
-          }
-        },
-        "country_runoff": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

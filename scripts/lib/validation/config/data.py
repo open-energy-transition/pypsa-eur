@@ -333,10 +333,6 @@ class DataConfig(BaseModel):
         default_factory=_DataSourceConfig,
         description="Costs data source configuration.",
     )
-    country_runoff: _DataSourceConfig = Field(
-        default_factory=_DataSourceConfig,
-        description="Country runoff data source configuration.",
-    )
     country_hdd: _DataSourceConfig = Field(
         default_factory=_DataSourceConfig,
         description="Country HDD data source configuration.",

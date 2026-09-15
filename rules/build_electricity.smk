@@ -410,54 +410,6 @@ rule build_fossil_fuel_prices:
         scripts("build_monthly_prices.py")
 
 
-if COUNTRY_RUNOFF_DATASET["source"] == "build":
-
-    # This rule uses one or multiple cutouts.
-    # To update the output files to include a new year, e.g. 2025 using an existing cutout,
-    # either create a new cutout covering the whole timespan or add another cutout that covers the additional year(s).
-    # E.g. cutouts=[<cutout for 1940-2024>, <cutout for 2025-2025>]
-    rule build_country_runoff:
-        input:
-            cutouts=["cutouts/europe-1940-2024-era5.nc"],
-            country_shapes=resources("country_shapes.geojson"),
-        output:
-            era5_runoff=COUNTRY_RUNOFF_DATASET["folder"] / "era5-runoff-per-country.csv",
-        log:
-            logs("build_country_runoff.log"),
-        benchmark:
-            benchmarks("build_country_runoff")
-        script:
-            scripts("build_country_runoff.py")
-
-
-rule build_hydro_profile:
-    input:
-        country_shapes=resources("country_shapes.geojson"),
-        eia_hydro_generation="data/eia_hydro_annual_generation.csv",
-        eia_hydro_capacity="data/eia_hydro_annual_capacity.csv",
-        era5_runoff=f"{COUNTRY_RUNOFF_DATASET['folder']}/era5-runoff-per-country.csv",
-        cutout=lambda w: input_cutout(
-            w, config_provider("renewable", "hydro", "cutout")(w)
-        ),
-    output:
-        profile=resources("profile_hydro.nc"),
-    log:
-        logs("build_hydro_profile.log"),
-    benchmark:
-        benchmarks("build_hydro_profile")
-    resources:
-        mem_mb=5000,
-    params:
-        hydro=config_provider("renewable", "hydro"),
-        countries=config_provider("countries"),
-        snapshots=config_provider("snapshots"),
-        drop_leap_day=config_provider("enable", "drop_leap_day"),
-    message:
-        "Building hydropower profile"
-    script:
-        scripts("build_hydro_profile.py")
-
-
 rule build_line_rating:
     input:
         base_network=resources("networks/base.nc"),
@@ -756,14 +708,12 @@ def input_profile_tech(w):
     }
     if "hydro" not in carriers:
         return inputs
-    if config_provider("renewable", "hydro", "source")(w) == "module":
-        # module_hydropower aggregates inflow over the shapes it is fed, which
-        # are the clustered onshore regions, so its output is already per bus.
-        return inputs | {
-            f"profile_hydro_{carrier}": hydro_module_inflow_pu(plant_type)
-            for carrier, plant_type in HYDRO_PLANT_TYPES.items()
-        }
-    return inputs | {"profile_hydro": resources("profile_hydro.nc")}
+    # module_hydropower aggregates inflow over the shapes it is fed, which
+    # are the clustered onshore regions, so its output is already per bus.
+    return inputs | {
+        f"profile_hydro_{carrier}": hydro_module_inflow_pu(plant_type)
+        for carrier, plant_type in HYDRO_PLANT_TYPES.items()
+    }
 
 
 def input_conventional(w):

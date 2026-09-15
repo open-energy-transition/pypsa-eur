@@ -65,5 +65,5 @@ class ModulesConfig(ConfigModel):
         default=_ModuleConfig(
             config_path=Path("config/modules/hydropower.yaml"), version="v0.2.2"
         ),
-        description="Configuration for the hydropower module, used when `renewable.hydro.source` is `module`.",
+        description="Configuration for the hydropower module.",
     )

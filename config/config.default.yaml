@@ -419,8 +419,6 @@ renewable:
     excluder_resolution: 100
     clip_p_max_pu: 0.01
   hydro:
-    source: legacy
-    cutout: default
     carriers:
     - ror
     - PHS
@@ -429,10 +427,6 @@ renewable:
     hydro_max_hours: energy_capacity_totals_by_country
     flatten_dispatch: false
     flatten_dispatch_buffer: 0.2
-    clip_min_inflow: 1.0
-    eia_norm_year: false
-    eia_correct_by_capacity: false
-    eia_approximate_missing: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#conventional
 conventional:
@@ -1430,9 +1424,6 @@ data:
     source: archive
     version: latest
   costs:
-    source: archive
-    version: latest
-  country_runoff:
     source: archive
     version: latest
   country_hdd:
