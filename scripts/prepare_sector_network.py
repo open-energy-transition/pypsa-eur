@@ -27,6 +27,7 @@ from pypsa.geo import haversine_pts
 from scripts._helpers import (
     get,
     get_temporal_resolution,
+    generate_periodic_profiles,
 )
 from scripts.add_electricity import (
     attach_storageunits,
@@ -2606,6 +2607,7 @@ def add_heat(
     solar_thermal_total_file: str,
     retro_cost_file: str,
     floor_area_file: str,
+    WWHR_costs_file: str,
     heat_source_profile_files: dict[str, str],
     heat_dsm_profile_file: str,
     params: dict,
@@ -2653,6 +2655,8 @@ def add_heat(
         Path to CSV file containing retrofitting costs
     floor_area_file : str
         Path to CSV file containing floor area data
+    WWHR_costs_file : str
+        Path to CSV file containing waste water heat recovery costs
     heat_source_profile_files : dict[str, str]
         Dictionary mapping heat source names to their data file paths
     heat_dsm_profile_file : str
@@ -3516,6 +3520,64 @@ def add_heat(
                     capital_cost=capital_cost[strength]
                     * options["retrofitting"]["cost_factor"],
                 )
+
+    if options["retrofitting"]["WWHR_endogen"]:
+        WWHR_costs = pd.read_csv(WWHR_costs_file, index_col=0)
+        heat_demand_shape = (
+            xr.open_dataset(hourly_heat_demand_total_file)
+            .to_dataframe()
+            .unstack(level=1)
+        )
+
+        name = "residential water"
+
+        hotwaterprofile = (
+            heat_demand_shape[name] / heat_demand_shape[name].sum()
+        ).multiply(pop_weighted_energy_totals[f"total {name}"]) * 1e6
+
+        # 80% of hot water is used for showers
+        # 35% is the assumed reduction of demand due to WWHR technology
+        WWHR_week = 0.8 * 0.35 * np.ones((24 * 7,))
+
+        WWHR_profile = generate_periodic_profiles(
+            dt_index=pd.date_range(freq="h", **params.snapshots, tz="UTC"),
+            nodes=hotwaterprofile.columns,
+            weekly_profile=WWHR_week,
+        )
+
+        heat_systems_residential_water = [
+            "residential rural",
+            "residential urban decentral",
+            "urban central",
+        ]
+
+        for name in n.loads[
+            n.loads.carrier.isin([x + " heat" for x in heat_systems_residential_water])
+        ].index:
+            node = n.buses.loc[name, "location"]
+            ct = pop_layout.loc[node, "ct"]
+
+            if "urban central" in name:
+                f = dist_fraction[node]
+            elif "urban decentral" in name:
+                f = urban_fraction[node] - dist_fraction[node]
+            else:
+                f = 1 - urban_fraction[node]
+
+            node_name = " ".join(name.split(" ")[2::])
+            n.madd(
+                "Generator",
+                [node],
+                suffix=" WWHRS " + node_name,
+                bus=name,
+                carrier="WWHRS",
+                p_nom_extendable=True,
+                p_nom_max=f * hotwaterprofile[node].max(),  # maximum energy savings
+                p_max_pu=pd.DataFrame(WWHR_profile[node]),
+                p_min_pu=pd.DataFrame(WWHR_profile[node]),
+                country=ct,
+                capital_cost=WWHR_costs.loc[node].max() / hotwaterprofile[node].max(),
+            )
 
 
 def add_methanol(
@@ -6309,6 +6371,7 @@ def main(
             solar_thermal_total_file=inputs.solar_thermal_total,
             retro_cost_file=inputs.retro_cost,
             floor_area_file=inputs.floor_area,
+            WWHR_costs_file=inputs.WWHR_costs,
             heat_source_profile_files={
                 source: inputs[source]
                 for source in params.limited_heat_sources
