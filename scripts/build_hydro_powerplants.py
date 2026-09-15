@@ -7,17 +7,17 @@ Convert the powerplantmatching hydro fleet into a `module_hydropower` input.
 Pumped storage is excluded (closed loop, no natural inflow). Plants with an
 unknown technology default to run-of-river: in ppm 0.8.1 all 197 such plants
 have `Set=PP` with no storage evidence, and 91% of labelled non-PHS hydro PP
-plants are run-of-river. Plants outside the shape countries are dropped here so
-they do not consume the module's `max_dropped` budget.
+plants are run-of-river. Plants outside the modelled countries are dropped here
+so they do not consume the module's `max_dropped` budget.
 
-The output follows the module's `PowerplantSchema`, plus a `country` column
-(alpha-2) that the schema filters out but `build_hydro_profile_module` uses to
-map plants onto buses.
+The output follows the module's `PowerplantSchema`. Extra columns are filtered
+out by the schema, so the fleet is handed over as the module defines it and the
+module assigns each plant to a shape itself.
 
 Outputs
 -------
 
-- `resources/modules/hydropower/{shapes}/powerplants.parquet`
+- `resources/modules/hydropower/base_s_{clusters}/powerplants.parquet`
 """
 
 import logging
@@ -38,11 +38,13 @@ def build_hydro_powerplants(
     powerplants_fn: str, shapes_fn: str, output_fn: str
 ) -> None:
     cc = coco.CountryConverter()
-    countries = set(pd.read_parquet(shapes_fn, columns=["country_id"])["country_id"])
+    countries = set(
+        pd.read_parquet(shapes_fn, columns=["shape_id"])["shape_id"].str[:2]
+    )
 
     ppl = pd.read_csv(powerplants_fn, index_col=0)
     ppl = ppl[ppl["Fueltype"].eq("Hydro") & ppl["Technology"].ne(EXCLUDED_TECHNOLOGY)]
-    ppl = ppl[cc.pandas_convert(ppl["Country"], to="ISO3").isin(countries)]
+    ppl = ppl[cc.pandas_convert(ppl["Country"], to="ISO2").isin(countries)]
     if ppl.empty:
         raise ValueError(
             f"No hydro powerplants in {powerplants_fn} for countries {sorted(countries)}."
@@ -55,7 +57,6 @@ def build_hydro_powerplants(
             "technology": ppl["Technology"].fillna(DEFAULT_TECHNOLOGY),
             "start_year": ppl["DateIn"].fillna(0),
             "end_year": ppl["DateOut"].fillna(9999),
-            "country": cc.pandas_convert(ppl["Country"], to="ISO2"),
         },
         geometry=gpd.points_from_xy(ppl["lon"], ppl["lat"]),
         crs="EPSG:4326",
@@ -73,7 +74,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
 
-        snakemake = mock_snakemake("build_hydro_powerplants", shapes="default")
+        snakemake = mock_snakemake("build_hydro_powerplants", clusters=50)
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 

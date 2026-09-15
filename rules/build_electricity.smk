@@ -458,67 +458,6 @@ rule build_hydro_profile:
         scripts("build_hydro_profile.py")
 
 
-rule prepare_hydro_shapes:
-    input:
-        geo_shapes=f"resources/modules/geo_boundaries/{config['modules']['geo_boundaries']['scenario']}.parquet",
-        eia_bulk=rules.hydropower_download_eia.output["zipfile"],
-    output:
-        shapes=HYDRO_SHAPES,
-    log:
-        logs("prepare_hydro_shapes.log"),
-    benchmark:
-        benchmarks("prepare_hydro_shapes")
-    threads: 1
-    resources:
-        mem_mb=2000,
-    message:
-        "Exposing geo_boundaries land shapes to module_hydropower (EIA-covered countries only)"
-    script:
-        scripts("prepare_hydro_shapes.py")
-
-
-rule build_hydro_powerplants:
-    input:
-        powerplants=rules.retrieve_powerplants.output["powerplants"],
-        shapes=f"{HYDRO_DIR}/{{shapes}}_shapes.parquet",
-    output:
-        powerplants=f"{HYDRO_DIR}/{{shapes}}/powerplants.parquet",
-    log:
-        logs("build_hydro_powerplants_{shapes}.log"),
-    benchmark:
-        benchmarks("build_hydro_powerplants_{shapes}")
-    threads: 1
-    resources:
-        mem_mb=2000,
-    message:
-        "Preparing hydro powerplants for module_hydropower '{wildcards.shapes}'"
-    script:
-        scripts("build_hydro_powerplants.py")
-
-
-rule build_hydro_profile_module:
-    input:
-        inflow_mwh=f"{HYDRO_DIR}/{HYDRO_SCENARIO}/disaggregated/inflow_mwh.parquet",
-        powerplants=f"{HYDRO_DIR}/{HYDRO_SCENARIO}/powerplants.parquet",
-        regions_onshore=resources("regions_onshore_base_s_{clusters}.geojson"),
-    output:
-        profile=resources("profile_{clusters}_hydro.nc"),
-    log:
-        logs("build_hydro_profile_module_{clusters}.log"),
-    benchmark:
-        benchmarks("build_hydro_profile_module_{clusters}")
-    threads: 1
-    resources:
-        mem_mb=8000,
-    params:
-        snapshots=config_provider("snapshots"),
-        drop_leap_day=config_provider("enable", "drop_leap_day"),
-    message:
-        "Aggregating module_hydropower plant inflow onto {wildcards.clusters} buses"
-    script:
-        scripts("build_hydro_profile_module.py")
-
-
 rule build_line_rating:
     input:
         base_network=resources("networks/base.nc"),
@@ -809,15 +748,22 @@ rule cluster_network:
 
 
 def input_profile_tech(w):
-    legacy_hydro = config_provider("renewable", "hydro", "source")(w) == "legacy"
-    return {
-        f"profile_{tech}": resources(
-            "profile_hydro.nc"
-            if tech == "hydro" and legacy_hydro
-            else "profile_{clusters}_" + tech + ".nc"
-        )
-        for tech in config_provider("electricity", "renewable_carriers")(w)
+    carriers = config_provider("electricity", "renewable_carriers")(w)
+    inputs = {
+        f"profile_{tech}": resources("profile_{clusters}_" + tech + ".nc")
+        for tech in carriers
+        if tech != "hydro"
     }
+    if "hydro" not in carriers:
+        return inputs
+    if config_provider("renewable", "hydro", "source")(w) == "module":
+        # module_hydropower aggregates inflow over the shapes it is fed, which
+        # are the clustered onshore regions, so its output is already per bus.
+        return inputs | {
+            f"profile_hydro_{carrier}": hydro_module_inflow_pu(plant_type)
+            for carrier, plant_type in HYDRO_PLANT_TYPES.items()
+        }
+    return inputs | {"profile_hydro": resources("profile_hydro.nc")}
 
 
 def input_conventional(w):

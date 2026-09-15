@@ -30,7 +30,6 @@ modules:
   hydropower:
     config_path: config/modules/hydropower.yaml
     version: v0.2.2
-    scenario: default
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:

@@ -2876,11 +2876,6 @@
             "version": {
               "description": "Module version to use.",
               "type": "string"
-            },
-            "scenario": {
-              "default": "default",
-              "description": "Scenario to use for the hydropower module.",
-              "type": "string"
             }
           },
           "required": [
@@ -3927,7 +3922,7 @@
           "properties": {
             "source": {
               "default": "legacy",
-              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
               "enum": [
                 "legacy",
                 "module"
@@ -6711,7 +6706,7 @@
       "properties": {
         "source": {
           "default": "legacy",
-          "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+          "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
           "enum": [
             "legacy",
             "module"
@@ -6797,29 +6792,6 @@
           "type": "boolean"
         }
       }
-    },
-    "_HydropowerModuleConfig": {
-      "description": "Configuration for module settings",
-      "properties": {
-        "config_path": {
-          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
-          "format": "file-path",
-          "type": "string"
-        },
-        "version": {
-          "description": "Module version to use.",
-          "type": "string"
-        },
-        "scenario": {
-          "default": "default",
-          "description": "Scenario to use for the hydropower module.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "config_path",
-        "version"
-      ]
     },
     "_ImportsConfig": {
       "description": "Configuration for `sector.imports` settings.",
@@ -7061,6 +7033,24 @@
           "type": "string"
         }
       }
+    },
+    "_ModuleConfig": {
+      "description": "Configuration for module settings",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
     },
     "_OETCConfig": {
       "description": "Configuration for `solving.oetc` settings (Open Energy Transition Computing cluster support).",
@@ -8400,11 +8390,6 @@
             },
             "version": {
               "description": "Module version to use.",
-              "type": "string"
-            },
-            "scenario": {
-              "default": "default",
-              "description": "Scenario to use for the hydropower module.",
               "type": "string"
             }
           },
@@ -10150,7 +10135,7 @@
           "properties": {
             "source": {
               "default": "legacy",
-              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+              "description": "Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
               "enum": [
                 "legacy",
                 "module"

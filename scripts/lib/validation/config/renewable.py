@@ -265,7 +265,7 @@ class _HydroConfig(BaseModel):
 
     source: Literal["legacy", "module"] = Field(
         "legacy",
-        description="Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, aggregated to buses in `build_hydro_profile_module`.",
+        description="Origin of the hydro inflow time series. `legacy` derives it from per-country runoff in `build_hydro_profile`. `module` derives it per power plant from the `module_hydropower` model block, which aggregates it onto the clustered onshore regions it is fed as shapes.",
     )
     cutout: str | list[str] = Field(
         "default", description="Specifies the weather data cutout file(s) to use."

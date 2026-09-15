@@ -48,15 +48,6 @@ class _GeoBoundariesModuleConfig(_ModuleConfig):
     )
 
 
-class _HydropowerModuleConfig(_ModuleConfig):
-    """Configuration for module settings"""
-
-    scenario: str = Field(
-        default="default",
-        description="Scenario to use for the hydropower module.",
-    )
-
-
 class ModulesConfig(ConfigModel):
     """Configuration for modules."""
 
@@ -70,8 +61,8 @@ class ModulesConfig(ConfigModel):
         ),
         description="Configuration for the geo_boundaries module.",
     )
-    hydropower: _HydropowerModuleConfig = Field(
-        default=_HydropowerModuleConfig(
+    hydropower: _ModuleConfig = Field(
+        default=_ModuleConfig(
             config_path=Path("config/modules/hydropower.yaml"), version="v0.2.2"
         ),
         description="Configuration for the hydropower module, used when `renewable.hydro.source` is `module`.",
