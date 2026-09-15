@@ -3,9 +3,9 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-crs:
-  projected: "epsg:3035"
-  geographic: "epsg:4326"
+crs:  # Taken from the central `modules.crs` (see geo_boundaries_module_config)
+  projected:
+  geographic:
 voronoi_eez:
   enabled: false
 scenarios:

@@ -6,6 +6,8 @@
 <!-- Upcoming Release -->
 <!-- ================= -->
 
+* feat: Hydro inflow now comes from the `module_hydropower` model block. The clustered onshore regions are handed to the module as its shapes, so it resolves inflow per power plant against HydroBASINS runoff, normalises it with EIA national generation and aggregates it per bus; `add_electricity` consumes that output directly. The per-country runoff approach is removed: rules `build_hydro_profile`, `build_country_runoff` and `retrieve_country_runoff`, and the `renewable: hydro:` options `cutout`, `clip_min_inflow`, `eia_norm_year`, `eia_correct_by_capacity` and `eia_approximate_missing`.
+
 * refactor: `prepare_sector_network.py` functions now take `spatial` as an explicit parameter instead of a module-level global.
 * fix: update stale contribution docs (linting and formatting ruff)
 * feat: data version CSV / YAML file can be specified separately or extended by the user in the `data.version_files` config entry ([#2016](https://github.com/PyPSA/pypsa-eur/issues/2016)).

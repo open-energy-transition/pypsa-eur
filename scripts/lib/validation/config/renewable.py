@@ -261,9 +261,6 @@ class _SolarConfig(BaseModel):
 class _HydroConfig(BaseModel):
     """Configuration for hydropower."""
 
-    cutout: str | list[str] = Field(
-        "default", description="Specifies the weather data cutout file(s) to use."
-    )
     carriers: list[str] = Field(
         default_factory=lambda: ["ror", "PHS", "hydro"],
         description="Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
@@ -283,22 +280,6 @@ class _HydroConfig(BaseModel):
     flatten_dispatch_buffer: float = Field(
         0.2,
         description="If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
-    )
-    clip_min_inflow: float = Field(
-        1.0,
-        description="To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-    )
-    eia_norm_year: bool | int = Field(
-        False,
-        description="To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year.",
-    )
-    eia_correct_by_capacity: bool = Field(
-        False,
-        description="Correct EIA annual hydro generation data by installed capacity.",
-    )
-    eia_approximate_missing: bool = Field(
-        False,
-        description="Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
     )
 
 

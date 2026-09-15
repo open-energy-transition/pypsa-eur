@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/modelblocks-org/module_hydropower/refs/tags/v0.2.2/workflow/internal/config.schema.yaml
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# Configuration for the `module_hydropower` model block, composed into pypsa-eur
+# via `rules/modules/hydropower.smk`, which overrides the keys left `null` here
+# from the central pypsa-eur configuration.
+
+pfafstetter_level: "06"  # matches the ~30 km resolution of the ERA5 input
+
+years:  # Derived from the pypsa-eur `snapshots` (see hydropower_module_config)
+  start:
+  end:
+
+powerplants:
+  technology_mapping:
+    run_of_river: "Run-Of-River"
+    reservoir: "Reservoir"
+  basin_adjustment:
+    buffer_radius: 1000  # epsg:3035 is in metres
+    max_outside: 50
+    max_dropped: 30
+
+crs:  # Taken from the central `modules.crs` (see hydropower_module_config)
+  projected:
+  geographic:
+
+smoothing_hours: "72h"
