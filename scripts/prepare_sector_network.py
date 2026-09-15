@@ -25,6 +25,7 @@ from networkx.algorithms.connectivity.edge_augmentation import k_edge_augmentati
 from pypsa.geo import haversine_pts
 
 from scripts._helpers import (
+    generate_periodic_profiles,
     get,
     get_temporal_resolution,
 )
@@ -451,6 +452,10 @@ def add_carrier_buses(
             )
 
             suffix = " primary"
+
+        # omit gas generators
+        if carrier == "gas":
+            return
 
         n.add(
             "Generator",
@@ -2602,6 +2607,7 @@ def add_heat(
     solar_thermal_total_file: str,
     retro_cost_file: str,
     floor_area_file: str,
+    WWHR_costs_file: str,
     heat_source_profile_files: dict[str, str],
     heat_dsm_profile_file: str,
     params: dict,
@@ -2649,6 +2655,8 @@ def add_heat(
         Path to CSV file containing retrofitting costs
     floor_area_file : str
         Path to CSV file containing floor area data
+    WWHR_costs_file : str
+        Path to CSV file containing waste water heat recovery costs
     heat_source_profile_files : dict[str, str]
         Dictionary mapping heat source names to their data file paths
     heat_dsm_profile_file : str
@@ -3335,6 +3343,9 @@ def add_heat(
                     lifetime=costs.at["central gas CHP", "lifetime"],
                 )
 
+                if not options["chp"]["cc"]:
+                    continue
+
                 n.add(
                     "Link",
                     nodes + f" urban central {fuel} CHP CC",
@@ -3510,6 +3521,64 @@ def add_heat(
                     * options["retrofitting"]["cost_factor"],
                 )
 
+    if options["retrofitting"]["WWHR_endogen"]:
+        WWHR_costs = pd.read_csv(WWHR_costs_file, index_col=0)
+        heat_demand_shape = (
+            xr.open_dataset(hourly_heat_demand_total_file)
+            .to_dataframe()
+            .unstack(level=1)
+        )
+
+        name = "residential water"
+
+        hotwaterprofile = (
+            heat_demand_shape[name] / heat_demand_shape[name].sum()
+        ).multiply(pop_weighted_energy_totals[f"total {name}"]) * 1e6
+
+        # 80% of hot water is used for showers
+        # 35% is the assumed reduction of demand due to WWHR technology
+        WWHR_week = 0.8 * 0.35 * np.ones((24 * 7,))
+
+        WWHR_profile = generate_periodic_profiles(
+            dt_index=pd.date_range(freq="h", **params.snapshots, tz="UTC"),
+            nodes=hotwaterprofile.columns,
+            weekly_profile=WWHR_week,
+        )
+
+        heat_systems_residential_water = [
+            "residential rural",
+            "residential urban decentral",
+            "urban central",
+        ]
+
+        for name in n.loads[
+            n.loads.carrier.isin([x + " heat" for x in heat_systems_residential_water])
+        ].index:
+            node = n.buses.loc[name, "location"]
+            ct = pop_layout.loc[node, "ct"]
+
+            if "urban central" in name:
+                f = dist_fraction[node]
+            elif "urban decentral" in name:
+                f = urban_fraction[node] - dist_fraction[node]
+            else:
+                f = 1 - urban_fraction[node]
+
+            node_name = " ".join(name.split(" ")[2::])
+            n.madd(
+                "Generator",
+                [node],
+                suffix=" WWHRS " + node_name,
+                bus=name,
+                carrier="WWHRS",
+                p_nom_extendable=True,
+                p_nom_max=f * hotwaterprofile[node].max(),  # maximum energy savings
+                p_max_pu=pd.DataFrame(WWHR_profile[node]),
+                p_min_pu=pd.DataFrame(WWHR_profile[node]),
+                country=ct,
+                capital_cost=WWHR_costs.loc[node].max() / hotwaterprofile[node].max(),
+            )
+
 
 def add_methanol(
     n: pypsa.Network,
@@ -3604,6 +3673,7 @@ def add_biomass(
     pop_layout,
     biomass_potentials_file,
     biomass_transport_costs_file=None,
+    industrial_demand_file=None,
     nyears=1,
 ):
     """
@@ -3675,10 +3745,28 @@ def add_biomass(
             "unsustainable biogas"
         ].sum()
 
+    if not options["industry"]:
+        # if the industry is not modelled, remove industrial demand from biomass potentials
+        industrial_demand = (
+            pd.read_csv(industrial_demand_file, index_col=0) * 1e6
+        ) * nyears
+        if options.get("biomass_spatial", options["biomass_transport"]):
+            e_set = industrial_demand.loc[
+                spatial.biomass.locations, "solid biomass"
+            ].rename(index=lambda x: x + " solid biomass")
+        else:
+            e_set = industrial_demand["solid biomass"].sum()
+    else:
+        # if the industry is modelled, keep full biomass potentials
+        e_set = 0
+
     if options.get("biomass_spatial", options["biomass_transport"]):
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].rename(
-            index=lambda x: x + " solid biomass"
-        )
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].rename(
+                index=lambda x: x + " solid biomass"
+            )
+            - e_set
+        ).clip(lower=0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].rename(index=lambda x: x + " municipal solid waste")
@@ -3690,7 +3778,9 @@ def add_biomass(
         ].rename(index=lambda x: x + " unsustainable bioliquids")
 
     else:
-        solid_biomass_potentials_spatial = biomass_potentials["solid biomass"].sum()
+        solid_biomass_potentials_spatial = (
+            biomass_potentials["solid biomass"].sum() - e_set
+        ).clip(lower=0)
         msw_biomass_potentials_spatial = biomass_potentials[
             "municipal solid waste"
         ].sum()
@@ -4094,6 +4184,12 @@ def add_biomass(
             lifetime=costs.at[key, "lifetime"],
         )
 
+    if (
+        not urban_central.empty
+        and options["chp"]["enable"]
+        and ("solid biomass" in options["chp"]["fuel"])
+        and options["chp"]["cc"]
+    ):
         n.add(
             "Link",
             urban_central + " urban central solid biomass CHP CC",
@@ -6275,6 +6371,7 @@ def main(
             solar_thermal_total_file=inputs.solar_thermal_total,
             retro_cost_file=inputs.retro_cost,
             floor_area_file=inputs.floor_area,
+            WWHR_costs_file=inputs.WWHR_costs,
             heat_source_profile_files={
                 source: inputs[source]
                 for source in params.limited_heat_sources
@@ -6300,6 +6397,7 @@ def main(
             pop_layout=pop_layout,
             biomass_potentials_file=inputs.biomass_potentials,
             biomass_transport_costs_file=inputs.biomass_transport_costs,
+            industrial_demand_file=inputs.industrial_demand,
             nyears=nyears,
         )
 
