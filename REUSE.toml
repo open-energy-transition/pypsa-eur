@@ -42,6 +42,7 @@ path = [
     "data/parameter_corrections.yaml",
     "data/retro/window_assumptions.csv",
     "data/retro/retro_cost_germany.csv",
+    "data/retro/households.csv",
     "data/transmission_projects/**",
     "data/unit_commitment.csv",
     "data/versions.csv",
