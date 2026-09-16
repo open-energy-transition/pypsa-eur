@@ -1222,10 +1222,7 @@ def add_generation(
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
             p_nom_extendable=(
                 True
-                if generator
-                in extendable_carriers.get(
-                    "Generator", list()
-                )
+                if generator in extendable_carriers.get("Generator", list())
                 else False
             ),
             p_nom=existing_capacities[generator] if not existing_capacities == 0 else 0,
