@@ -1150,6 +1150,7 @@ def add_generation(
     cf_industry: dict,
     existing_capacities: pd.Series,
     existing_efficiencies: pd.Series | None = None,
+    extendable_carriers: dict = dict(),
 ) -> None:
     """
     Add conventional electricity generation to the network.
@@ -1179,6 +1180,8 @@ def add_generation(
         Capacities for the generators that were previously assigned in add_electricity
     existing_efficiencies : pd.Series | None
         Efficiencies for the generators that were previously assigned in add_electricity
+    extendable_carriers : dict
+        Dictionary of extendable carriers, needed for generator buses
 
     Returns
     -------
@@ -1217,7 +1220,14 @@ def add_generation(
             * costs.at[generator, "VOM"],  # NB: VOM is per MWel
             capital_cost=costs.at[generator, "efficiency"]
             * costs.at[generator, "capital_cost"],  # NB: fixed cost is per MWel
-            p_nom_extendable=True,
+            p_nom_extendable=(
+                True
+                if generator
+                in extendable_carriers.get(
+                    "Generator", list()
+                )
+                else False
+            ),
             p_nom=existing_capacities[generator] if not existing_capacities == 0 else 0,
             p_nom_min=existing_capacities[generator]
             if not existing_capacities == 0
@@ -6349,6 +6359,7 @@ def main(
         cf_industry=cf_industry,
         existing_capacities=existing_capacities,
         existing_efficiencies=existing_efficiencies,
+        extendable_carriers=params.electricity.get("extendable_carriers", dict()),
     )
 
     add_h2_gas_infrastructure(
