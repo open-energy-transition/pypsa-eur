@@ -1491,8 +1491,7 @@ def insert_electricity_distribution_grid(
             carrier="solar rooftop",
             p_nom_extendable=(
                 True
-                if "solar"
-                in extendable_carriers.get("Generator", list())
+                if "solar" in extendable_carriers.get("Generator", list())
                 else False
             ),  # solar rooftop only extendable if solar is extendable
             p_nom_max=potential.loc[solar],
