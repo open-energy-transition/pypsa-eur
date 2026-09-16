@@ -438,8 +438,9 @@ def chemicals_industry():
 
     # subtract ammonia energy demand (in ktNH3/a)
     ammonia = pd.read_csv(snakemake.input.ammonia_production, index_col=0)
+    ammonia_year = min(ammonia.columns.astype(int), key=lambda y: abs(y - year))
     ammonia_total = ammonia.loc[
-        ammonia.index.intersection(eu27), str(max(2018, year))
+        ammonia.index.intersection(eu27), str(ammonia_year)
     ].sum()
     df.loc["methane", sector] -= ammonia_total * params["MWh_CH4_per_tNH3_SMR"]
     df.loc["elec", sector] -= ammonia_total * params["MWh_elec_per_tNH3_SMR"]
