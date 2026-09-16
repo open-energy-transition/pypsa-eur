@@ -6228,6 +6228,43 @@ def add_import_options(
         )
 
 
+def get_nominal_capacities(n, carrier, component):
+    """Gets capacities for {carrier} in n.{component}"""
+    component_list = ["generators", "storage_units", "links", "stores"]
+    component_dict = {name: getattr(n, name) for name in component_list}
+    e_nom_carriers = ["stores"]
+    nom_col = {x: "e_nom" if x in e_nom_carriers else "p_nom" for x in component_list}
+
+    capacity = component_dict[component].query("carrier in @carrier")[
+        nom_col[component]
+    ]
+    return capacity
+
+
+def set_capacities(n, data, carrier, component, nom_types=["nom"]):
+    """
+    Sets capacities for {carrier} in n.{component}
+    nom_type - specifies which nominal is set (i.e. p_nom, p_nom_min).
+               options = {"nom", "nom_min", "nom_max"}
+    """
+    component_list = ["generators", "storage_units", "links", "stores"]
+    component_dict = {name: getattr(n, name) for name in component_list}
+    e_nom_carriers = ["stores"]
+
+    mask = component_dict[component].query("carrier in @carrier").index
+
+    for nom_type in nom_types:
+        nom_col = {
+            x: f"e_{nom_type}" if x in e_nom_carriers else f"p_{nom_type}"
+            for x in component_list
+        }
+        component_dict[component].loc[mask, nom_col[component]] = data
+
+        logger.info(f"Set {nom_col[component]} for {carrier} in {component}")
+
+    return n
+
+
 def main(
     n: pypsa.Network,
     inputs,
@@ -6254,6 +6291,8 @@ def main(
         pd.read_csv(inputs["pop_weighted_heat_totals"], index_col=0) * nyears
     )
     pop_weighted_energy_totals.update(pop_weighted_heat_totals)
+
+    capacities_OCGT = get_nominal_capacities(n, carrier="OCGT", component="generators")
 
     fn = inputs.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0)
@@ -6305,6 +6344,14 @@ def main(
         spatial=spatial,
         options=options,
         cf_industry=cf_industry,
+    )
+
+    set_capacities(
+        n,
+        data=capacities_OCGT,
+        carrier="OCGT",
+        component="links",
+        nom_types=["nom", "nom_min"],
     )
 
     add_h2_gas_infrastructure(
