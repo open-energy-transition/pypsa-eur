@@ -97,7 +97,7 @@ def get_compose_inputs(w):
                 if cfg["sector"]["retrofitting"]["retro_endogen"]
                 else []
             ),
-            WWHR_cost=(
+            WWHR_costs=(
                 resources("WWHR_costs.csv")
                 if cfg["sector"]["retrofitting"]["WWHR_endogen"]
                 else []

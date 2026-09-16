@@ -1369,6 +1369,7 @@ def insert_electricity_distribution_grid(
     options: dict,
     pop_layout: pd.DataFrame,
     solar_rooftop_potentials_fn: str,
+    extendable_carriers: dict = dict(),
 ) -> None:
     """
     Insert electricity distribution grid components into the network.
@@ -1393,6 +1394,8 @@ def insert_electricity_distribution_grid(
         Population data per node with at least:
         - 'total' column containing population in thousands
         Index should match network nodes
+    extendable_carriers : dict
+        Dictionary of extendable carriers, needed for generator buses
 
     Returns
     -------
@@ -1489,9 +1492,7 @@ def insert_electricity_distribution_grid(
             p_nom_extendable=(
                 True
                 if "solar"
-                in snakemake.params.electricity.get("extendable_carriers", dict()).get(
-                    "Generator", list()
-                )
+                in extendable_carriers.get("Generator", list())
                 else False
             ),  # solar rooftop only extendable if solar is extendable
             p_nom_max=potential.loc[solar],
@@ -6583,7 +6584,12 @@ def main(
 
     if options["electricity_distribution_grid"]:
         insert_electricity_distribution_grid(
-            n, costs, options, pop_layout, inputs.solar_rooftop_potentials
+            n,
+            costs,
+            options,
+            pop_layout,
+            inputs.solar_rooftop_potentials,
+            extendable_carriers=extendable_carriers,
         )
 
     if options["enhanced_geothermal"].get("enable", False):
