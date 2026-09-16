@@ -25,9 +25,9 @@ from networkx.algorithms.connectivity.edge_augmentation import k_edge_augmentati
 from pypsa.geo import haversine_pts
 
 from scripts._helpers import (
+    generate_periodic_profiles,
     get,
     get_temporal_resolution,
-    generate_periodic_profiles,
 )
 from scripts.add_electricity import (
     attach_storageunits,
