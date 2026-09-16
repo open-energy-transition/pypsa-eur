@@ -6306,7 +6306,7 @@ def main(
 
     spatial = define_spatial(pop_layout.index, options)
 
-    if foresight in ["myopic", "perfect"]:
+    if foresight in ["overnight", "myopic", "perfect"]:
         fuel_carriers = params.fuel_carriers
         for carrier in fuel_carriers:
             add_carrier_buses(
