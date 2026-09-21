@@ -6146,7 +6146,6 @@ def add_enhanced_geothermal(
 
     # p_nom_max conversion GW -> MW
     egs_potentials["p_nom_max"] = egs_potentials["p_nom_max"] * 1000.0
-
     # not using add_carrier_buses, as we are not interested in a Store
     n.add("Carrier", "geothermal heat")
 
@@ -6760,7 +6759,7 @@ if __name__ == "__main__":
             egs_overlap=snakemake.input["egs_overlap"],
             egs_config=snakemake.params["sector"]["enhanced_geothermal"],
             spatial=spatial,
-            egs_capacity_factors="path/to/capacity_factors.csv",
+            egs_capacity_factors=snakemake.input["egs_capacity_factors"],
         )
 
     if options["imports"]["enable"]:
