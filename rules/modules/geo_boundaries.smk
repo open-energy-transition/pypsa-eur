@@ -8,11 +8,11 @@ MODULE_NAME = "geo_boundaries"
 def geo_boundaries_module_config() -> dict:
     """Module configuration with the keys left `null` in the module config filled in.
 
-    `crs` is taken from `modules.crs`, so it is defined once for every composed
+    `crs` is taken from the top-level `crs`, so it is defined once for every composed
     module rather than repeated in each module config.
     """
     module_cfg = module_config(MODULE_NAME)
-    module_cfg["crs"] = dict(config["modules"]["crs"])
+    module_cfg["crs"] = dict(config["crs"])
     return module_cfg
 
 

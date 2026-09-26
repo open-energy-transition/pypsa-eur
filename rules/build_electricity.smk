@@ -711,8 +711,8 @@ def input_profile_tech(w):
     # module_hydropower aggregates inflow over the shapes it is fed, which
     # are the clustered onshore regions, so its output is already per bus.
     return inputs | {
-        f"profile_hydro_{carrier}": hydro_module_inflow_pu(plant_type)
-        for carrier, plant_type in HYDRO_PLANT_TYPES.items()
+        f"profile_hydro_{plant_type}": hydro_module_inflow_pu(plant_type)
+        for plant_type in HYDRO_PLANT_TYPES
     }
 
 

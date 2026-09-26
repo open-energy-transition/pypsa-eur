@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: CC0-1.0
 
-crs:  # Taken from the central `modules.crs` (see geo_boundaries_module_config)
+crs:  # Taken from the top-level `crs` (see geo_boundaries_module_config)
   projected:
   geographic:
 voronoi_eez:

@@ -2,17 +2,19 @@
 #
 # SPDX-License-Identifier: MIT
 """
-Convert the powerplantmatching hydro fleet into a `module_hydropower` input.
+Convert the pypsa-eur hydro fleet into a `module_hydropower` input.
 
-Pumped storage is excluded (closed loop, no natural inflow). Plants with an
-unknown technology default to run-of-river: in ppm 0.8.1 all 197 such plants
-have `Set=PP` with no storage evidence, and 91% of labelled non-PHS hydro PP
-plants are run-of-river. Plants outside the modelled countries are dropped here
-so they do not consume the module's `max_dropped` budget.
+The fleet is `powerplants_s_{clusters}.csv`, the table `add_electricity` builds
+the network from, so the module and the network see the same plants.
+Technologies are renamed to carriers with `renewable.hydro.technology_mapping`,
+the mapping `add_electricity` uses. Hydro plants without a mapped technology
+(missing in powerplantmatching) are left out here, as they are left out of the
+network; the module would reject them anyway, since `technology` may not be
+empty. Pumped storage is passed on: the module keeps only the plant types in
+its own `technology_mapping` and ignores the rest.
 
 The output follows the module's `PowerplantSchema`. Extra columns are filtered
-out by the schema, so the fleet is handed over as the module defines it and the
-module assigns each plant to a shape itself.
+out by the schema, and the module assigns each plant to a shape itself.
 
 Outputs
 -------
@@ -22,7 +24,6 @@ Outputs
 
 import logging
 
-import country_converter as coco
 import geopandas as gpd
 import pandas as pd
 
@@ -30,40 +31,40 @@ from scripts._helpers import configure_logging, set_scenario_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TECHNOLOGY = "Run-Of-River"
-EXCLUDED_TECHNOLOGY = "Pumped Storage"
-
 
 def build_hydro_powerplants(
-    powerplants_fn: str, shapes_fn: str, output_fn: str
+    powerplants_fn: str, technology_mapping: dict[str, str], output_fn: str
 ) -> None:
-    cc = coco.CountryConverter()
-    countries = set(
-        pd.read_parquet(shapes_fn, columns=["shape_id"])["shape_id"].str[:2]
-    )
-
     ppl = pd.read_csv(powerplants_fn, index_col=0)
-    ppl = ppl[ppl["Fueltype"].eq("Hydro") & ppl["Technology"].ne(EXCLUDED_TECHNOLOGY)]
-    ppl = ppl[cc.pandas_convert(ppl["Country"], to="ISO2").isin(countries)]
-    if ppl.empty:
-        raise ValueError(
-            f"No hydro powerplants in {powerplants_fn} for countries {sorted(countries)}."
+    ppl = ppl[ppl["Fueltype"].eq("Hydro")]
+    carrier = ppl["Technology"].map(technology_mapping)
+
+    unmapped = carrier.isna()
+    if unmapped.any():
+        logger.info(
+            f"Leaving out {unmapped.sum()} hydro plants "
+            f"({ppl.loc[unmapped, 'Capacity'].sum() / 1e3:.2f} GW) without a "
+            "technology in `renewable.hydro.technology_mapping`; they are not "
+            "attached to the network either."
         )
+    ppl, carrier = ppl[~unmapped], carrier[~unmapped]
+    if ppl.empty:
+        raise ValueError(f"No mapped hydro powerplants in {powerplants_fn}.")
 
     out = gpd.GeoDataFrame(
         {
             "powerplant_id": ppl.index.astype(str),
             "output_capacity_mw": ppl["Capacity"],
-            "technology": ppl["Technology"].fillna(DEFAULT_TECHNOLOGY),
+            "technology": carrier,
             "start_year": ppl["DateIn"].fillna(0),
             "end_year": ppl["DateOut"].fillna(9999),
         },
         geometry=gpd.points_from_xy(ppl["lon"], ppl["lat"]),
         crs="EPSG:4326",
-    ).dropna(subset=["output_capacity_mw", "geometry"])
+    ).dropna(subset=["output_capacity_mw"])
 
     logger.info(
-        f"Writing {len(out)} of {len(ppl)} hydro powerplants "
+        f"Writing {len(out)} hydro powerplants "
         f"({out['output_capacity_mw'].sum() / 1e3:.1f} GW) to {output_fn}\n"
         f"{out['technology'].value_counts().to_string()}"
     )
@@ -79,7 +80,7 @@ if __name__ == "__main__":
     set_scenario_config(snakemake)
 
     build_hydro_powerplants(
-        snakemake.input.powerplants,
-        snakemake.input.shapes,
-        snakemake.output.powerplants,
+        powerplants_fn=snakemake.input.powerplants,
+        technology_mapping=snakemake.params.technology_mapping,
+        output_fn=snakemake.output.powerplants,
     )

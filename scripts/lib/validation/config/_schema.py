@@ -16,6 +16,7 @@ from scripts.lib.validation.config.co2_budget import Co2BudgetConfig
 from scripts.lib.validation.config.conventional import ConventionalConfig
 from scripts.lib.validation.config.costs import CostsConfig
 from scripts.lib.validation.config.countries import CountriesConfig
+from scripts.lib.validation.config.crs import CrsConfig
 from scripts.lib.validation.config.data import DataConfig
 from scripts.lib.validation.config.electricity import ElectricityConfig
 from scripts.lib.validation.config.enable import EnableConfig
@@ -103,6 +104,10 @@ class ConfigSchema(BaseModel):
     modules: ModulesConfig = Field(
         default_factory=ModulesConfig,
         description="Modules configuration for the workflow",
+    )
+    crs: CrsConfig = Field(
+        default_factory=CrsConfig,
+        description="Coordinate reference systems for the project, handed to the composed modules.",
     )
     run: RunConfig = Field(
         default_factory=RunConfig,

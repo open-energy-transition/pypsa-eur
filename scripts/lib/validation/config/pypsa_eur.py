@@ -34,13 +34,13 @@ class PypsaEurConfig(ConfigModel):
             "offwind-float",
             "solar-hsat",
             "solar",
-            "ror",
+            "run_of_river",
             "nuclear",
         ],
         description="Generator carriers to keep from PyPSA-Eur.",
     )
     StorageUnit: list[str] = Field(
-        default_factory=lambda: ["PHS", "hydro"],
+        default_factory=lambda: ["PHS", "reservoir"],
         description="StorageUnit carriers to keep from PyPSA-Eur.",
     )
     Store: list[str] = Field(

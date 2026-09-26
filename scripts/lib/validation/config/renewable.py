@@ -262,8 +262,16 @@ class _HydroConfig(BaseModel):
     """Configuration for hydropower."""
 
     carriers: list[str] = Field(
-        default_factory=lambda: ["ror", "PHS", "hydro"],
-        description="Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
+        default_factory=lambda: ["run_of_river", "PHS", "reservoir"],
+        description="Specifies the types of hydro power plants to attach to the network. 'run_of_river' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'reservoir' stands for hydroelectric dams. The first two names follow `module_hydropower`.",
+    )
+    technology_mapping: dict[str, str] = Field(
+        default_factory=lambda: {
+            "Run-Of-River": "run_of_river",
+            "Reservoir": "reservoir",
+            "Pumped Storage": "PHS",
+        },
+        description="Maps powerplantmatching hydro technologies to the carriers in `carriers`. Hydro plants whose technology is missing or not listed are not attached.",
     )
     PHS_max_hours: float = Field(
         6,

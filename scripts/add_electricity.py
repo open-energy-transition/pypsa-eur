@@ -123,6 +123,8 @@ STORE_LOOKUP = {
     },
 }
 
+HYDRO_COST_TECHNOLOGIES = {"ror": "run_of_river", "hydro": "reservoir"}
+
 idx = pd.IndexSlice
 
 logger = logging.getLogger(__name__)
@@ -270,6 +272,7 @@ def load_and_aggregate_powerplants(
     consider_efficiency_classes: bool | list[float] = False,
     aggregation_strategies: dict = None,
     exclude_carriers: list = None,
+    technology_mapping: dict = None,
 ) -> pd.DataFrame:
     if not aggregation_strategies:
         aggregation_strategies = {}
@@ -284,16 +287,11 @@ def load_and_aggregate_powerplants(
         "ccgt, thermal": "CCGT",
         "hard coal": "coal",
     }
-    tech_dict = {
-        "Run-Of-River": "ror",
-        "Reservoir": "hydro",
-        "Pumped Storage": "PHS",
-    }
     ppl = (
         pd.read_csv(ppl_fn, index_col=0, dtype={"bus": "str"})
         .powerplant.to_pypsa_names()
         .rename(columns=str.lower)
-        .replace({"carrier": carrier_dict, "technology": tech_dict})
+        .replace({"carrier": carrier_dict, "technology": technology_mapping or {}})
     )
 
     # Replace carriers "natural gas" and "hydro" with the respective technology;
@@ -493,15 +491,13 @@ def attach_wind_and_solar(
     landfall_lengths : dict, optional
         Dictionary containing the landfall lengths for offshore wind, by default None.
     """
+    carriers = [car for car in carriers if car != "hydro"]
     add_missing_carriers(n, carriers)
 
     if landfall_lengths is None:
         landfall_lengths = {}
 
     for car in carriers:
-        if car == "hydro":
-            continue
-
         landfall_length = landfall_lengths.get(car, 0.0)
 
         with xr.open_dataset(profile_filenames["profile_" + car]) as ds:
@@ -731,35 +727,6 @@ def attach_existing_batteries(
     logger.info(f"Added {len(batt)} existing battery storage units\n({stats} MW)")
 
 
-def module_inflow(
-    inflow_pu_fn: str, units: pd.DataFrame, snapshots: pd.Index
-) -> pd.DataFrame:
-    """
-    Scale `module_hydropower`'s per-bus inflow to the capacity of each unit.
-
-    The module aggregates plant inflow over the shapes it is handed, which are
-    the clustered onshore regions, so a column of `inflow_pu_fn` is a bus and its
-    values are per unit of the hydro capacity on that bus. Buses carrying no
-    plant of this type are absent from the file and receive no inflow.
-
-    Parameters
-    ----------
-    inflow_pu_fn : str
-        Path to the module's aggregated per-unit inflow for one plant type.
-    units : pd.DataFrame
-        Hydro units of the matching carrier, with `bus` and `p_nom`.
-    snapshots : pd.Index
-        Network snapshots. Selected rather than reindexed, so a module run that
-        does not cover them fails here instead of yielding zero inflow.
-    """
-    inflow_pu = pd.read_parquet(inflow_pu_fn)
-    inflow_pu.index = pd.DatetimeIndex(inflow_pu.index)
-    inflow_pu = inflow_pu.reindex(columns=units["bus"], fill_value=0.0).loc[snapshots]
-    return inflow_pu.set_axis(units.index, axis="columns").multiply(
-        units["p_nom"], axis="columns"
-    )
-
-
 def attach_hydro(
     n: pypsa.Network,
     costs: pd.DataFrame,
@@ -782,6 +749,9 @@ def attach_hydro(
         DataFrame containing the power plant data.
     profile_hydro : dict[str, str]
         Mapping of carrier to the module's per-bus, per-unit inflow parquet.
+        The module aggregates plant inflow over the clustered onshore regions it
+        is handed, so a column is a bus; buses without a plant of that type are
+        absent and receive no inflow.
     hydro_capacities : str
         Path to the hydro capacities data.
     carriers : list
@@ -792,45 +762,38 @@ def attach_hydro(
     add_missing_carriers(n, carriers)
     add_co2_emissions(n, costs, carriers)
 
-    ror = ppl.query('carrier == "ror"')
+    ror = ppl.query('carrier == "run_of_river"')
     phs = ppl.query('carrier == "PHS"')
-    hydro = ppl.query('carrier == "hydro"')
+    hydro = ppl.query('carrier == "reservoir"')
 
-    inflow_idx = ror.index.union(hydro.index)
-    inflow_t = pd.DataFrame()
-    if not inflow_idx.empty:
-        units = ppl.loc[inflow_idx]
-        inflow_t = pd.concat(
-            [
-                module_inflow(profile_hydro[carrier], group, n.snapshots)
-                for carrier, group in units.groupby("carrier")
-            ],
-            axis="columns",
-        ).reindex(columns=inflow_idx)
+    # Per-unit inflow of each unit's bus, one column per unit. Selected by snapshot
+    # rather than reindexed, so a module run that misses snapshots fails here.
+    inflow_pu = {
+        carrier: pd.read_parquet(profile_hydro[carrier])
+        .reindex(columns=units["bus"], fill_value=0.0)
+        .loc[n.snapshots]
+        .set_axis(units.index, axis="columns")
+        for carrier, units in (("run_of_river", ror), ("reservoir", hydro))
+        if not units.empty
+    }
+    dry = [unit for pu in inflow_pu.values() for unit in pu.columns[pu.sum() == 0]]
+    if dry:
+        logger.warning(
+            f"module_hydropower reports no inflow for {len(dry)} hydro units "
+            f"({ppl.loc[dry, 'p_nom'].sum() / 1e3:.1f} GW): {dry}"
+        )
 
-        dry = inflow_t.columns[inflow_t.to_numpy().sum(axis=0) == 0]
-        if not dry.empty:
-            logger.warning(
-                f"module_hydropower reports no inflow for {len(dry)} of "
-                f"{len(inflow_idx)} hydro units "
-                f"({units.loc[dry, 'p_nom'].sum() / 1e3:.1f} GW): {list(dry)}"
-            )
-
-    if "ror" in carriers and not ror.empty:
+    if "run_of_river" in carriers and not ror.empty:
         n.add(
             "Generator",
             ror.index,
-            carrier="ror",
+            carrier="run_of_river",
             bus=ror["bus"],
             p_nom=ror["p_nom"],
-            efficiency=costs.at["ror", "efficiency"],
-            capital_cost=costs.at["ror", "capital_cost"],
+            efficiency=costs.at["run_of_river", "efficiency"],
+            capital_cost=costs.at["run_of_river", "capital_cost"],
             weight=ror["p_nom"],
-            p_max_pu=(
-                inflow_t[ror.index]
-                .divide(ror["p_nom"], axis=1)
-                .where(lambda df: df <= 1.0, other=1.0)
-            ),
+            p_max_pu=inflow_pu["run_of_river"].clip(upper=1.0),
         )
 
     if "PHS" in carriers and not phs.empty:
@@ -851,7 +814,7 @@ def attach_hydro(
             cyclic_state_of_charge=True,
         )
 
-    if "hydro" in carriers and not hydro.empty:
+    if "reservoir" in carriers and not hydro.empty:
         hydro_max_hours = params.get("hydro_max_hours")
 
         assert hydro_capacities is not None, "No path for hydro capacities given."
@@ -899,7 +862,7 @@ def attach_hydro(
 
         if params.get("flatten_dispatch", False):
             buffer = params.get("flatten_dispatch_buffer", 0.2)
-            average_capacity_factor = inflow_t[hydro.index].mean() / hydro["p_nom"]
+            average_capacity_factor = inflow_pu["reservoir"].mean()
             p_max_pu = (average_capacity_factor + buffer).clip(upper=1)
         else:
             p_max_pu = 1
@@ -907,18 +870,18 @@ def attach_hydro(
         n.add(
             "StorageUnit",
             hydro.index,
-            carrier="hydro",
+            carrier="reservoir",
             bus=hydro["bus"],
             p_nom=hydro["p_nom"],
             max_hours=hydro_max_hours,
-            capital_cost=costs.at["hydro", "capital_cost"],
-            marginal_cost=costs.at["hydro", "marginal_cost"],
+            capital_cost=costs.at["reservoir", "capital_cost"],
+            marginal_cost=costs.at["reservoir", "marginal_cost"],
             p_max_pu=p_max_pu,  # dispatch
             p_min_pu=0.0,  # store
-            efficiency_dispatch=costs.at["hydro", "efficiency"],
+            efficiency_dispatch=costs.at["reservoir", "efficiency"],
             efficiency_store=0.0,
             cyclic_state_of_charge=True,
-            inflow=inflow_t.loc[:, hydro.index],
+            inflow=inflow_pu["reservoir"].multiply(hydro["p_nom"], axis="columns"),
         )
 
 
@@ -1236,7 +1199,7 @@ if __name__ == "__main__":
     time = get_snapshots(snakemake.params.snapshots, snakemake.params.drop_leap_day)
     n.set_snapshots(time)
 
-    costs = load_costs(snakemake.input.costs)
+    costs = load_costs(snakemake.input.costs).rename(index=HYDRO_COST_TECHNOLOGIES)
 
     ppl = load_and_aggregate_powerplants(
         snakemake.input.powerplants,
@@ -1244,6 +1207,7 @@ if __name__ == "__main__":
         params.consider_efficiency_classes,
         params.aggregation_strategies,
         params.exclude_carriers,
+        params.renewable["hydro"]["technology_mapping"],
     )
 
     attach_load(
@@ -1306,11 +1270,10 @@ if __name__ == "__main__":
     if "hydro" in renewable_carriers:
         p = params.renewable["hydro"]
         carriers = p.pop("carriers", [])
-        # One aggregated per-unit file per module plant type, keyed by the
-        # carrier it supplies (see `HYDRO_PLANT_TYPES` in the module rules).
         profile_hydro = {
-            carrier: snakemake.input[f"profile_hydro_{carrier}"]
-            for carrier in ("ror", "hydro")
+            name.removeprefix("profile_hydro_"): fn
+            for name, fn in snakemake.input.items()
+            if name.startswith("profile_hydro_")
         }
         attach_hydro(
             n,

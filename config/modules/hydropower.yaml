@@ -15,14 +15,14 @@ years:  # Derived from the pypsa-eur `snapshots` (see hydropower_module_config)
 
 powerplants:
   technology_mapping:
-    run_of_river: "Run-Of-River"
-    reservoir: "Reservoir"
+    run_of_river: "run_of_river"
+    reservoir: "reservoir"
   basin_adjustment:
     buffer_radius: 1000  # epsg:3035 is in metres
     max_outside: 50
     max_dropped: 30
 
-crs:  # Taken from the central `modules.crs` (see hydropower_module_config)
+crs:  # Taken from the top-level `crs` (see hydropower_module_config)
   projected:
   geographic:
 

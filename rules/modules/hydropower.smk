@@ -10,7 +10,9 @@ from scripts._helpers import get_snapshots
 MODULE_NAME = "hydropower"
 HYDRO_DIR = f"resources/modules/{MODULE_NAME}"
 HYDRO_PARTITION = "base_s_{clusters}"
-HYDRO_PLANT_TYPES = {"ror": "run_of_river", "hydro": "reservoir"}
+HYDRO_PLANT_TYPES = list(
+    module_config(MODULE_NAME)["powerplants"]["technology_mapping"]
+)
 
 
 def hydro_module_inflow_pu(plant_type: str) -> str:
@@ -22,7 +24,7 @@ def hydropower_module_config() -> dict:
     """Module configuration with the keys left `null` in the module config filled in.
 
     `years` is derived from the pypsa-eur snapshots, and `crs` is taken from
-    `modules.crs`, so it is defined once for every composed module rather than
+    the top-level `crs`, so it is defined once for every composed module rather than
     repeated in each module config.
     """
     snapshot_years = get_snapshots(
@@ -33,7 +35,7 @@ def hydropower_module_config() -> dict:
         start=int(snapshot_years.min()),
         end=int(snapshot_years.max()) + 1,
     )
-    module_cfg["crs"] = dict(config["modules"]["crs"])
+    module_cfg["crs"] = dict(config["crs"])
     return module_cfg
 
 
@@ -80,8 +82,7 @@ rule build_hydro_shapes:
 
 rule build_hydro_powerplants:
     input:
-        powerplants=rules.retrieve_powerplants.output["powerplants"],
-        shapes=rules.build_hydro_shapes.output["shapes"],
+        powerplants=resources("powerplants_s_{clusters}.csv"),
     output:
         powerplants=f"{HYDRO_DIR}/{HYDRO_PARTITION}/powerplants.parquet",
     log:
@@ -91,6 +92,8 @@ rule build_hydro_powerplants:
     threads: 1
     resources:
         mem_mb=2000,
+    params:
+        technology_mapping=config_provider("renewable", "hydro", "technology_mapping"),
     message:
         "Preparing hydro powerplants for module_hydropower"
     script:
