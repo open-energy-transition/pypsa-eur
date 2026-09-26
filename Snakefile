@@ -85,6 +85,7 @@ OSM_DATASET = dataset_version("osm")
 include: "rules/modules/geo_boundaries.smk"
 include: "rules/collect.smk"
 include: "rules/retrieve.smk"
+include: "rules/modules/hydropower.smk"
 include: "rules/build_electricity.smk"
 include: "rules/build_sector.smk"
 include: "rules/solve_electricity.smk"

@@ -261,12 +261,17 @@ class _SolarConfig(BaseModel):
 class _HydroConfig(BaseModel):
     """Configuration for hydropower."""
 
-    cutout: str | list[str] = Field(
-        "default", description="Specifies the weather data cutout file(s) to use."
-    )
     carriers: list[str] = Field(
-        default_factory=lambda: ["ror", "PHS", "hydro"],
-        description="Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
+        default_factory=lambda: ["run_of_river", "PHS", "reservoir"],
+        description="Specifies the types of hydro power plants to attach to the network. 'run_of_river' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'reservoir' stands for hydroelectric dams. The first two names follow `module_hydropower`.",
+    )
+    technology_mapping: dict[str, str] = Field(
+        default_factory=lambda: {
+            "Run-Of-River": "run_of_river",
+            "Reservoir": "reservoir",
+            "Pumped Storage": "PHS",
+        },
+        description="Maps powerplantmatching hydro technologies to the carriers in `carriers`. Hydro plants whose technology is missing or not listed are not attached.",
     )
     PHS_max_hours: float = Field(
         6,
@@ -283,22 +288,6 @@ class _HydroConfig(BaseModel):
     flatten_dispatch_buffer: float = Field(
         0.2,
         description="If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
-    )
-    clip_min_inflow: float = Field(
-        1.0,
-        description="To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-    )
-    eia_norm_year: bool | int = Field(
-        False,
-        description="To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year.",
-    )
-    eia_correct_by_capacity: bool = Field(
-        False,
-        description="Correct EIA annual hydro generation data by installed capacity.",
-    )
-    eia_approximate_missing: bool = Field(
-        False,
-        description="Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
     )
 
 

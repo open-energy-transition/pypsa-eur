@@ -44,3 +44,9 @@ class ModulesConfig(ConfigModel):
         ),
         description="Configuration for the geo_boundaries module.",
     )
+    hydropower: _ModuleConfig = Field(
+        default=_ModuleConfig(
+            config_path=Path("config/modules/hydropower.yaml"), version="v0.2.2"
+        ),
+        description="Configuration for the hydropower module.",
+    )

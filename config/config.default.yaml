@@ -24,6 +24,14 @@ modules:
     config_path: config/modules/geo_boundaries.yaml
     version: v1.0.1
     scenario: default
+  hydropower:
+    config_path: config/modules/hydropower.yaml
+    version: v0.2.2
+
+# docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#crs
+crs:
+  projected: "epsg:3035"
+  geographic: "epsg:4326"
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
@@ -413,19 +421,18 @@ renewable:
     excluder_resolution: 100
     clip_p_max_pu: 0.01
   hydro:
-    cutout: default
     carriers:
-    - ror
+    - run_of_river
     - PHS
-    - hydro
+    - reservoir
+    technology_mapping:
+      "Run-Of-River": run_of_river
+      Reservoir: reservoir
+      Pumped Storage: PHS
     PHS_max_hours: 6
     hydro_max_hours: energy_capacity_totals_by_country
     flatten_dispatch: false
     flatten_dispatch_buffer: 0.2
-    clip_min_inflow: 1.0
-    eia_norm_year: false
-    eia_correct_by_capacity: false
-    eia_approximate_missing: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#conventional
 conventional:
@@ -523,11 +530,11 @@ pypsa_eur:
   - "offwind-float"
   - "solar-hsat"
   - solar
-  - ror
+  - run_of_river
   - nuclear
   StorageUnit:
   - PHS
-  - hydro
+  - reservoir
   Store: []
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#energy
@@ -1423,9 +1430,6 @@ data:
     source: archive
     version: latest
   costs:
-    source: archive
-    version: latest
-  country_runoff:
     source: archive
     version: latest
   country_hdd:

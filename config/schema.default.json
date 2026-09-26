@@ -873,6 +873,21 @@
       },
       "type": "array"
     },
+    "CrsConfig": {
+      "description": "Configuration for `crs` settings.",
+      "properties": {
+        "projected": {
+          "default": "epsg:3035",
+          "description": "Projected coordinate reference system, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+          "type": "string"
+        },
+        "geographic": {
+          "default": "epsg:4326",
+          "description": "Geographic coordinate reference system, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+          "type": "string"
+        }
+      }
+    },
     "DataConfig": {
       "description": "Configuration for `data` settings.",
       "properties": {
@@ -1685,26 +1700,6 @@
           }
         },
         "costs": {
-          "description": "Configuration for a single data source.",
-          "properties": {
-            "source": {
-              "default": "archive",
-              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
-              "enum": [
-                "archive",
-                "primary",
-                "build"
-              ],
-              "type": "string"
-            },
-            "version": {
-              "default": "latest",
-              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
-              "type": "string"
-            }
-          }
-        },
-        "country_runoff": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {
@@ -2849,6 +2844,24 @@
             "config_path",
             "version"
           ]
+        },
+        "hydropower": {
+          "description": "Configuration for module settings",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
         }
       }
     },
@@ -3887,27 +3900,19 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
-            "cutout": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              ],
-              "default": "default",
-              "description": "Specifies the weather data cutout file(s) to use."
-            },
             "carriers": {
-              "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
+              "description": "Specifies the types of hydro power plants to attach to the network. 'run_of_river' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'reservoir' stands for hydroelectric dams. The first two names follow `module_hydropower`.",
               "items": {
                 "type": "string"
               },
               "type": "array"
+            },
+            "technology_mapping": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Maps powerplantmatching hydro technologies to the carriers in `carriers`. Hydro plants whose technology is missing or not listed are not attached.",
+              "type": "object"
             },
             "PHS_max_hours": {
               "default": 6,
@@ -3937,33 +3942,6 @@
               "default": 0.2,
               "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
               "type": "number"
-            },
-            "clip_min_inflow": {
-              "default": 1.0,
-              "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-              "type": "number"
-            },
-            "eia_norm_year": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "integer"
-                }
-              ],
-              "default": false,
-              "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-            },
-            "eia_correct_by_capacity": {
-              "default": false,
-              "description": "Correct EIA annual hydro generation data by installed capacity.",
-              "type": "boolean"
-            },
-            "eia_approximate_missing": {
-              "default": false,
-              "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-              "type": "boolean"
             }
           }
         }
@@ -6647,27 +6625,19 @@
     "_HydroConfig": {
       "description": "Configuration for hydropower.",
       "properties": {
-        "cutout": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          ],
-          "default": "default",
-          "description": "Specifies the weather data cutout file(s) to use."
-        },
         "carriers": {
-          "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
+          "description": "Specifies the types of hydro power plants to attach to the network. 'run_of_river' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'reservoir' stands for hydroelectric dams. The first two names follow `module_hydropower`.",
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "technology_mapping": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Maps powerplantmatching hydro technologies to the carriers in `carriers`. Hydro plants whose technology is missing or not listed are not attached.",
+          "type": "object"
         },
         "PHS_max_hours": {
           "default": 6,
@@ -6697,33 +6667,6 @@
           "default": 0.2,
           "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
           "type": "number"
-        },
-        "clip_min_inflow": {
-          "default": 1.0,
-          "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-          "type": "number"
-        },
-        "eia_norm_year": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "integer"
-            }
-          ],
-          "default": false,
-          "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-        },
-        "eia_correct_by_capacity": {
-          "default": false,
-          "description": "Correct EIA annual hydro generation data by installed capacity.",
-          "type": "boolean"
-        },
-        "eia_approximate_missing": {
-          "default": false,
-          "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-          "type": "boolean"
         }
       }
     },
@@ -6967,6 +6910,24 @@
           "type": "string"
         }
       }
+    },
+    "_ModuleConfig": {
+      "description": "Configuration for module settings",
+      "properties": {
+        "config_path": {
+          "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+          "format": "file-path",
+          "type": "string"
+        },
+        "version": {
+          "description": "Module version to use.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_path",
+        "version"
+      ]
     },
     "_OETCConfig": {
       "description": "Configuration for `solving.oetc` settings (Open Energy Transition Computing cluster support).",
@@ -8280,6 +8241,39 @@
             "config_path",
             "version"
           ]
+        },
+        "hydropower": {
+          "description": "Configuration for module settings",
+          "properties": {
+            "config_path": {
+              "description": "Path to module default configuration file. Can be relative to the project directory or absolute.",
+              "format": "file-path",
+              "type": "string"
+            },
+            "version": {
+              "description": "Module version to use.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "config_path",
+            "version"
+          ]
+        }
+      }
+    },
+    "crs": {
+      "description": "Configuration for `crs` settings.",
+      "properties": {
+        "projected": {
+          "default": "epsg:3035",
+          "description": "Projected coordinate reference system, used for area and distance calculations. Defaults to ETRS89-extended / LAEA Europe, whose units are metres.",
+          "type": "string"
+        },
+        "geographic": {
+          "default": "epsg:4326",
+          "description": "Geographic coordinate reference system, used for storing and exchanging coordinates. Defaults to WGS 84, whose units are degrees.",
+          "type": "string"
         }
       }
     },
@@ -10016,27 +10010,19 @@
         "hydro": {
           "description": "Configuration for hydropower.",
           "properties": {
-            "cutout": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
-              ],
-              "default": "default",
-              "description": "Specifies the weather data cutout file(s) to use."
-            },
             "carriers": {
-              "description": "Specifies the types of hydro power plants to build per-unit availability time series for. 'ror' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'hydro' stands for hydroelectric dams.",
+              "description": "Specifies the types of hydro power plants to attach to the network. 'run_of_river' stands for run-of-river plants, 'PHS' represents pumped-hydro storage, and 'reservoir' stands for hydroelectric dams. The first two names follow `module_hydropower`.",
               "items": {
                 "type": "string"
               },
               "type": "array"
+            },
+            "technology_mapping": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Maps powerplantmatching hydro technologies to the carriers in `carriers`. Hydro plants whose technology is missing or not listed are not attached.",
+              "type": "object"
             },
             "PHS_max_hours": {
               "default": 6,
@@ -10066,33 +10052,6 @@
               "default": 0.2,
               "description": "If `flatten_dispatch` is true, specify the value added above the average capacity factor.",
               "type": "number"
-            },
-            "clip_min_inflow": {
-              "default": 1.0,
-              "description": "To avoid too small values in the inflow time series, values below this threshold (MW) are set to zero.",
-              "type": "number"
-            },
-            "eia_norm_year": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "type": "integer"
-                }
-              ],
-              "default": false,
-              "description": "To specify a specific year by which hydro inflow is normed that deviates from the snapshots' year."
-            },
-            "eia_correct_by_capacity": {
-              "default": false,
-              "description": "Correct EIA annual hydro generation data by installed capacity.",
-              "type": "boolean"
-            },
-            "eia_approximate_missing": {
-              "default": false,
-              "description": "Approximate hydro generation data for years not included in EIA dataset through a regression based on annual runoff.",
-              "type": "boolean"
             }
           }
         }
@@ -13537,26 +13496,6 @@
           }
         },
         "costs": {
-          "description": "Configuration for a single data source.",
-          "properties": {
-            "source": {
-              "default": "archive",
-              "description": "Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source.",
-              "enum": [
-                "archive",
-                "primary",
-                "build"
-              ],
-              "type": "string"
-            },
-            "version": {
-              "default": "latest",
-              "description": "Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source.",
-              "type": "string"
-            }
-          }
-        },
-        "country_runoff": {
           "description": "Configuration for a single data source.",
           "properties": {
             "source": {

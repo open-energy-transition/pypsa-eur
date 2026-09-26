@@ -30,7 +30,7 @@ Then, the process continues by calculating conventional power plant capacities, 
 - [build_powerplants][] for today's thermal power plant capacities using [powerplantmatching](https://github.com/PyPSA/powerplantmatching) allocating these to the matching clustered region for each powerplant,
 - [determine_availability_matrix][] for the land eligibility analysis of each cutout grid cell for PV, onshore and offshore wind,
 - [build_renewable_profiles][] for the hourly capacity factors and installation potentials constrained by land-use in each substation's Voronoi cell for PV, onshore and offshore wind, and
-- [build_hydro_profile][] for the hourly per-unit hydro power availability time series.
+- the `module_hydropower` model block (`rules/modules/hydropower.smk`) for the hourly per-unit hydro inflow time series.
 
 The rules [add_electricity][] and [prepare_network][] then tie all the different data inputs
 together into a detailed PyPSA network stored in `networks/base_s_{clusters}_elec.nc`.
@@ -126,10 +126,6 @@ together into a detailed PyPSA network stored in `networks/base_s_{clusters}_ele
 
 ::: build_renewable_profiles
 
-
-## Rule `build_hydro_profile` {#hydroprofiles}
-
-::: build_hydro_profile
 
 ## Rule `build_powerplants` {#powerplants}
 

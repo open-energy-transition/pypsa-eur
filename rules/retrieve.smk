@@ -380,21 +380,6 @@ if (CUTOUT_DATASET := dataset_version("cutout"))["source"] in [
             copy2(input[0], output[0])
 
 
-if (COUNTRY_RUNOFF_DATASET := dataset_version("country_runoff"))["source"] in [
-    "archive"
-]:
-
-    rule retrieve_country_runoff:
-        input:
-            storage(COUNTRY_RUNOFF_DATASET["url"]),
-        output:
-            era5_runoff=f"{COUNTRY_RUNOFF_DATASET['folder']}/era5-runoff-per-country.csv",
-        message:
-            "Retrieving country runoff data"
-        run:
-            copy2(input[0], output[0])
-
-
 if (COUNTRY_HDD_DATASET := dataset_version("country_hdd"))["source"] in ["archive"]:
 
     rule retrieve_country_hdd:

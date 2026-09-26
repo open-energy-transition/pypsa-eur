@@ -402,6 +402,37 @@ Configuration for `links` settings.
 ```
 
 
+## `modules` {#modules_cf}
+
+PyPSA-Eur composes external "model block" workflows via Snakemake's `module` directive. Each module is a self-contained workflow hosted in its own repository and pinned to a version. The modules used are:
+
+- `geo_boundaries` — https://github.com/modelblocks-org/module_geo_boundaries
+- `hydropower` — https://github.com/modelblocks-org/module_hydropower
+
+See https://www.modelblocks.org/modules/ for a summary of available modules.
+
+{{ schema_table("modules") }}
+
+**YAML Syntax**
+
+```yaml
+{{ yaml_section("modules") }}
+```
+
+
+## `crs` {#crs_cf}
+
+Coordinate reference systems for the project. The composed modules receive them in place of their own defaults.
+
+{{ schema_table("crs") }}
+
+**YAML Syntax**
+
+```yaml
+{{ yaml_section("crs") }}
+```
+
+
 ## `transmission_projects` {#transmission_projects_cf}
 
 Allows to define additional transmission projects that will be added to the base network, e.g., from the TYNDP 2020 dataset. The projects are read in from the CSV files in the subfolder of `data/transmission_projects/`. New transmission projects, e.g. from TYNDP 2024, can be added in a new subfolder of transmission projects, e.g. `data/transmission_projects/tyndp2024` while extending the list of `transmission_projects` in the `config.yaml` by `tyndp2024`. The CSV files in the project folder should have the same columns as the CSV files in the template folder `data/transmission_projects/template`.
@@ -961,9 +992,6 @@ See the [data versioning documentation](data_sources.md#managing_data_versions) 
     |   `source` | enum (`archive`, `primary`, `build`) | `archive` | Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source. |
     |   `version` | string | `latest` | Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source. |
     | `costs` | any |  | Configuration for a single data source. |
-    |   `source` | enum (`archive`, `primary`, `build`) | `archive` | Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source. |
-    |   `version` | string | `latest` | Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source. |
-    | `country_runoff` | any |  | Configuration for a single data source. |
     |   `source` | enum (`archive`, `primary`, `build`) | `archive` | Source of the data. 'archive' retrieves pre-built data, 'primary' retrieves from primary source. |
     |   `version` | string | `latest` | Version of the data to use. Uses the specific 'version' for the selected 'source' or the dataset tagged 'latest' for this source. |
     | `country_hdd` | any |  | Configuration for a single data source. |
