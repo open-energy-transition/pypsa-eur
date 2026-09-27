@@ -213,7 +213,7 @@ def prepare_building_stock_data():
         & (building_data.subsector != "Total")
     ]
 
-    # components = list(u_values.type.unique())
+    components = list(u_values.type.unique())
 
     country_iso_dic = building_data.set_index("country")["country_code"].to_dict()
 
@@ -314,7 +314,7 @@ def prepare_building_stock_data():
     data_PL["btype"] = area_PL["subsector"]
 
     data_PL_final = pd.DataFrame()
-    for component in []:
+    for component in components:
         data_PL["type"] = component
         data_PL["value"] = data_PL.apply(
             lambda x: u_values_PL[
