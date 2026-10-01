@@ -60,7 +60,11 @@ import pypsa
 import xarray as xr
 from pypsa.clustering.spatial import DEFAULT_ONE_PORT_STRATEGIES, normed_or_uniform
 
-from scripts._helpers import PYPSA_V1, rename_techs, update_p_nom_max
+from scripts._helpers import (
+    PYPSA_V1,
+    rename_techs,
+    update_p_nom_max,
+)
 
 if PYPSA_V1:
     pypsa.options.params.add.return_names = True
@@ -489,7 +493,6 @@ def set_transmission_costs(
 def attach_wind_and_solar(
     n: pypsa.Network,
     costs: pd.DataFrame,
-    ppl: pd.DataFrame,
     profile_filenames: dict,
     carriers: list | set,
     extendable_carriers: list | set,
@@ -505,8 +508,6 @@ def attach_wind_and_solar(
         The PyPSA network to attach the generators to.
     costs : pd.DataFrame
         DataFrame containing the cost data.
-    ppl : pd.DataFrame
-        DataFrame containing the power plant data.
     profile_filenames : dict
         Dictionary containing the paths to the wind and solar profiles.
     carriers : list | set
@@ -580,21 +581,12 @@ def attach_wind_and_solar(
             p_max_pu = ds["profile"].to_pandas()
             p_max_pu.columns = p_max_pu.columns.map(flatten)
 
-            if not ppl.query("carrier == @car").empty:
-                caps = ppl.query("carrier == @car").groupby("bus").p_nom.sum()
-                caps = pd.Series(data=caps, index=ds.indexes["bus"]).fillna(0)
-            else:
-                caps = pd.Series(index=ds.indexes["bus"]).fillna(0)
-            caps.index = caps.index.map(flatten)
-
             n.add(
                 "Generator",
                 bus_bins,
                 suffix=" " + car,
                 bus=buses,
                 carrier=car,
-                p_nom=caps,
-                p_nom_min=caps,
                 p_nom_extendable=car in extendable_carriers["Generator"],
                 p_nom_max=p_nom_max,
                 marginal_cost=costs.at[supcar, "marginal_cost"],

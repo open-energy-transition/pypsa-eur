@@ -1037,7 +1037,6 @@ sector:
   conventional_generation:
     OCGT: gas
     CCGT: gas
-  keep_existing_capacities: false
   biomass_to_liquid: true
   biomass_to_liquid_cc: false
   electrobiofuels: true
