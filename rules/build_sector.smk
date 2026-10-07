@@ -1276,9 +1276,11 @@ rule build_retro_cost:
         clustered_pop_layout=resources("pop_layout.csv"),
         cost_germany="data/retro/retro_cost_germany.csv",
         window_assumptions="data/retro/window_assumptions.csv",
+        households="data/retro/households.csv",
     output:
         retro_cost=resources("retro_cost.csv"),
         floor_area=resources("floor_area.csv"),
+        WWHR_costs=resources("WWHR_costs.csv"),
     log:
         logs("build_retro_cost.log"),
     benchmark:
