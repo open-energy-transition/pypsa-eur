@@ -31,7 +31,7 @@ from scripts._helpers import (
 logger = logging.getLogger(__name__)
 
 
-def heat_dsm_profile(nodes, options):
+def heat_dsm_profile(node_countries: pd.Series, options: dict) -> pd.DataFrame:
     """
     Generate heat demand-side management (DSM) availability profile with periodic restrictions.
 
@@ -47,8 +47,8 @@ def heat_dsm_profile(nodes, options):
 
     Parameters
     ----------
-    nodes : pd.Index or array-like
-        Node identifiers for which to generate profiles.
+    node_countries : pd.Series
+        Country codes indexed by the nodes for which to generate profiles.
     options : dict
         Configuration dictionary containing:
         - ``options["residential_heat"]["dsm"]["restriction_time"]``: list of int
@@ -67,7 +67,7 @@ def heat_dsm_profile(nodes, options):
 
     dsm_profile = generate_periodic_profiles(
         dt_index=pd.date_range(freq="h", **snakemake.params.snapshots, tz="UTC"),
-        nodes=nodes,
+        node_countries=node_countries,
         weekly_profile=weekly_profile,
     )
 
@@ -99,6 +99,10 @@ if __name__ == "__main__":
 
     intraday_profiles = pd.read_csv(snakemake.input.heat_profile, index_col=0)
 
+    node_countries = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0).ct[
+        daily_space_heat_demand.columns
+    ]
+
     sectors = ["residential", "services"]
     uses = ["water", "space"]
 
@@ -110,7 +114,7 @@ if __name__ == "__main__":
         weekly_profile = weekday * 5 + weekend * 2
         intraday_year_profile = generate_periodic_profiles(
             daily_space_heat_demand.index.tz_localize("UTC"),
-            nodes=daily_space_heat_demand.columns,
+            node_countries=node_countries,
             weekly_profile=weekly_profile,
         )
 
@@ -120,7 +124,7 @@ if __name__ == "__main__":
             )
             if sector == "residential":
                 dsm_profile[f"{sector} {use}"] = heat_dsm_profile(
-                    daily_space_heat_demand.columns, sector_options
+                    node_countries, sector_options
                 )
         else:
             heat_demand[f"{sector} {use}"] = intraday_year_profile

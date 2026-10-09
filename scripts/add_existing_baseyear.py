@@ -481,7 +481,7 @@ def add_power_capacities_installed_before_baseyear(
 def get_efficiency(
     heat_system: HeatSystem,
     carrier: str,
-    nodes: pd.Index,
+    countries: pd.Index,
     efficiencies: dict[str, float],
     costs: pd.DataFrame,
 ) -> pd.Series | float:
@@ -494,8 +494,8 @@ def get_efficiency(
     heat_system : object
     carrier : str
         The type of fuel or energy carrier (e.g., 'gas', 'oil').
-    nodes : pandas.Series
-        A pandas Series containing node information used to match the heating efficiency data.
+    countries : pandas.Index
+        Country codes of the nodes, used to match the heating efficiency data.
     efficiencies : dict
         A dictionary containing efficiency values for different carriers and sectors.
     costs : pandas.DataFrame
@@ -518,10 +518,10 @@ def get_efficiency(
         efficiency = costs.at[boiler_costs_name, "efficiency"]
     elif heat_system.sector.value == "residential":
         key = f"{carrier} residential space efficiency"
-        efficiency = nodes.str[:2].map(efficiencies[key])
+        efficiency = countries.map(efficiencies[key])
     elif heat_system.sector.value == "services":
         key = f"{carrier} services space efficiency"
-        efficiency = nodes.str[:2].map(efficiencies[key])
+        efficiency = countries.map(efficiencies[key])
     else:
         raise ValueError(f"Heat system {heat_system} not defined.")
 
@@ -594,6 +594,7 @@ def add_heating_capacities_installed_before_baseyear(
         nodes = pd.Index(
             n.buses.location[n.buses.index.str.contains(f"{heat_system} heat")]
         )
+        countries = nodes.map(n.buses.country)
 
         if (
             not heat_system == HeatSystem.URBAN_CENTRAL
@@ -697,7 +698,7 @@ def add_heating_capacities_installed_before_baseyear(
             )
 
             efficiency = get_efficiency(
-                heat_system, "gas", nodes, heating_efficiencies, costs
+                heat_system, "gas", countries, heating_efficiencies, costs
             )
 
             n.add(
@@ -724,7 +725,7 @@ def add_heating_capacities_installed_before_baseyear(
             )
 
             efficiency = get_efficiency(
-                heat_system, "oil", nodes, heating_efficiencies, costs
+                heat_system, "oil", countries, heating_efficiencies, costs
             )
 
             n.add(
@@ -751,7 +752,7 @@ def add_heating_capacities_installed_before_baseyear(
             )
 
             efficiency = get_efficiency(
-                heat_system, "biomass", nodes, heating_efficiencies, costs
+                heat_system, "biomass", countries, heating_efficiencies, costs
             )
 
             # prevents redundant addition of urban central biomass boiler which tends to crash
@@ -783,23 +784,12 @@ def add_heating_capacities_installed_before_baseyear(
                 )
 
             # delete links with p_nom=nan corresponding to extra nodes in country
+            # and links with capacities below threshold
             n.remove(
                 "Link",
-                [
-                    index
-                    for index in n.links.index.to_list()
-                    if str(grouping_year) in index and np.isnan(n.links.p_nom[index])
-                ],
-            )
-
-            # delete links with capacities below threshold
-            n.remove(
-                "Link",
-                [
-                    index
-                    for index in n.links.index.to_list()
-                    if str(grouping_year) in index
-                    and n.links.p_nom[index] < capacity_threshold
+                n.links.index[
+                    (n.links.build_year == int(grouping_year))
+                    & (n.links.p_nom.isna() | (n.links.p_nom < capacity_threshold))
                 ],
             )
 

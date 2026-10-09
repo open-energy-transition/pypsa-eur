@@ -67,9 +67,8 @@ def handle_missing_countries(dh_areas, onshore_regions, missing_countries, handl
         new_rows = []
         for country_code in missing_countries:
             # Find all regions belonging to this country
-            # Region names typically start with 2-letter country code (e.g., 'DE 1', 'FR 2')
             country_regions = onshore_regions[
-                onshore_regions["name"].str.startswith(country_code)
+                onshore_regions["country"] == country_code
             ]
 
             # Merge all regions of this country into a single geometry
@@ -139,8 +138,7 @@ if __name__ == "__main__":
     onshore_regions: gpd.GeoDataFrame = gpd.read_file(snakemake.input.onshore_regions)
 
     # Identify discrepancies between modeled countries and available DH data
-    # Extract country codes from region names (assumes format like 'DE 1', 'FR 2', etc.)
-    region_countries = set([name.split()[0][:2] for name in onshore_regions["name"]])
+    region_countries = set(onshore_regions["country"])
 
     # Get countries that already have DH area data
     dh_countries = set(dh_areas["country"].unique())

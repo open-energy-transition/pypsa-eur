@@ -32,9 +32,8 @@ if __name__ == "__main__":
 
     cutout = load_cutout(snakemake.input.cutout)
 
-    clustered_regions = (
-        gpd.read_file(snakemake.input.onshore_regions).set_index("name").buffer(0)
-    )
+    regions = gpd.read_file(snakemake.input.onshore_regions).set_index("name")
+    clustered_regions = regions.buffer(0)
 
     I = cutout.indicatormatrix(clustered_regions)  # noqa: E741
 
@@ -45,7 +44,7 @@ if __name__ == "__main__":
 
     pop = pd.DataFrame(pop, index=clustered_regions.index)
 
-    pop["ct"] = pop.index.str[:2]
+    pop["ct"] = regions.country
     country_population = pop.total.groupby(pop.ct).sum()
     pop["fraction"] = pop.total / pop.ct.map(country_population)
 

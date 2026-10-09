@@ -70,6 +70,18 @@ def locate_missing_industrial_sites(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def assign_to_regions(
+    gdf: gpd.GeoDataFrame, regions: gpd.GeoDataFrame
+) -> gpd.GeoDataFrame:
+    """
+    Assign points to the bus regions they lie in, with the bus country.
+    """
+    gdf = gpd.sjoin(
+        gdf, regions[["country", "geometry"]], how="inner", predicate="within"
+    )
+    return gdf.rename(columns={"name": "bus"})
+
+
 def prepare_hotmaps_database(fn: str, regions: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
     Load hotmaps database of industrial sites and map onto bus regions.
@@ -88,10 +100,7 @@ def prepare_hotmaps_database(fn: str, regions: gpd.GeoDataFrame) -> gpd.GeoDataF
 
     gdf = gpd.GeoDataFrame(df, geometry="coordinates", crs="EPSG:4326")
 
-    gdf = gpd.sjoin(gdf, regions, how="inner", predicate="within")
-
-    gdf.rename(columns={"name": "bus"}, inplace=True)
-    gdf["country"] = gdf.bus.str[:2]
+    gdf = assign_to_regions(gdf, regions)
 
     # the .sjoin can lead to duplicates if a geom is in two overlapping regions
     if gdf.index.duplicated().any():
@@ -143,10 +152,7 @@ def prepare_gem_steel_database(fn: str, regions: gpd.GeoDataFrame) -> gpd.GeoDat
     geometry = gpd.points_from_xy(latlon["lon"], latlon["lat"])
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
-    gdf = gpd.sjoin(gdf, regions, how="inner", predicate="within")
-
-    gdf.rename(columns={"name": "bus"}, inplace=True)
-    gdf["country"] = gdf.bus.str[:2]
+    gdf = assign_to_regions(gdf, regions)
 
     return gdf
 
@@ -173,10 +179,7 @@ def prepare_gem_cement_database(fn: str, regions: gpd.GeoDataFrame) -> gpd.GeoDa
     geometry = gpd.points_from_xy(latlon["lon"], latlon["lat"])
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
-    gdf = gpd.sjoin(gdf, regions, how="inner", predicate="within")
-
-    gdf.rename(columns={"name": "bus"}, inplace=True)
-    gdf["country"] = gdf.bus.str[:2]
+    gdf = assign_to_regions(gdf, regions)
 
     return gdf
 
@@ -190,10 +193,7 @@ def prepare_ammonia_database(fn: str, regions: gpd.GeoDataFrame) -> gpd.GeoDataF
     geometry = gpd.points_from_xy(df.Longitude, df.Latitude)
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
-    gdf = gpd.sjoin(gdf, regions, how="inner", predicate="within")
-
-    gdf.rename(columns={"name": "bus"}, inplace=True)
-    gdf["country"] = gdf.bus.str[:2]
+    gdf = assign_to_regions(gdf, regions)
 
     return gdf
 
@@ -210,10 +210,7 @@ def prepare_refineries_supplement(
     geometry = gpd.points_from_xy(df.Longitude, df.Latitude)
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
-    gdf = gpd.sjoin(gdf, regions, how="inner", predicate="within")
-
-    gdf.rename(columns={"name": "bus"}, inplace=True)
-    gdf["country"] = gdf.bus.str[:2]
+    gdf = assign_to_regions(gdf, regions)
 
     return gdf
 
@@ -235,12 +232,11 @@ def build_nodal_distribution_key(
     keys = pd.DataFrame(index=regions.index, columns=sectors, dtype=float)
 
     pop = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
-    pop["country"] = pop.index.str[:2]
-    ct_total = pop.total.groupby(pop["country"]).sum()
-    keys["population"] = pop.total / pop.country.map(ct_total)
+    ct_total = pop.total.groupby(pop.ct).sum()
+    keys["population"] = pop.total / pop.ct.map(ct_total)
 
     for sector, country in product(sectors, countries):
-        regions_ct = regions.index[regions.index.str.contains(country)]
+        regions_ct = regions.index[regions.country == country]
 
         facilities = hotmaps.query("country == @country and Subsector == @sector")
 
@@ -270,7 +266,7 @@ def build_nodal_distribution_key(
 
     # add cement distribution from GEM
     for country in countries:
-        regions_ct = regions.index[regions.index.str.contains(country)]
+        regions_ct = regions.index[regions.country == country]
 
         status_list = ["operating", "operating pre-retirement", "construction"]
         facilities = cement.query(
@@ -323,7 +319,7 @@ def build_nodal_distribution_key(
     # add specific steel subsectors from GEM
     steel_processes = ["EAF", "DRI + EAF", "Integrated steelworks"]
     for process, country in product(steel_processes, countries):
-        regions_ct = regions.index[regions.index.str.contains(country)]
+        regions_ct = regions.index[regions.country == country]
 
         facilities = steel.query("country == @country")
 
@@ -407,7 +403,7 @@ def build_nodal_distribution_key(
 
     # add ammonia
     for country in countries:
-        regions_ct = regions.index[regions.index.str.contains(country)]
+        regions_ct = regions.index[regions.country == country]
 
         facilities = ammonia.query("country == @country")
 

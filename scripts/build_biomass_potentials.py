@@ -31,7 +31,13 @@ logger = logging.getLogger(__name__)
 AVAILABLE_BIOMASS_YEARS = [2010, 2020, 2030, 2040, 2050]
 
 
-def _calc_unsustainable_potential(df, df_unsustainable, share_unsus, resource_type):
+def _calc_unsustainable_potential(
+    df: pd.DataFrame,
+    df_unsustainable: pd.DataFrame,
+    share_unsus: float,
+    resource_type: str,
+    countries: pd.Series,
+) -> pd.Series:
     """
     Calculate the unsustainable biomass potential for a given resource type or
     regex.
@@ -46,6 +52,8 @@ def _calc_unsustainable_potential(df, df_unsustainable, share_unsus, resource_ty
         The share of unsustainable biomass potential retained.
     resource_type : str or regex
         The resource type to calculate the unsustainable potential for.
+    countries : pd.Series
+        Country codes indexed by region names.
 
     Returns
     -------
@@ -59,8 +67,8 @@ def _calc_unsustainable_potential(df, df_unsustainable, share_unsus, resource_ty
         resource_potential = df_unsustainable[resource_type]
 
     def _calculate_resource_allocation(c):
-        country = c.name[:2]
-        country_total = df.loc[df.index.str[:2] == country].sum().sum()
+        country = countries[c.name]
+        country_total = df.loc[countries[df.index] == country].sum().sum()
         if country_total == 0:
             return 0.0
         return c.sum() / country_total * resource_potential.loc[country]
@@ -238,7 +246,7 @@ def convert_nuts2_to_regions(bio_nuts2, regions):
     """
     # calculate area of nuts2 regions
     bio_nuts2["area_nuts2"] = area(bio_nuts2)
-    overlay = gpd.overlay(regions, bio_nuts2, keep_geom_type=True)
+    overlay = gpd.overlay(regions[["name", "geometry"]], bio_nuts2, keep_geom_type=True)
 
     # calculate share of nuts2 area inside region
     overlay["share"] = area(overlay) / overlay["area_nuts2"]
@@ -256,7 +264,9 @@ def convert_nuts2_to_regions(bio_nuts2, regions):
     return bio_regions
 
 
-def add_unsustainable_potentials(df, input_eurostat):
+def add_unsustainable_potentials(
+    df: pd.DataFrame, input_eurostat: str, countries: pd.Series
+) -> pd.DataFrame:
     """
     Add unsustainable biomass potentials to the given dataframe. The difference
     between the data of JRC and Eurostat is assumed to be unsustainable
@@ -268,6 +278,8 @@ def add_unsustainable_potentials(df, input_eurostat):
         The dataframe with sustainable biomass potentials.
     input_eurostat : str
         Path to the file with Eurostat biomass data.
+    countries : pd.Series
+        Country codes indexed by region names.
 
     Returns
     -------
@@ -309,7 +321,7 @@ def add_unsustainable_potentials(df, input_eurostat):
     # Phase out unsustainable biomass potentials linearly from 2020 to 2035 while phasing in sustainable potentials
     share_unsus = params.get("share_unsustainable_use_retained").get(investment_year)
 
-    df_wo_ch = df.drop(df.filter(regex=r"CH\d*", axis=0).index)
+    df_wo_ch = df.loc[countries[df.index] != "CH"].copy()
 
     # Calculate unsustainable solid biomass
     df_wo_ch["unsustainable solid biomass"] = _calc_unsustainable_potential(
@@ -317,6 +329,7 @@ def add_unsustainable_potentials(df, input_eurostat):
         df_unsustainable,
         share_unsus,
         "R5110-5150_W6000RI",  # Primary solid biofuels
+        countries,
     )
 
     # Calculate unsustainable biogas
@@ -325,6 +338,7 @@ def add_unsustainable_potentials(df, input_eurostat):
         df_unsustainable,
         share_unsus,
         "R5300",  # Biogases
+        countries,
     )
 
     # Calculate unsustainable bioliquids
@@ -333,6 +347,7 @@ def add_unsustainable_potentials(df, input_eurostat):
         df_unsustainable,
         share_unsus,
         resource_type="R5210|R5220|R5230|R5290",  # gasoline, diesel, kerosene, liquids
+        countries=countries,
     )
 
     share_sus = params.get("share_sustainable_potential_available").get(investment_year)
@@ -404,7 +419,9 @@ if __name__ == "__main__":
     df = df.T.groupby(grouper).sum().T
 
     input_eurostat = snakemake.input.eurostat
-    df = add_unsustainable_potentials(df, input_eurostat)
+    df = add_unsustainable_potentials(
+        df, input_eurostat, regions.set_index("name").country
+    )
 
     df *= 1e6  # TWh/a to MWh/a
     df.index.name = "MWh/a"

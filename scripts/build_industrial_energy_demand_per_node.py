@@ -38,8 +38,11 @@ if __name__ == "__main__":
     fn = snakemake.input.industrial_energy_demand_per_node_today
     nodal_today = pd.read_csv(fn, index_col=0)
 
+    countries = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0).ct
+
     nodal_sector_ratios = pd.concat(
-        {node: sector_ratios[node[:2]] for node in nodal_production.index}, axis=1
+        {node: sector_ratios[countries[node]] for node in nodal_production.index},
+        axis=1,
     )
 
     nodal_production_stacked = nodal_production.stack()

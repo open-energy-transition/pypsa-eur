@@ -48,7 +48,7 @@ def build_nodal_industrial_production():
 
     fn = snakemake.input.industrial_distribution_key
     keys = pd.read_csv(fn, index_col=0)
-    keys["country"] = keys.index.str[:2]
+    keys["country"] = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0).ct
 
     nodal_production = pd.DataFrame(
         index=keys.index, columns=industrial_production.columns, dtype=float

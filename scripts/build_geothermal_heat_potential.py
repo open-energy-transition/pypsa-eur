@@ -163,7 +163,7 @@ def get_heat_source_power(
     ]
 
     if not non_covered_regions.empty:
-        if all(non_covered_regions.str.contains("|".join(not_eu_27))):
+        if onshore_regions.country[non_covered_regions].isin(not_eu_27).all():
             if ignore_missing_regions:
                 logger.warning(
                     f"The onshore regions outside EU 27 ({non_covered_regions.to_list()}) have no heat source power. Filling with zeros."

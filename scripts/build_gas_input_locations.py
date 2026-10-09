@@ -169,12 +169,12 @@ if __name__ == "__main__":
     # entry points are still in Russian or Ukrainian territory.
     buffer = 9000  # meters
     eastern_countries = ["FI", "EE", "LT", "LV", "PL", "SK", "HU", "RO"]
-    add_buffer_b = regions.index.str[:2].isin(eastern_countries)
+    add_buffer_b = regions.country.isin(eastern_countries)
     regions.loc[add_buffer_b] = (
         regions[add_buffer_b].to_crs(3035).buffer(buffer).to_crs(4326)
     )
 
-    countries = regions.index.str[:2].unique().str.replace("GB", "UK")
+    countries = pd.Index(regions.country.unique()).str.replace("GB", "UK")
 
     gas_input_locations = build_gas_input_locations(
         snakemake.input.gem,

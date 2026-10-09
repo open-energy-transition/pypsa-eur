@@ -64,24 +64,9 @@ def extrapolate_missing_supply_temperatures_by_country(
     }
 
 
-def get_country_from_node_name(node_name: str) -> str:
-    """
-    Extracts the country code from a given node name.
-
-    Parameters
-    ----------
-        node_name (str): The name of the node.
-
-    Returns
-    -------
-        str: The country code extracted from the node name.
-    """
-    return node_name[:2]
-
-
 def map_temperature_dict_to_onshore_regions(
     supply_temperature_by_country: dict,
-    onshore_regions: pd.Index,
+    region_countries: pd.Series,
 ) -> xr.DataArray:
     """
     Map dictionary of temperatures to onshore regions.
@@ -92,26 +77,20 @@ def map_temperature_dict_to_onshore_regions(
     ----------
     supply_temperature_by_country : dictionary
         Dictionary with temperatures as values and country keys as keys.
-    onshore_regions : pd.Index
-        Names of onshore regions
+    region_countries : pd.Series
+        Country codes indexed by onshore region names
 
     Returns
     -------
     xr.DataArray
         The dictionary values mapped to onshore regions with onshore regions as coordinates.
     """
+    fill_value = np.mean(list(supply_temperature_by_country.values()))
+    temperatures = region_countries.map(supply_temperature_by_country).fillna(
+        fill_value
+    )
     return xr.DataArray(
-        [
-            (
-                supply_temperature_by_country[get_country_from_node_name(node_name)]
-                if get_country_from_node_name(node_name)
-                in supply_temperature_by_country.keys()
-                else np.mean(list(supply_temperature_by_country.values()))
-            )
-            for node_name in onshore_regions.values
-        ],
-        dims=["name"],
-        coords={"name": onshore_regions},
+        temperatures.values, dims=["name"], coords={"name": region_countries.index}
     )
 
 
@@ -219,26 +198,28 @@ if __name__ == "__main__":
     )
 
     # map forward and return temperatures specified on country-level to onshore regions
-    onshore_regions = gpd.read_file(snakemake.input.onshore_regions)["name"]
+    region_countries = gpd.read_file(snakemake.input.onshore_regions).set_index("name")[
+        "country"
+    ]
     snapshots = get_snapshots(
         snakemake.params.snapshots, snakemake.params.drop_leap_day
     )
     max_forward_temperature_central_heating_by_node_and_time: xr.DataArray = (
         map_temperature_dict_to_onshore_regions(
             supply_temperature_by_country=max_forward_temperature_investment_year,
-            onshore_regions=onshore_regions,
+            region_countries=region_countries,
         )
     )
     min_forward_temperature_central_heating_by_node_and_time: xr.DataArray = (
         map_temperature_dict_to_onshore_regions(
             supply_temperature_by_country=min_forward_temperature_investment_year,
-            onshore_regions=onshore_regions,
+            region_countries=region_countries,
         )
     )
     return_temperature_central_heating_by_node_and_time: xr.DataArray = (
         map_temperature_dict_to_onshore_regions(
             supply_temperature_by_country=return_temperature_investment_year,
-            onshore_regions=onshore_regions,
+            region_countries=region_countries,
         )
     )
 

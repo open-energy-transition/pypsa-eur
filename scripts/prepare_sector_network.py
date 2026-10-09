@@ -2569,7 +2569,7 @@ def build_heat_demand(
         name = f"{sector} {use}"
 
         # efficiency for final energy to thermal energy service
-        eff = pop_weighted_energy_totals.index.str[:2].map(
+        eff = pop_weighted_energy_totals.index.map(n.buses.country).map(
             heating_efficiencies[f"total {sector} {use} efficiency"]
         )
 
@@ -3956,8 +3956,12 @@ def add_biomass(
         )
 
         # costs
-        bus0_costs = biomass_transport.bus0.apply(lambda x: transport_costs[x[:2]])
-        bus1_costs = biomass_transport.bus1.apply(lambda x: transport_costs[x[:2]])
+        bus0_costs = biomass_transport.bus0.apply(
+            lambda x: transport_costs[n.buses.at[x, "country"]]
+        )
+        bus1_costs = biomass_transport.bus1.apply(
+            lambda x: transport_costs[n.buses.at[x, "country"]]
+        )
         biomass_transport["costs"] = pd.concat([bus0_costs, bus1_costs], axis=1).mean(
             axis=1
         )
@@ -3993,8 +3997,9 @@ def add_biomass(
         # add artificial biomass generators at nodes which include transport costs
         transport_costs = pd.read_csv(biomass_transport_costs_file, index_col=0)
         transport_costs = transport_costs.squeeze()
-        bus_transport_costs = spatial.biomass.nodes.to_series().apply(
-            lambda x: transport_costs[x[:2]]
+        bus_transport_costs = pd.Series(
+            transport_costs.loc[n.buses.country.loc[spatial.biomass.locations]].values,
+            index=spatial.biomass.nodes,
         )
         average_distance = 200  # km #TODO: validate this assumption
 
@@ -4855,10 +4860,9 @@ def add_industry(
 
     # remove today's industrial electricity demand by scaling down total electricity demand
     for ct in n.buses.country.dropna().unique():
-        # TODO map onto n.bus.country
-
         loads_i = n.loads.index[
-            (n.loads.index.str[:2] == ct) & (n.loads.carrier == "electricity")
+            (n.loads.bus.map(n.buses.country) == ct)
+            & (n.loads.carrier == "electricity")
         ]
         if n.loads_t.p_set[loads_i].empty:
             continue

@@ -55,7 +55,9 @@ def build_nodal_transport_data(fn, pop_layout, year):
     return nodal_transport_data
 
 
-def build_transport_demand(traffic_fn, airtemp_fn, nodes, nodal_transport_data):
+def build_transport_demand(
+    traffic_fn, airtemp_fn, node_countries, nodal_transport_data
+):
     """
     Returns transport demand per bus in unit km driven [100 km].
     """
@@ -65,7 +67,7 @@ def build_transport_demand(traffic_fn, airtemp_fn, nodes, nodal_transport_data):
     # create annual profile take account time zone + summer time
     transport_shape = generate_periodic_profiles(
         dt_index=snapshots,
-        nodes=nodes,
+        node_countries=node_countries,
         weekly_profile=traffic.values,
     )
     transport_shape = transport_shape / transport_shape.sum()
@@ -129,7 +131,7 @@ def transport_degree_factor(
     return dd
 
 
-def bev_availability_profile(fn, snapshots, nodes, options):
+def bev_availability_profile(fn, snapshots, node_countries, options):
     """
     Derive plugged-in availability for passenger electric vehicles.
     """
@@ -153,12 +155,12 @@ def bev_availability_profile(fn, snapshots, nodes, options):
 
     return generate_periodic_profiles(
         dt_index=snapshots,
-        nodes=nodes,
+        node_countries=node_countries,
         weekly_profile=avail.values,
     )
 
 
-def bev_dsm_profile(snapshots, nodes, options):
+def bev_dsm_profile(snapshots, node_countries, options):
     dsm_week = np.zeros((24 * 7,))
 
     # assuming that at a certain time ("bev_dsm_restriction_time") EVs have to
@@ -169,7 +171,7 @@ def bev_dsm_profile(snapshots, nodes, options):
 
     return generate_periodic_profiles(
         dt_index=snapshots,
-        nodes=nodes,
+        node_countries=node_countries,
         weekly_profile=dsm_week,
     )
 
@@ -184,7 +186,7 @@ if __name__ == "__main__":
 
     pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
 
-    nodes = pop_layout.index
+    node_countries = pop_layout.ct
 
     pop_weighted_energy_totals = pd.read_csv(
         snakemake.input.pop_weighted_energy_totals, index_col=0
@@ -207,15 +209,15 @@ if __name__ == "__main__":
     transport_demand = build_transport_demand(
         snakemake.input.traffic_data_KFZ,
         snakemake.input.temp_air_total,
-        nodes,
+        node_countries,
         nodal_transport_data,
     )
 
     avail_profile = bev_availability_profile(
-        snakemake.input.traffic_data_Pkw, snapshots, nodes, options
+        snakemake.input.traffic_data_Pkw, snapshots, node_countries, options
     )
 
-    dsm_profile = bev_dsm_profile(snapshots, nodes, options)
+    dsm_profile = bev_dsm_profile(snapshots, node_countries, options)
 
     nodal_transport_data.to_csv(snakemake.output.transport_data)
     transport_demand.to_csv(snakemake.output.transport_demand)

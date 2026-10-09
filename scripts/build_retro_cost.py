@@ -206,7 +206,6 @@ def prepare_building_stock_data():
 
     # for still missing countries calculate floor area by population size
     pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
-    pop_layout["ct"] = pop_layout.index.str[:2]
     ct_total = pop_layout.total.groupby(pop_layout["ct"]).sum()
 
     area_per_pop = (
@@ -511,19 +510,11 @@ def prepare_temperature_data():
     temperature_factor = (t_threshold - temperature_average_d_heat) * d_heat * 1/365
     """
     temperature = xr.open_dataarray(snakemake.input.air_temperature).to_pandas()
-    d_heat = (
-        temperature.T.groupby(temperature.columns.str[:2])
-        .mean()
-        .T.resample("1D")
-        .mean()
-        < t_threshold
-    ).sum()
-    temperature_average_d_heat = (
-        temperature.T.groupby(temperature.columns.str[:2])
-        .mean()
-        .T.apply(
-            lambda x: get_average_temperature_during_heating_season(x, t_threshold=15)
-        )
+    countries = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0).ct
+    temperature_ct = temperature.T.groupby(countries).mean().T
+    d_heat = (temperature_ct.resample("1D").mean() < t_threshold).sum()
+    temperature_average_d_heat = temperature_ct.apply(
+        lambda x: get_average_temperature_during_heating_season(x, t_threshold=15)
     )
     # accumulated difference between internal and external temperature
     # units ([K]-[K]) * [days/year]

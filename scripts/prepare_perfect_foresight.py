@@ -384,7 +384,7 @@ def apply_phase_outs(
 
     def cap_lifetimes(static: pd.DataFrame, bus: str) -> None:
         for rule in phase_outs:
-            country = static[bus].str[:2]
+            country = static[bus].map(n.buses.location).map(n.buses.country)
             in_scope = static.carrier.isin(rule["carriers"]) & country.isin(
                 rule["countries"]
             )

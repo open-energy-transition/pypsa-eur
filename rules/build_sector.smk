@@ -146,6 +146,7 @@ rule build_hourly_heat_demand:
     input:
         heat_profile="data/heat_load_profile_BDEW.csv",
         heat_demand=resources("daily_heat_demand_total.nc"),
+        clustered_pop_layout=resources("pop_layout.csv"),
     output:
         heat_demand=resources("hourly_heat_demand_total.nc"),
         heat_dsm_profile=resources("residential_heat_dsm_profile.csv"),
@@ -1127,6 +1128,7 @@ rule build_industrial_distribution_key:
 rule build_industrial_production_per_node:
     """Distributes industrial production per country to model regions with distribution keys."""
     input:
+        clustered_pop_layout=resources("pop_layout.csv"),
         industrial_distribution_key=resources("industrial_distribution_key.csv"),
         industrial_production_per_country_tomorrow=resources(
             "industrial_production_per_country_tomorrow_{horizon}.csv"
@@ -1148,6 +1150,7 @@ rule build_industrial_energy_demand_per_node:
     """Computes industrial energy demand per carrier and model region from production and ratios."""
     input:
         industry_sector_ratios=resources("industry_sector_ratios_{horizon}.csv"),
+        clustered_pop_layout=resources("pop_layout.csv"),
         industrial_production_per_node=resources("industrial_production_{horizon}.csv"),
         industrial_energy_demand_per_node_today=resources(
             "industrial_energy_demand_today.csv"
@@ -1197,6 +1200,7 @@ rule build_industrial_energy_demand_per_country_today:
 rule build_industrial_energy_demand_per_node_today:
     """Distributes today's industrial energy demand per country to model regions."""
     input:
+        clustered_pop_layout=resources("pop_layout.csv"),
         industrial_distribution_key=resources("industrial_distribution_key.csv"),
         industrial_energy_demand_per_country_today=resources(
             "industrial_energy_demand_per_country_today.csv"

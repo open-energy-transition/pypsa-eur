@@ -614,18 +614,23 @@ def mock_snakemake(
     return snakemake
 
 
-def generate_periodic_profiles(dt_index, nodes, weekly_profile, localize=None):
+def generate_periodic_profiles(
+    dt_index: pd.DatetimeIndex,
+    node_countries: pd.Series,
+    weekly_profile: list | np.ndarray,
+    localize: str | None = None,
+) -> pd.DataFrame:
     """
     Give a 24*7 long list of weekly hourly profiles, generate this for each
-    country for the period dt_index, taking account of time zones and summer
-    time.
+    node for the period dt_index, taking account of the time zone and summer
+    time of the node country given in `node_countries` (indexed by node).
     """
     weekly_profile = pd.Series(weekly_profile, range(24 * 7))
 
-    week_df = pd.DataFrame(index=dt_index, columns=nodes)
+    week_df = pd.DataFrame(index=dt_index, columns=node_countries.index)
 
-    for node in nodes:
-        ct = node[:2] if node[:2] != "XK" else "RS"
+    for node, country in node_countries.items():
+        ct = country if country != "XK" else "RS"
         timezone = pytz.timezone(pytz.country_timezones[ct][0])
         tz_dt_index = dt_index.tz_convert(timezone)
         week_df[node] = [24 * dt.weekday() + dt.hour for dt in tz_dt_index]

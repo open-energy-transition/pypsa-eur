@@ -36,7 +36,7 @@ def allocate_sequestration_potential(
         attr = [attr]
     gdf = gdf.loc[gdf[attr].sum(axis=1) > threshold, attr + ["geometry"]]
     gdf["area_sqkm"] = area(gdf)
-    overlay = gpd.overlay(regions, gdf, keep_geom_type=True)
+    overlay = gpd.overlay(regions[["name", "geometry"]], gdf, keep_geom_type=True)
     overlay["share"] = area(overlay) / overlay["area_sqkm"]
     adjust_cols = overlay.columns.difference({"name", "area_sqkm", "geometry", "share"})
     overlay[adjust_cols] = overlay[adjust_cols].multiply(overlay["share"], axis=0)

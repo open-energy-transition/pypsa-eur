@@ -55,7 +55,7 @@ if __name__ == "__main__":
     outflows = p.sjoin_nearest(r).groupby("name").properties_outflows.sum().div(1e3)
 
     # calculate fraction of each country's port outflows
-    countries = outflows.index.str[:2]
+    countries = outflows.index.map(regions.country)
     outflows_per_country = outflows.groupby(countries).sum()
     fraction = outflows / countries.map(outflows_per_country)
 
