@@ -812,19 +812,20 @@ def main(
 
     grouping_years_power = params.existing_capacities["grouping_years_power"]
     grouping_years_heat = params.existing_capacities["grouping_years_heat"]
-    add_power_capacities_installed_before_baseyear(
-        n=n,
-        costs=costs,
-        grouping_years=grouping_years_power,
-        baseyear=baseyear,
-        powerplants_file=inputs.powerplants,
-        countries=params.countries,
-        capacity_threshold=params.existing_capacities["threshold_capacity"],
-        lifetime_values=params.costs["fill_values"],
-        renewable_carriers=renewable_carriers,
-        spatial=spatial,
-        solar_rooftop_ratio=params.existing_capacities["solar_rooftop_ratio"],
-    )
+    if not params.clustering["keep_assets"]:
+        add_power_capacities_installed_before_baseyear(
+            n=n,
+            costs=costs,
+            grouping_years=grouping_years_power,
+            baseyear=baseyear,
+            powerplants_file=inputs.powerplants,
+            countries=params.countries,
+            capacity_threshold=params.existing_capacities["threshold_capacity"],
+            lifetime_values=params.costs["fill_values"],
+            renewable_carriers=renewable_carriers,
+            spatial=spatial,
+            solar_rooftop_ratio=params.existing_capacities["solar_rooftop_ratio"],
+        )
 
     if options["heating"]:
         add_heating_capacities_installed_before_baseyear(

@@ -201,6 +201,7 @@ validate-config = "pytest test/test_config_schema.py::test_config_file_is_valid 
 pytest = ">=8.4.2"
 
 [feature.datarecord.dependencies]
+scip = "10.0.*"
 duckdb = ">=1.5.4,<2"
 narwhals = ">=2,<3,!=2.21.0"
 pyarrow = "*"

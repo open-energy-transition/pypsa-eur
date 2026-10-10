@@ -495,6 +495,157 @@ def remove_elec_base_techs(n: pypsa.Network, carriers_to_keep: dict) -> None:
         n.carriers.drop(to_remove, inplace=True, errors="ignore")
 
 
+UNIT_FUELS = {
+    "OCGT": "gas",
+    "CCGT": "gas",
+    "coal": "coal",
+    "lignite": "lignite",
+    "oil": "oil",
+    "nuclear": "uranium",
+    "biomass": "biomass",
+}
+
+
+def fuel_buses(spatial: SimpleNamespace, fuel: pd.Series, bus: pd.Series) -> pd.Series:
+    """
+    Return the spatial fuel bus of each asset from its fuel and electricity bus.
+
+    Parameters
+    ----------
+    spatial : SimpleNamespace
+        Container of spatial data with `nodes` and `locations` per fuel.
+    fuel : pd.Series
+        Fuel carrier per asset.
+    bus : pd.Series
+        Electricity bus per asset.
+
+    Returns
+    -------
+    pd.Series
+        Fuel bus per asset.
+    """
+    buses = pd.Series(index=fuel.index, dtype=object)
+    for carrier, assets in fuel.groupby(fuel).groups.items():
+        spatial_fuel = vars(spatial)[carrier]
+        nodes = pd.Series(list(spatial_fuel.nodes), index=list(spatial_fuel.locations))
+        buses[assets] = nodes["EU"] if "EU" in nodes.index else bus[assets].map(nodes)
+    if buses.isna().any():
+        raise ValueError(f"No fuel bus for {buses.index[buses.isna()].tolist()}")
+    return buses
+
+
+def existing_units(n: pypsa.Network) -> pd.DataFrame:
+    """
+    Return the existing conventional unit generators that become links.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network with unit generators.
+
+    Returns
+    -------
+    pd.DataFrame
+        Static data of the non-extendable generators of the carriers in `UNIT_FUELS`.
+    """
+    gens = n.generators
+    return gens[gens.carrier.isin(UNIT_FUELS.keys()) & ~gens.p_nom_extendable].copy()
+
+
+def convert_existing_units_to_links(
+    n: pypsa.Network,
+    units: pd.DataFrame,
+    costs: pd.DataFrame,
+    spatial: SimpleNamespace,
+) -> set[str]:
+    """
+    Replace existing conventional unit generators by one link per unit.
+
+    Each link runs from the spatial fuel bus of its unit to the electricity bus
+    and keeps the unit name, build year, lifetime and geometry. Fossil and
+    nuclear units keep their efficiency and emit to `co2 atmosphere`. Biomass
+    units become `urban central solid biomass CHP` links with cost efficiencies
+    and no heat bus; `connect_existing_chp_units` attaches the heat bus.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network to modify.
+    units : pd.DataFrame
+        Unit generators from `existing_units`, taken before
+        `patch_electricity_network` removes them.
+    costs : pd.DataFrame
+        Technology costs.
+    spatial : SimpleNamespace
+        Container of spatial data.
+
+    Returns
+    -------
+    set[str]
+        Fuel carriers of the converted units.
+    """
+    fuel = units.carrier.map(UNIT_FUELS)
+    bus0 = fuel_buses(spatial, fuel, units.bus)
+    logger.info(f"Converting {len(units)} existing units to links")
+    n.remove("Generator", n.generators.index.intersection(units.index))
+
+    attrs = units[
+        ["bus", "p_min_pu", "p_max_pu", "build_year", "lifetime", "geometry"]
+    ].rename(columns={"bus": "bus1"})
+    attrs["asset_status"] = "existing"
+
+    is_fossil = units.carrier != "biomass"
+    fossil = units[is_fossil]
+    fossil_cost = costs.loc[fossil.carrier].set_axis(fossil.index)
+    n.add(
+        "Link",
+        fossil.index,
+        bus0=bus0[fossil.index],
+        bus2="co2 atmosphere",
+        carrier=fossil.carrier,
+        marginal_cost=fossil.efficiency * fossil_cost.VOM,
+        capital_cost=fossil.efficiency * fossil_cost.capital_cost,
+        p_nom=fossil.p_nom / fossil.efficiency,
+        efficiency=fossil.efficiency,
+        efficiency2=fuel[fossil.index].map(costs["CO2 intensity"]),
+        **attrs.loc[fossil.index],
+    )
+
+    chp = units[~is_fossil]
+    key = "central solid biomass CHP"
+    n.add(
+        "Link",
+        chp.index,
+        bus0=bus0[chp.index],
+        bus2="",
+        carrier="urban central solid biomass CHP",
+        marginal_cost=costs.at[key, "efficiency"] * costs.at[key, "VOM"],
+        capital_cost=costs.at[key, "efficiency"] * costs.at[key, "capital_cost"],
+        p_nom=chp.p_nom / costs.at[key, "efficiency"],
+        efficiency=costs.at[key, "efficiency"],
+        efficiency2=costs.at[key, "efficiency-heat"],
+        **attrs.loc[chp.index],
+    )
+    return set(fuel)
+
+
+def connect_existing_chp_units(n: pypsa.Network) -> None:
+    """
+    Attach existing biomass CHP units to the urban central heat bus of their location.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        Network to modify.
+    """
+    links = n.links
+    chp = links.index[
+        (links.carrier == "urban central solid biomass CHP") & ~links.p_nom_extendable
+    ]
+    heat_bus = links.bus1[chp] + " urban central heat"
+    links.loc[chp, "bus2"] = heat_bus.where(heat_bus.isin(n.buses.index), "")
+
+
 # TODO: PyPSA-Eur merge issue
 def remove_non_electric_buses(n):
     """
@@ -1438,6 +1589,8 @@ def insert_electricity_distribution_grid(
 
     # set existing solar to cost of utility cost rather the 50-50 rooftop-utility
     solar = n.generators.index[n.generators.carrier == "solar"]
+    if "asset_status" in n.generators.columns:
+        solar = solar[n.generators.asset_status[solar] == "candidate"]
     n.generators.loc[solar, "capital_cost"] = costs.at["solar-utility", "capital_cost"]
 
     fn = solar_rooftop_potentials_fn
@@ -6161,17 +6314,24 @@ def main(
     fn = inputs.gas_input_nodes_simplified
     gas_input_nodes = pd.read_csv(fn, index_col=0) if fn else None
 
+    spatial = define_spatial(pop_layout.index, options)
+    keep_assets = params.clustering["keep_assets"]
+    units = existing_units(n) if keep_assets else None
+
     carriers_to_keep = params.pypsa_eur
     patch_electricity_network(n, carriers_to_keep)
+    unit_fuels = (
+        convert_existing_units_to_links(n, units, costs, spatial)
+        if keep_assets
+        else set()
+    )
 
     fn = inputs.heating_efficiencies
     year = int(params["energy_totals_year"])
     heating_efficiencies = pd.read_csv(fn, index_col=[1, 0]).loc[year]
 
-    spatial = define_spatial(pop_layout.index, options)
-
     if foresight in ["myopic", "perfect"]:
-        fuel_carriers = params.fuel_carriers
+        fuel_carriers = sorted(set(params.fuel_carriers) | unit_fuels - {"biomass"})
         for carrier in fuel_carriers:
             add_carrier_buses(
                 n=n,
@@ -6307,6 +6467,9 @@ def main(
             biomass_transport_costs_file=inputs.biomass_transport_costs,
             nyears=nyears,
         )
+
+    if keep_assets:
+        connect_existing_chp_units(n)
 
     if options["ammonia"]:
         add_ammonia(n, costs, pop_layout, spatial, cf_industry)

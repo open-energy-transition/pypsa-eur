@@ -1,0 +1,141 @@
+# yaml-language-server: $schema=../schema.default.json
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+tutorial: true
+
+run:
+  name: "test-sector-keep-assets"
+  disable_progressbar: true
+  shared_resources:
+    policy: false
+
+# Avoid flaky primary-source downloads in CI/test workflows
+data:
+  bfs_road_vehicle_stock:
+    source: archive
+    version: latest
+  bfs_gdp_and_population:
+    source: archive
+    version: latest
+
+foresight: perfect
+planning_horizons: [2030, 2040, 2050]
+
+countries: ['BE']
+
+snapshots:
+  start: "2013-03-01"
+  end: "2013-03-08"
+
+sector:
+  enabled: true
+  heat_vent:
+    urban central: true
+    urban decentral: true
+    rural: true
+  solid_biomass_import:
+    enable: true
+  district_heating:
+    ates:
+      enable: true
+    ptes:
+      supplemental_heating:
+        enable: true
+        booster_heat_pump: true
+  regional_oil_demand: false
+  regional_co2_sequestration_potential:
+    enable: false
+  co2_spatial: false
+  co2_network: false
+  methanol:
+    methanol_to_power:
+      ocgt: false
+    biomass_to_methanol: false
+  ammonia: false
+  biomass_spatial: false
+  biomass_to_liquid: false
+  electrobiofuels: false
+
+co2_budget:
+  relative: false
+  upper:
+    2030: 2.0
+    2040:
+    2050: 0.0
+  lower:
+    2030: 0.15
+
+electricity:
+  extendable_carriers:
+    Generator: [OCGT]
+    StorageUnit: [battery]
+    Store: [H2]
+    Link: [H2 pipeline]
+
+  renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float]
+
+  estimate_renewable_capacities:
+    enable: true
+    from_powerplantmatching: true
+    from_irenastat: true
+
+
+atlite:
+  default_cutout: be-03-2013-era5
+  cutouts:
+    be-03-2013-era5:
+      module: era5
+      x: [4., 15.]
+      y: [46., 56.]
+      time: ["2013-03-01", "2013-03-08"]
+
+renewable:
+  offwind-ac:
+    max_depth: false
+  offwind-dc:
+    max_depth: false
+  offwind-float:
+    max_depth: false
+    min_depth: false
+
+clustering:
+  keep_assets: true
+  keep_assets_busmaps: [5, 10]
+  simplify_network:
+    to_380: false
+  temporal:
+    averaging: 24h
+  cluster_network:
+    algorithm: kmeans
+    n_clusters: all
+
+industry:
+  St_primary_fraction:
+    2030: 0.6
+    2040: 0.5
+    2050: 0.4
+
+solving:
+  solver:
+    name: highs
+    options: highs-simplex
+  mem_mb: 4000
+  check_objective:
+    enable: false
+
+plotting:
+  map:
+    boundaries:
+  eu_node_location:
+    x: -5.5
+    y: 46.
+  costs_max: auto
+  costs_threshold: 0.001
+  energy_max: auto
+  energy_min: auto
+  energy_threshold: 0.00001
+  interactive_bus_balance:
+    bus_name_pattern: "*central heat*"
+  enable_heat_source_maps: true
