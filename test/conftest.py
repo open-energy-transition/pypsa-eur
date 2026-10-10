@@ -178,3 +178,21 @@ def pytest_addoption(parser):
         metavar="CONFIGFILE",
         help="Config files to check for keys that are not part of the config schema.",
     )
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "datarecord: needs the pixi environment `datarecord`; run with "
+        "`pixi run -e datarecord pytest test -m datarecord`.",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if "datarecord" in config.getoption("markexpr"):
+        return
+    selected = [item for item in items if "datarecord" not in item.keywords]
+    config.hook.pytest_deselected(
+        items=[item for item in items if "datarecord" in item.keywords]
+    )
+    items[:] = selected

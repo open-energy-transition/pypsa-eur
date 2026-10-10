@@ -373,3 +373,30 @@ rule plot_interactive_bus_balance:
         ),
     script:
         scripts("plot_interactive_bus_balance.py")
+
+
+if config["foresight"] == "perfect":
+
+    rule build_datarecord:
+        """Exports the network handed to the solver as a datarecord with its mathspec fragments."""
+        input:
+            network=resources(f"networks/composed_{config['planning_horizons'][-1]}.nc"),
+        output:
+            directory=directory(resources("datarecords/composed")),
+        log:
+            logs("build_datarecord.log"),
+        benchmark:
+            benchmarks("build_datarecord")
+        resources:
+            mem_mb=10000,
+        params:
+            solving=config_provider("solving"),
+            foresight=config_provider("foresight"),
+            planning_horizons=config_provider("planning_horizons"),
+            sector=config_provider("sector"),
+            co2_sequestration_potential=config_provider(
+                "sector", "co2_sequestration_potential"
+            ),
+            custom_extra_functionality=input_custom_extra_functionality,
+        script:
+            scripts("build_datarecord.py")

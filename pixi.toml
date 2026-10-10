@@ -200,7 +200,18 @@ validate-config = "pytest test/test_config_schema.py::test_config_file_is_valid 
 [feature.test.dependencies]
 pytest = ">=8.4.2"
 
+[feature.datarecord.dependencies]
+duckdb = ">=1.5.4,<2"
+narwhals = ">=2,<3,!=2.21.0"
+pyarrow = "*"
+pyparsing = ">=3.1"
+
+[feature.datarecord.pypi-dependencies]
+datarecord = { path = "/Users/brynpickering/Repos/energy-models/datarecord", editable = true }
+mathspec = { git = "https://github.com/energy-models/mathspec", rev = "8c481e8196878c9fe51979600ab4ce20d26dc8ef" }
+
 [environments]
 doc = { features = ["doc"], no-default-feature = true }
 test = ["test", "dev"]
 dev = ["dev"]
+datarecord = ["datarecord", "test"]

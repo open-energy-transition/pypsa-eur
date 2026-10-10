@@ -23,6 +23,15 @@ rolling horizon.
 
 {{ rules("solve_network", "solve_operations_network") }}
 
+## Exporting a datarecord
+
+The export writes the network that the solver gets as a datarecord, with the
+mathspec of its constraints. It runs for perfect foresight only, and it needs
+the pixi environment `datarecord`:
+`pixi run -e datarecord snakemake -call build_datarecord`.
+
+{{ rules("build_datarecord") }}
+
 ## Library modules
 
 These modules are not rules of their own. Their functions are imported and
