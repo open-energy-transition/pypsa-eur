@@ -8,9 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pypsa
 import pytest
-import yaml
 
-from scripts.lib import mathspec_fragments as mf
 from scripts.solve_network import add_land_use_constraint, add_max_growth
 
 pytestmark = pytest.mark.datarecord
@@ -19,10 +17,10 @@ PERIODS = [2030, 2040]
 
 
 @pytest.fixture(scope="module")
-def base() -> dict:
-    from datarecord.tools.pypsa import MATHSPEC
+def mc():
+    from scripts.lib import mathspec_constraints
 
-    return yaml.safe_load(MATHSPEC.read_text())
+    return mathspec_constraints
 
 
 @pytest.fixture(scope="function")
@@ -121,10 +119,10 @@ def network() -> pypsa.Network:
     glc = dict(carrier_attribute="co2_emissions", sense="<=")
     n.add(
         "GlobalConstraint",
-        "CO2Limit-upper-2040",
+        ["CO2Limit-upper-2030", "CO2Limit-upper-2040"],
         type="co2_atmosphere",
-        investment_period=2040,
-        constant=500.0,
+        investment_period=PERIODS,
+        constant=[1000.0, 500.0],
         **glc,
     )
     n.add(
@@ -210,115 +208,138 @@ SWITCHES = {
     "defaults": (
         {},
         {
-            "land_use_constraint_solar_2040",
-            "Link_charger_ratio_1",
-            "Link_bidirectional_sync_0",
-            "Carrier_growth_limit_solar",
-            "solar_potential",
+            "global_constraint_period_constant",
+            "battery_charger_discharger",
+            "reversed_forward",
+            "solar_potential_factor",
         },
     ),
-    "BAU": ({"BAU": True}, {"bau_mincaps"}),
-    "SAFE": ({"SAFE": True}, {"safe_mintotalcap"}),
-    "EQ": ({"EQ": "EQ0.7"}, {"equity_min"}),
-    "reserve": (
-        {"operational_reserve": True},
-        {"reserve_margin", "Generator_p_reserve_upper_fixed_idle"},
-    ),
+    "BAU": ({"BAU": True}, {"bau_mincapacity"}),
+    "SAFE": ({"SAFE": True}, {"safe_peak_capacity", "safe_conventional"}),
+    "EQ": ({"EQ": "EQ0.7"}, {"equity_min_share"}),
+    "reserve": ({"operational_reserve": True}, {"reserve_contingency", "reserve_vres"}),
 }
 
 
 @pytest.mark.parametrize(
     ("switches", "expected"), SWITCHES.values(), ids=SWITCHES.keys()
 )
-def test_fragments_compose_onto_base_spec(
+def test_constraint_data_binds_to_the_static_math(
+    mc,
     network: pypsa.Network,
     solve_config: dict,
-    base: dict,
+    tmp_path: Path,
     switches: dict,
     expected: set[str],
 ) -> None:
     import mathspec
+    from datarecord import Record, combine, connect, write_record
     from datarecord.tools.pypsa import MATHSPEC, PyPSA
 
     solve_config["electricity"]["operational_reserve"]["activate"] = switches.pop(
         "operational_reserve", False
     )
     solve_config["solving"]["constraints"].update(switches)
-    fragments = [
-        mf.global_constraints(network, base),
-        mf.extra_functionality(network, solve_config, None, base),
-    ]
-    for fragment in fragments:
-        mathspec.to_spec(fragment)
-    spec = mathspec.merge([MATHSPEC, *fragments])
-    PyPSA.check_spec(spec, PyPSA.to_datarecord(network))
-    assert expected <= set(spec.constraints)
+    data = mc.constraint_data(network, solve_config, None)
+    base = PyPSA.to_datarecord(network)
+    con = connect()
+    write_record(
+        None,
+        combine(base, mc.extension(data, base.schema)),
+        con,
+        uri=str(tmp_path / "record"),
+    )
+    spec = mathspec.merge([MATHSPEC, *mc.SPECS])
+    PyPSA.check_spec(spec, Record.at(str(tmp_path / "record"), con))
+    assert expected <= set(data)
 
 
-@pytest.mark.parametrize(
-    ("name", "rhs"),
-    [
-        ("CO2Limit_upper_2040", "<= 500.0"),
-        ("CO2Budget", "<= 10000.0"),
-        ("GasLimit", "<= 100000.0"),
-        ("lv_limit", "<= 10000.0"),
-        ("lc_limit", "<= 1000000.0"),
-        ("hydro_limit", "<= 980.0"),
-        ("solar_cap", "<= 1000.0"),
-    ],
-)
-def test_global_constraint_constants(
-    network: pypsa.Network, base: dict, name: str, rhs: str
-) -> None:
-    constraint = mf.global_constraints(network, base)["constraints"][
-        f"GlobalConstraint_{name}"
-    ]
-    assert constraint["expression"].endswith(rhs)
-
-
-def test_co2_atmosphere_reads_the_rise_over_its_period(
-    network: pypsa.Network, base: dict
-) -> None:
-    level = mf.global_constraints(network, base)["expressions"][
-        "GlobalConstraint_CO2Limit_upper_2040_level"
-    ]
-    assert {key: case["expression"] for key, case in level["cases"].items()} == {
-        "final": "1",
-        "previous": "-1",
+def test_global_constraints_collapse_by_family(mc, network: pypsa.Network) -> None:
+    data = mc.global_constraint_data(network)
+    assert data["global_constraint_type"].to_dict() == {
+        "CO2Limit-upper": "co2_atmosphere",
+        "CO2Budget": "Co2Budget",
+        "GasLimit": "primary_energy",
+        "lv_limit": "transmission_volume_expansion_limit",
+        "lc_limit": "transmission_expansion_cost_limit",
+        "hydro limit": "operational_limit",
+        "solar cap": "tech_capacity_expansion_limit",
     }
-    assert "snapshot_period[period] == 2030" in level["cases"]["previous"]["when"]
+    assert data["global_constraint_period_constant"].to_dict() == {
+        ("CO2Limit-upper", 2030): 1000.0,
+        ("CO2Limit-upper", 2040): 500.0,
+        ("CO2Budget", 2040): 1e4,
+        ("hydro limit", 2040): 1e3,
+        ("solar cap", 2040): 1e3,
+    }
+    assert data["global_constraint_constant"].to_dict() == {
+        "GasLimit": 1e5,
+        "lv_limit": 1e4,
+        "lc_limit": 1e6,
+    }
+    assert data["global_constraint_carrier_attribute"].to_dict() == {
+        "GasLimit": "gas_usage"
+    }
+    carriers = data["global_constraint_carrier"]
+    assert set(map(tuple, carriers.values)) == {
+        ("lv_limit", "AC"),
+        ("lc_limit", "AC"),
+        ("hydro limit", "hydro"),
+        ("solar cap", "solar"),
+    }
 
 
-def test_battery_pairs_inline_the_discharger_efficiency(
-    network: pypsa.Network, solve_config: dict, base: dict
+def test_battery_pairs_carry_the_discharger_efficiency(
+    mc, network: pypsa.Network, solve_config: dict
 ) -> None:
-    fragment = mf.extra_functionality(network, solve_config, None, base)
-    cases = fragment["expressions"]["Link_charger_ratio_0_coefficient"]["cases"]
-    assert [(case["when"], case["expression"]) for case in cases.values()] == [
-        ("entity == 'b0 battery charger-2030'", "1.0"),
-        ("entity == 'b0 battery discharger-2030'", "-0.9"),
+    data = mc.extra_functionality_data(network, solve_config, None)
+    assert data["battery_charger_discharger"].values.tolist() == [
+        ["b0 battery charger-2030", "b0 battery discharger-2030"],
+        ["b0 battery charger-2040", "b0 battery discharger-2040"],
     ]
-
-
-def test_unknown_global_constraint_type_raises(
-    network: pypsa.Network, base: dict
-) -> None:
-    network.add("GlobalConstraint", "odd", type="odd_type", constant=1.0)
-    with pytest.raises(mf.UnsupportedConstraintError, match="odd_type"):
-        mf.global_constraints(network, base)
+    assert data["discharger_efficiency"].to_dict() == {
+        "b0 battery charger-2030": 0.9,
+        "b0 battery charger-2040": 0.9,
+    }
 
 
 @pytest.mark.parametrize(
-    "switches",
-    [{"CCL": True}, {"EQ": "EQ0.7c"}],
-    ids=["CCL", "EQ per country"],
+    "glc",
+    [
+        {"name": "odd", "type": "odd_type"},
+        {
+            "name": "CO2Limit-upper-2030",
+            "type": "co2_atmosphere",
+            "sense": ">=",
+            "investment_period": 2030,
+        },
+    ],
+    ids=["unknown type", "family with two senses"],
+)
+def test_untranslatable_global_constraint_raises(
+    mc, network: pypsa.Network, glc: dict
+) -> None:
+    network.remove("GlobalConstraint", network.global_constraints.index[:1])
+    network.add(
+        "GlobalConstraint",
+        glc.pop("name"),
+        constant=1.0,
+        carrier_attribute="co2_emissions",
+        **glc,
+    )
+    with pytest.raises(mc.UnsupportedConstraintError):
+        mc.global_constraint_data(network)
+
+
+@pytest.mark.parametrize(
+    "switches", [{"CCL": True}, {"EQ": "EQ0.7c"}], ids=["CCL", "EQ per country"]
 )
 def test_untranslatable_constraint_raises(
-    network: pypsa.Network, solve_config: dict, base: dict, switches: dict
+    mc, network: pypsa.Network, solve_config: dict, switches: dict
 ) -> None:
     solve_config["solving"]["constraints"].update(switches)
-    with pytest.raises(mf.UnsupportedConstraintError):
-        mf.extra_functionality(network, solve_config, None, base)
+    with pytest.raises(mc.UnsupportedConstraintError):
+        mc.extra_functionality_data(network, solve_config, None)
 
 
 @pytest.mark.parametrize(
@@ -327,9 +348,9 @@ def test_untranslatable_constraint_raises(
     ids=["empty", "custom"],
 )
 def test_custom_extra_functionality(
+    mc,
     network: pypsa.Network,
     solve_config: dict,
-    base: dict,
     tmp_path: Path,
     body: str,
     raises: bool,
@@ -337,10 +358,10 @@ def test_custom_extra_functionality(
     path = tmp_path / "custom.py"
     path.write_text(f"def custom(n, snapshots, snakemake):\n{body}")
     if raises:
-        with pytest.raises(mf.UnsupportedConstraintError, match="custom.py"):
-            mf.extra_functionality(network, solve_config, str(path), base)
+        with pytest.raises(mc.UnsupportedConstraintError, match="custom.py"):
+            mc.extra_functionality_data(network, solve_config, str(path))
     else:
-        mf.extra_functionality(network, solve_config, str(path), base)
+        mc.extra_functionality_data(network, solve_config, str(path))
 
 
 @pytest.mark.parametrize(("country", "raises"), [("DE", False), ("FR", True)])
@@ -362,8 +383,9 @@ def test_export_datarecord(
     network: pypsa.Network, solve_config: dict, tmp_path: Path
 ) -> None:
     from scripts.build_datarecord import (
+        add_zero_gas_usage,
         export_datarecord,
-        prefix_shared_bus_columns,
+        prefix_shared_entity_columns,
         rename_shared_one_port_names,
     )
 
@@ -371,10 +393,11 @@ def test_export_datarecord(
     network.buses["tags"] = "bus"
     network.lines["tags"] = "line"
     rename_shared_one_port_names(network)
-    prefix_shared_bus_columns(network)
+    prefix_shared_entity_columns(network)
+    add_zero_gas_usage(network)
     export_datarecord(network, solve_config, None, tmp_path / "composed")
     assert "H2 pipeline-2030 (Load)" in network.loads.index
-    assert "bus_tags" in network.buses
+    assert "entity_tags" in network.lines
     assert sorted(p.name for p in (tmp_path / "composed" / "math").iterdir()) == [
         "extra_functionality.yaml",
         "global_constraints.yaml",

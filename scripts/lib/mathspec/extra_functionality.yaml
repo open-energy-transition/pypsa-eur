@@ -1,0 +1,404 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: MIT
+
+description: >-
+  The constraints `solve_network` adds beyond PyPSA's model
+  (`extra_functionality`), and the ones PyPSA builds from the data that
+  `solve_network.prepare_network` sets for perfect foresight (land-use limits
+  per bus and carrier, growth limits per carrier). A constraint has rows only
+  where the record holds its data, which the export writes for the
+  constraints the config activates. Pairs of entities that a constraint ties
+  together are relations from an entity to its `partner`. Composes onto
+  `pypsa.mathspec.yaml`.
+
+given:
+  variables:
+    nom: {dims: [entity]}
+    p: {dims: [scenario, snapshot, entity]}
+    spill: {dims: [scenario, snapshot, entity]}
+  parameters:
+    entity_group: {dims: [entity], dtype: str}
+    role: {dims: [entity, bus], dtype: str}
+    active: {dims: [entity], dtype: bool}
+    build_year: {dims: [entity], dtype: int}
+    lifetime: {dims: [entity]}
+    period_year: {dims: [period], dtype: int}
+    snapshot_weighting_generators: {dims: [snapshot]}
+    snapshot_weighting_stores: {dims: [snapshot]}
+    p_nom: {dims: [entity]}
+    p_nom_max: {dims: [entity]}
+    p_nom_extendable: {dims: [entity], dtype: bool}
+    s_nom_extendable: {dims: [entity], dtype: bool}
+    e_nom_extendable: {dims: [entity], dtype: bool}
+    p_max_pu: {dims: [scenario, snapshot, entity]}
+    p_set: {dims: [scenario, snapshot, entity]}
+    inflow: {dims: [scenario, snapshot, entity]}
+    max_growth: {dims: [carrier]}
+    max_relative_growth: {dims: [carrier]}
+
+dimensions:
+  scenario: {}
+  snapshot: {dtype: datetime, ordered: true}
+  period: {dtype: int, ordered: true}
+  entity: {}
+  bus: {}
+  carrier: {}
+
+relations:
+  snapshot_period: {key: snapshot, values: period}
+  entity_carrier: {key: entity, values: carrier, missing: absent}
+  bus_carrier: {key: bus, values: carrier, missing: absent}
+  tes_store_charger:
+    key: entity
+    values: {partner: entity}
+    description: a thermal energy store and its charger (`add_TES_energy_to_power_ratio_constraints`)
+  tes_charger_discharger:
+    key: entity
+    values: {partner: entity}
+    description: a thermal energy storage charger and its discharger (`add_TES_charger_ratio_constraints`)
+  battery_charger_discharger:
+    key: entity
+    values: {partner: entity}
+    description: a battery charger and its discharger (`add_battery_constraints`)
+  reversed_forward:
+    key: entity
+    values: {partner: entity}
+    description: a reversed lossy link and its forward link (`add_lossy_bidirectional_link_constraints`)
+  pipe_retrofit:
+    key: entity
+    values: {partner: entity}
+    description: a gas pipeline and the H2 pipeline retrofitted from it (`add_pipe_retrofit_constraint`)
+  egs_storage_well:
+    key: entity
+    values: {partner: entity}
+    description: a geothermal reservoir and its well (`add_flexible_egs_constraint`)
+  gas_retrofit:
+    key: entity
+    values: {partner: entity}
+    description: an existing gas boiler and the H2 boiler it can be retrofitted to (`add_retrofit_gas_boiler_constraint`)
+  gas_retrofit_heat_load:
+    key: entity
+    values: {partner: entity}
+    description: an existing gas boiler and the heat load at its output bus
+
+parameters:
+  bau_mincapacity: {dims: [carrier], missing: absent, description: "`electricity.BAU_mincapacities`"}
+  safe_conventional: {dims: [carrier], dtype: bool, missing: neutral, description: "`electricity.conventional_carriers`"}
+  safe_peak_capacity:
+    dims: []
+    missing: absent
+    description: the peak load times one plus `electricity.SAFE_reservemargin`
+  reserve_provider:
+    dims: [carrier]
+    dtype: bool
+    missing: neutral
+    description: the generator carriers that hold operational reserve (all but load shedding)
+  reserve_vres: {dims: [carrier], dtype: bool, missing: neutral, description: variable renewable carriers}
+  reserve_epsilon_load: {dims: [], missing: absent, description: "`operational_reserve.epsilon_load`"}
+  reserve_epsilon_vres: {dims: [], missing: absent, description: "`operational_reserve.epsilon_vres`"}
+  reserve_contingency: {dims: [], missing: absent, description: "`operational_reserve.contingency`"}
+  equity_min_share: {dims: [], missing: absent, description: the share of its demand a node produces (`EQ`)}
+  solar_potential_factor:
+    dims: [carrier]
+    missing: absent
+    description: the land a unit of capacity of a solar carrier takes, relative to fixed solar
+  solar_potential_reference:
+    dims: [carrier]
+    dtype: bool
+    missing: neutral
+    description: the solar carrier whose potential is the potential of the bus
+  tes_energy_to_power_ratio:
+    dims: [entity]
+    missing: absent
+    description: the energy to power ratio of a thermal energy store's charger
+  discharger_efficiency:
+    dims: [entity]
+    missing: absent
+    description: the efficiency of a charger's discharger
+  pipe_retrofit_ch4_per_h2: {dims: [], missing: absent, description: one over `sector.H2_retrofit_capacity_per_CH4`}
+  heat_load_profile:
+    dims: [snapshot, entity]
+    missing: absent
+    description: a heat load over its peak in the period
+  import_weight:
+    dims: [entity]
+    missing: absent
+    description: what one unit of flow of an import generator or link counts toward the import limit
+  import_limit: {dims: [], missing: absent, description: "`sector.imports.limit` over the modelled years"}
+  import_limit_sense: {dims: [], dtype: str, missing: absent, description: "`sector.imports.limit_sense`"}
+
+expressions:
+  ef_standing:
+    dims: [entity, period]
+    cases:
+      standing:
+        when: active AND build_year <= period_year AND build_year + lifetime > period_year
+        expression: 1
+    otherwise: 0
+  land_use_weight:
+    dims: [entity, bus, period]
+    cases:
+      one_port:
+        when: >-
+          (entity_group == 'Generator' OR entity_group == 'StorageUnit' OR entity_group == 'Store')
+          AND (p_nom_extendable OR e_nom_extendable) AND role == 'attached'
+        expression: ef_standing
+    otherwise: 0
+  land_use_capacity:
+    dims: [bus, carrier, period]
+    expression: sum(nom * land_use_weight, over=entity, by=entity_carrier[carrier])
+  growth_first:
+    dims: [entity, period]
+    cases:
+      first:
+        when: >-
+          (p_nom_extendable OR s_nom_extendable OR e_nom_extendable)
+          AND active AND build_year <= period_year AND build_year + lifetime > period_year
+          AND NOT shift(active AND build_year <= period_year AND build_year + lifetime > period_year, along=period, offset=1)
+        expression: 1
+    otherwise: 0
+  growth_capacity:
+    dims: [carrier, period]
+    expression: sum(nom * growth_first, over=entity, by=entity_carrier[carrier])
+  bau_generator:
+    dims: [entity]
+    cases:
+      extendable: {when: "entity_group == 'Generator' AND p_nom_extendable", expression: 1}
+    otherwise: 0
+  safe_extendable:
+    dims: [entity]
+    cases:
+      conventional:
+        when: "entity_group == 'Generator' AND p_nom_extendable AND at(safe_conventional, by=entity_carrier[carrier])"
+        expression: 1
+    otherwise: 0
+  safe_fixed:
+    dims: [entity]
+    cases:
+      conventional:
+        when: "entity_group == 'Generator' AND NOT p_nom_extendable AND at(safe_conventional, by=entity_carrier[carrier])"
+        expression: 1
+    otherwise: 0
+  reserve_load:
+    dims: [entity]
+    cases:
+      load: {when: "entity_group == 'Load'", expression: 1}
+    otherwise: 0
+  reserve_vres_extendable:
+    dims: [entity]
+    cases:
+      vres:
+        when: >-
+          entity_group == 'Generator' AND p_nom_extendable
+          AND at(reserve_provider AND reserve_vres, by=entity_carrier[carrier])
+        expression: 1
+    otherwise: 0
+  reserve_vres_fixed:
+    dims: [entity]
+    cases:
+      vres:
+        when: >-
+          entity_group == 'Generator' AND NOT p_nom_extendable
+          AND at(reserve_provider AND reserve_vres, by=entity_carrier[carrier])
+        expression: 1
+    otherwise: 0
+  equity_generator:
+    dims: [entity, bus]
+    cases:
+      generator: {when: "entity_group == 'Generator' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  equity_load:
+    dims: [entity, bus]
+    cases:
+      load: {when: "entity_group == 'Load' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  equity_storage_unit:
+    dims: [entity, bus]
+    cases:
+      storage_unit: {when: "entity_group == 'StorageUnit' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  solar_potential_generator:
+    dims: [entity, bus]
+    cases:
+      solar:
+        when: >-
+          entity_group == 'Generator' AND p_nom_extendable AND role == 'attached'
+          AND at(solar_potential_factor > 0, by=entity_carrier[carrier])
+        expression: at(solar_potential_factor, by=entity_carrier[carrier])
+    otherwise: 0
+  solar_potential_reference_generator:
+    dims: [entity, bus]
+    cases:
+      reference:
+        when: >-
+          entity_group == 'Generator' AND p_nom_extendable AND role == 'attached'
+          AND at(solar_potential_reference, by=entity_carrier[carrier])
+        expression: 1
+    otherwise: 0
+  solar_potential_tracking_generator:
+    dims: [entity, bus]
+    cases:
+      tracking:
+        when: >-
+          entity_group == 'Generator' AND role == 'attached'
+          AND at(solar_potential_factor > 0 AND NOT solar_potential_reference, by=entity_carrier[carrier])
+        expression: at(solar_potential_factor, by=entity_carrier[carrier])
+    otherwise: 0
+  solar_potential_left:
+    dims: [bus]
+    description: the potential of the reference solar carrier at a bus, less what the existing tracking solar takes
+    expression: >-
+      sum(p_nom_max * solar_potential_reference_generator, over=entity)
+      - sum(p_nom * solar_potential_tracking_generator, over=entity)
+
+variables:
+  Generator_r:
+    dims: [scenario, snapshot, entity]
+    where: "reserve_contingency AND entity_group == 'Generator' AND at(reserve_provider, by=entity_carrier[carrier])"
+    bounds: {lower: 0}
+    description: the operational reserve a generator holds
+
+constraints:
+  land_use_constraint:
+    dims: [entity, bus, period]
+    description: >-
+      `add_land_use_constraint`: the extendable capacity of a carrier at a bus
+      that stands in a period, at most the potential of each extendable
+      generator of that carrier built at that bus in that period (PyPSA's bus
+      columns `nom_max_{carrier}_{period}` hold the smallest of them)
+    where: >-
+      entity_group == 'Generator' AND p_nom_extendable AND role == 'attached'
+      AND build_year == period_year AND p_nom_max < inf
+    expression: at(land_use_capacity, by=entity_carrier[carrier]) <= p_nom_max
+  Carrier_growth_limit:
+    dims: [carrier, period]
+    description: PyPSA's growth limit from `max_growth` and `max_relative_growth` (`add_max_growth`)
+    where: max_growth < inf
+    expression: >-
+      growth_capacity - max_relative_growth * shift(growth_capacity, along=period, offset=1, edge=0)
+      <= max_growth
+  bau_mincaps:
+    dims: [carrier]
+    description: "`add_BAU_constraints`"
+    where: bau_mincapacity
+    expression: sum(nom * bau_generator, over=entity, by=entity_carrier[carrier]) >= bau_mincapacity
+  safe_mintotalcap:
+    dims: []
+    description: "`add_SAFE_constraints`"
+    where: safe_peak_capacity
+    expression: sum(nom * safe_extendable, over=entity) >= safe_peak_capacity - sum(p_nom * safe_fixed, over=entity)
+  reserve_margin:
+    dims: [scenario, snapshot]
+    description: "`add_operational_reserve_margin`: the reserve requirement"
+    where: reserve_contingency
+    expression: >-
+      sum(Generator_r, over=entity)
+      - reserve_epsilon_vres * sum(nom * p_max_pu * reserve_vres_extendable, over=entity)
+      >= reserve_epsilon_load * sum(p_set * reserve_load, over=entity)
+      + reserve_epsilon_vres * sum(p_max_pu * p_nom * reserve_vres_fixed, over=entity)
+      + reserve_contingency
+  Generator_p_reserve_upper_extendable:
+    dims: [scenario, snapshot, entity]
+    description: "`add_operational_reserve_margin`: dispatch and reserve within extendable capacity"
+    where: Generator_r AND p AND p_nom_extendable
+    expression: p + Generator_r - p_max_pu * nom <= 0
+  Generator_p_reserve_upper_extendable_idle:
+    dims: [scenario, snapshot, entity]
+    description: "`add_operational_reserve_margin`: reserve within extendable capacity where the unit does not dispatch"
+    where: Generator_r AND NOT p AND p_nom_extendable
+    expression: Generator_r - p_max_pu * nom <= 0
+  Generator_p_reserve_upper_fixed:
+    dims: [scenario, snapshot, entity]
+    description: "`add_operational_reserve_margin`: dispatch and reserve within fixed capacity"
+    where: Generator_r AND p AND NOT p_nom_extendable
+    expression: p + Generator_r <= p_max_pu * p_nom
+  Generator_p_reserve_upper_fixed_idle:
+    dims: [scenario, snapshot, entity]
+    description: "`add_operational_reserve_margin`: reserve within fixed capacity where the unit does not dispatch"
+    where: Generator_r AND NOT p AND NOT p_nom_extendable
+    expression: Generator_r <= p_max_pu * p_nom
+  equity_min:
+    dims: [scenario, bus]
+    description: "`add_EQ_constraints` per node"
+    where: "equity_min_share AND count(entity_group == 'Load' AND role == 'attached', over=entity) >= 1"
+    expression: >-
+      0.1 * sum(p * equity_generator * snapshot_weighting_generators, over=[snapshot, entity])
+      - 0.1 * sum(spill * equity_storage_unit * snapshot_weighting_stores, over=[snapshot, entity])
+      >= 0.1 * (equity_min_share * sum(p_set * equity_load * snapshot_weighting_generators, over=[snapshot, entity])
+      - sum(inflow * equity_storage_unit * snapshot_weighting_stores, over=[snapshot, entity]))
+  solar_potential:
+    dims: [bus]
+    description: "`add_solar_potential_constraints`"
+    where: >-
+      count(entity_group == 'Generator' AND p_nom_extendable AND role == 'attached'
+      AND at(solar_potential_reference, by=entity_carrier[carrier]), over=entity) >= 1
+      AND count(entity_group == 'Generator' AND role == 'attached'
+      AND at(solar_potential_factor > 0 AND NOT solar_potential_reference, by=entity_carrier[carrier]), over=entity) >= 1
+      AND solar_potential_left >= 0
+    expression: sum(nom * solar_potential_generator, over=entity) <= solar_potential_left
+  solar_potential_clipped:
+    dims: [bus]
+    description: "`add_solar_potential_constraints`, where the potential left is below zero and clipped to it"
+    where: >-
+      count(entity_group == 'Generator' AND p_nom_extendable AND role == 'attached'
+      AND at(solar_potential_reference, by=entity_carrier[carrier]), over=entity) >= 1
+      AND count(entity_group == 'Generator' AND role == 'attached'
+      AND at(solar_potential_factor > 0 AND NOT solar_potential_reference, by=entity_carrier[carrier]), over=entity) >= 1
+      AND solar_potential_left < 0
+    expression: sum(nom * solar_potential_generator, over=entity) <= 0
+  TES_energy_to_power_ratio:
+    dims: [entity]
+    description: "`add_TES_energy_to_power_ratio_constraints`"
+    where: tes_store_charger AND tes_energy_to_power_ratio
+    expression: nom - tes_energy_to_power_ratio * at(nom, by=tes_store_charger[partner]) == 0
+  TES_charger_ratio:
+    dims: [entity]
+    description: "`add_TES_charger_ratio_constraints`"
+    where: tes_charger_discharger AND discharger_efficiency
+    expression: nom - discharger_efficiency * at(nom, by=tes_charger_discharger[partner]) == 0
+  Link_charger_ratio:
+    dims: [entity]
+    description: "`add_battery_constraints`"
+    where: battery_charger_discharger AND discharger_efficiency
+    expression: nom - discharger_efficiency * at(nom, by=battery_charger_discharger[partner]) == 0
+  Link_bidirectional_sync:
+    dims: [entity]
+    description: "`add_lossy_bidirectional_link_constraints`"
+    where: reversed_forward
+    expression: nom - at(nom, by=reversed_forward[partner]) == 0
+  Link_pipe_retrofit:
+    dims: [entity]
+    description: "`add_pipe_retrofit_constraint`"
+    where: pipe_retrofit AND pipe_retrofit_ch4_per_h2
+    expression: nom + pipe_retrofit_ch4_per_h2 * at(nom, by=pipe_retrofit[partner]) == p_nom
+  upper_bound_charging_capacity_of_geothermal_reservoir:
+    dims: [entity]
+    description: "`add_flexible_egs_constraint`"
+    where: egs_storage_well
+    expression: nom - at(nom, by=egs_storage_well[partner]) <= 0
+  gas_retrofit:
+    dims: [scenario, snapshot, entity]
+    description: "`add_retrofit_gas_boiler_constraint`, where both boilers dispatch"
+    where: gas_retrofit AND gas_retrofit_heat_load AND p AND at(p, by=gas_retrofit[partner])
+    expression: p + at(p, by=gas_retrofit[partner]) == p_nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+  gas_retrofit_alone:
+    dims: [scenario, snapshot, entity]
+    description: "`add_retrofit_gas_boiler_constraint`, where the H2 boiler does not dispatch"
+    where: gas_retrofit AND gas_retrofit_heat_load AND p AND NOT at(p, by=gas_retrofit[partner])
+    expression: p == p_nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+  import_limit_upper:
+    dims: [scenario]
+    description: "`add_import_limit_constraint`"
+    where: "import_limit AND import_limit_sense == '<='"
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) <= import_limit
+  import_limit_lower:
+    dims: [scenario]
+    description: "`add_import_limit_constraint`"
+    where: "import_limit AND import_limit_sense == '>='"
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) >= import_limit
+  import_limit_equal:
+    dims: [scenario]
+    description: "`add_import_limit_constraint`"
+    where: "import_limit AND import_limit_sense == '=='"
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) == import_limit

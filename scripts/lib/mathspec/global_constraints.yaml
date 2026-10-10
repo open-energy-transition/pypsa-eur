@@ -1,0 +1,298 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: MIT
+
+description: >-
+  The global constraints of a PyPSA-Eur network, collapsed by family: one
+  `global_constraint` label per family, a limit per period where the family
+  binds per investment period (`global_constraint_period_constant`) and one
+  limit where it binds over the horizon (`global_constraint_constant`). The
+  type, sense and carrier selection of a family are attributes of its label;
+  the weight of a carrier is an attribute of the carrier dim. Translated from
+  PyPSA's `define_primary_energy_limit`, `define_operational_limit`,
+  `define_transmission_volume_expansion_limit`,
+  `define_transmission_expansion_cost_limit` and
+  `define_tech_capacity_expansion_limit`, and from PyPSA-Eur's
+  `solve_network.add_carbon_constraint` (`co2_atmosphere`) and
+  `add_carbon_budget_constraint` (`Co2Budget`). Composes onto
+  `pypsa.mathspec.yaml`.
+
+given:
+  variables:
+    nom: {dims: [entity]}
+    p: {dims: [scenario, snapshot, entity]}
+    e: {dims: [scenario, snapshot, entity]}
+  expressions:
+    capital_weight: {dims: [entity, period]}
+  parameters:
+    entity_group: {dims: [entity], dtype: str}
+    role: {dims: [entity, bus], dtype: str}
+    efficiency: {dims: [scenario, snapshot, entity, bus]}
+    active: {dims: [entity], dtype: bool}
+    build_year: {dims: [entity], dtype: int}
+    lifetime: {dims: [entity]}
+    period_year: {dims: [period], dtype: int}
+    period_weighting_years: {dims: [period]}
+    snapshot_weighting_generators: {dims: [snapshot]}
+    p_nom_extendable: {dims: [entity], dtype: bool}
+    s_nom_extendable: {dims: [entity], dtype: bool}
+    e_nom_extendable: {dims: [entity], dtype: bool}
+    e_cyclic: {dims: [entity], dtype: bool}
+    e_initial: {dims: [entity]}
+    e_initial_per_period: {dims: [entity], dtype: bool}
+    cyclic_state_of_charge: {dims: [entity], dtype: bool}
+    state_of_charge_initial: {dims: [entity]}
+    state_of_charge_initial_per_period: {dims: [entity], dtype: bool}
+    capital_cost: {dims: [entity]}
+    length: {dims: [entity]}
+    co2_emissions: {dims: [carrier]}
+    gas_usage: {dims: [carrier]}
+
+dimensions:
+  scenario: {}
+  snapshot: {dtype: datetime, ordered: true}
+  period: {dtype: int, ordered: true}
+  entity: {}
+  bus: {}
+  carrier: {}
+  global_constraint:
+    description: a family of PyPSA global constraints, one per name less its period suffix
+
+relations:
+  snapshot_period: {key: snapshot, values: period}
+  entity_carrier: {key: entity, values: carrier, missing: absent}
+  bus_carrier: {key: bus, values: carrier, missing: absent}
+  global_constraint_carrier:
+    key: [global_constraint, carrier]
+    description: the carriers a family selects (`carrier_attribute` of an operational, transmission or capacity limit)
+
+parameters:
+  global_constraint_type:
+    dims: [global_constraint]
+    dtype: str
+    description: "`type` of the family's `GlobalConstraint` rows"
+  global_constraint_sense:
+    dims: [global_constraint]
+    dtype: str
+    description: "`sense` of the family's rows: `<=`, `>=` or `==`"
+  global_constraint_carrier_attribute:
+    dims: [global_constraint]
+    dtype: str
+    missing: absent
+    description: the carrier attribute a primary energy limit weights carriers by
+  global_constraint_constant:
+    dims: [global_constraint]
+    missing: absent
+    description: the limit of a family that binds over the horizon
+  global_constraint_period_constant:
+    dims: [global_constraint, period]
+    missing: absent
+    description: the limit of a family in each investment period it binds in
+
+expressions:
+  glc_extendable:
+    dims: [entity]
+    cases:
+      extendable: {when: p_nom_extendable OR s_nom_extendable OR e_nom_extendable, expression: 1}
+    otherwise: 0
+  glc_standing:
+    dims: [entity, period]
+    cases:
+      standing:
+        when: active AND build_year <= period_year AND build_year + lifetime > period_year
+        expression: 1
+    otherwise: 0
+  glc_period_weight:
+    dims: [snapshot]
+    expression: snapshot_weighting_generators * at(period_weighting_years, by=snapshot_period[period])
+  glc_generator:
+    dims: [entity]
+    cases:
+      generator: {when: "entity_group == 'Generator'", expression: 1}
+    otherwise: 0
+  glc_generator_port:
+    dims: [entity, bus]
+    cases:
+      generator: {when: "entity_group == 'Generator' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  glc_generator_efficiency:
+    dims: [scenario, snapshot, entity]
+    expression: sum(efficiency * glc_generator_port, over=bus)
+  glc_generator_fuel:
+    dims: [scenario, snapshot, entity]
+    cases:
+      generator: {when: "entity_group == 'Generator'", expression: 1 / glc_generator_efficiency}
+    otherwise: 0
+  glc_output:
+    dims: [scenario, carrier, period]
+    description: what the generators of a carrier produce in a period, weighted by snapshot and period years
+    expression: >-
+      sum(sum(p * glc_generator, over=entity, by=entity_carrier[carrier]) * glc_period_weight,
+      over=snapshot, by=snapshot_period[period])
+  glc_fuel:
+    dims: [scenario, carrier, period]
+    description: what the generators of a carrier consume in a period, their output over their efficiency
+    expression: >-
+      sum(sum(p * glc_generator_fuel, over=entity, by=entity_carrier[carrier]) * glc_period_weight,
+      over=snapshot, by=snapshot_period[period])
+  glc_store_final:
+    dims: [snapshot, entity]
+    cases:
+      final:
+        when: >-
+          entity_group == 'Store' AND active AND NOT e_cyclic AND e_initial_per_period
+          AND position(snapshot, within=snapshot_period[period]) == -1
+        expression: at(period_weighting_years, by=snapshot_period[period])
+    otherwise: 0
+  glc_storage_unit_final:
+    dims: [snapshot, entity]
+    cases:
+      final:
+        when: >-
+          entity_group == 'StorageUnit' AND active AND NOT cyclic_state_of_charge
+          AND state_of_charge_initial_per_period
+          AND position(snapshot, within=snapshot_period[period]) == -1
+        expression: at(period_weighting_years, by=snapshot_period[period])
+    otherwise: 0
+  glc_drawdown:
+    dims: [scenario, carrier, period]
+    description: >-
+      what the non-cyclic storage of a carrier, reset each period, gives up over a
+      period: its initial level less its final one, weighted by period years
+    expression: >-
+      sum(sum(e_initial * glc_store_final, over=entity, by=entity_carrier[carrier])
+      + sum(state_of_charge_initial * glc_storage_unit_final, over=entity, by=entity_carrier[carrier])
+      - sum(e * glc_store_final, over=entity, by=entity_carrier[carrier])
+      - sum(e * glc_storage_unit_final, over=entity, by=entity_carrier[carrier]),
+      over=snapshot, by=snapshot_period[period])
+  glc_co2_store:
+    dims: [snapshot, entity, bus]
+    cases:
+      final:
+        when: >-
+          entity_group == 'Store' AND NOT e_cyclic AND role == 'attached'
+          AND at(co2_emissions != 0, by=bus_carrier[carrier])
+          AND position(snapshot, within=snapshot_period[period]) == -1
+        expression: 1
+    otherwise: 0
+  glc_co2_level:
+    dims: [scenario, period]
+    description: the level of the stores on emission buses at the end of a period
+    expression: sum(sum(e * glc_co2_store, over=[entity, bus]), over=snapshot, by=snapshot_period[period])
+  glc_branch:
+    dims: [entity]
+    cases:
+      branch: {when: "entity_group == 'Line' OR entity_group == 'Link'", expression: glc_extendable}
+    otherwise: 0
+  glc_branch_standing:
+    dims: [entity]
+    cases:
+      standing:
+        when: count(active AND build_year <= period_year AND build_year + lifetime > period_year, over=period) >= 1
+        expression: glc_branch
+    otherwise: 0
+  glc_volume:
+    dims: [carrier, period]
+    expression: sum(nom * length * glc_branch * glc_standing, over=entity, by=entity_carrier[carrier])
+  glc_volume_horizon:
+    dims: [carrier]
+    expression: sum(nom * length * glc_branch_standing, over=entity, by=entity_carrier[carrier])
+  glc_cost:
+    dims: [carrier, period]
+    expression: sum(nom * capital_cost * glc_branch * glc_standing, over=entity, by=entity_carrier[carrier])
+  glc_cost_horizon:
+    dims: [carrier]
+    expression: >-
+      sum(nom * capital_cost * sum(capital_weight, over=period) * glc_branch_standing,
+      over=entity, by=entity_carrier[carrier])
+  glc_capacity:
+    dims: [carrier, period]
+    expression: sum(nom * glc_extendable * glc_standing, over=entity, by=entity_carrier[carrier])
+  glc_active:
+    dims: [entity]
+    cases:
+      active: {when: active, expression: glc_extendable}
+    otherwise: 0
+  glc_capacity_horizon:
+    dims: [carrier]
+    expression: sum(nom * glc_active, over=entity, by=entity_carrier[carrier])
+  glc_period_total:
+    dims: [scenario, global_constraint, period]
+    description: the left-hand side of a family in one investment period
+    cases:
+      primary_energy_co2:
+        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'co2_emissions'"
+        expression: sum((glc_fuel + glc_drawdown) * co2_emissions, over=carrier)
+      primary_energy_gas:
+        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'gas_usage'"
+        expression: sum((glc_fuel + glc_drawdown) * gas_usage, over=carrier)
+      operational_limit:
+        when: "global_constraint_type == 'operational_limit'"
+        expression: sum(glc_output + glc_drawdown, over=carrier, by=global_constraint_carrier[global_constraint])
+      transmission_volume:
+        when: "global_constraint_type == 'transmission_volume_expansion_limit'"
+        expression: sum(glc_volume, over=carrier, by=global_constraint_carrier[global_constraint])
+      transmission_cost:
+        when: "global_constraint_type == 'transmission_expansion_cost_limit'"
+        expression: sum(glc_cost, over=carrier, by=global_constraint_carrier[global_constraint])
+      tech_capacity:
+        when: "global_constraint_type == 'tech_capacity_expansion_limit'"
+        expression: sum(glc_capacity, over=carrier, by=global_constraint_carrier[global_constraint])
+      co2_atmosphere:
+        when: "global_constraint_type == 'co2_atmosphere'"
+        expression: glc_co2_level - shift(glc_co2_level, along=period, offset=1, edge=0)
+      co2_budget:
+        when: "global_constraint_type == 'Co2Budget'"
+        expression: glc_co2_level * period_weighting_years
+    otherwise: 0
+  glc_horizon_total:
+    dims: [scenario, global_constraint]
+    description: the left-hand side of a family over the horizon
+    cases:
+      primary_energy_co2:
+        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'co2_emissions'"
+        expression: sum((glc_fuel + glc_drawdown) * co2_emissions, over=[carrier, period])
+      primary_energy_gas:
+        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'gas_usage'"
+        expression: sum((glc_fuel + glc_drawdown) * gas_usage, over=[carrier, period])
+      operational_limit:
+        when: "global_constraint_type == 'operational_limit'"
+        expression: >-
+          sum(sum(glc_output + glc_drawdown, over=period),
+          over=carrier, by=global_constraint_carrier[global_constraint])
+      transmission_volume:
+        when: "global_constraint_type == 'transmission_volume_expansion_limit'"
+        expression: sum(glc_volume_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
+      transmission_cost:
+        when: "global_constraint_type == 'transmission_expansion_cost_limit'"
+        expression: sum(glc_cost_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
+      tech_capacity:
+        when: "global_constraint_type == 'tech_capacity_expansion_limit'"
+        expression: sum(glc_capacity_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
+    otherwise: 0
+
+constraints:
+  GlobalConstraint_period_upper:
+    dims: [scenario, global_constraint, period]
+    where: "global_constraint_period_constant AND global_constraint_sense == '<='"
+    expression: glc_period_total <= global_constraint_period_constant
+  GlobalConstraint_period_lower:
+    dims: [scenario, global_constraint, period]
+    where: "global_constraint_period_constant AND global_constraint_sense == '>='"
+    expression: glc_period_total >= global_constraint_period_constant
+  GlobalConstraint_period_equal:
+    dims: [scenario, global_constraint, period]
+    where: "global_constraint_period_constant AND global_constraint_sense == '=='"
+    expression: glc_period_total == global_constraint_period_constant
+  GlobalConstraint_horizon_upper:
+    dims: [scenario, global_constraint]
+    where: "global_constraint_constant AND global_constraint_sense == '<='"
+    expression: glc_horizon_total <= global_constraint_constant
+  GlobalConstraint_horizon_lower:
+    dims: [scenario, global_constraint]
+    where: "global_constraint_constant AND global_constraint_sense == '>='"
+    expression: glc_horizon_total >= global_constraint_constant
+  GlobalConstraint_horizon_equal:
+    dims: [scenario, global_constraint]
+    where: "global_constraint_constant AND global_constraint_sense == '=='"
+    expression: glc_horizon_total == global_constraint_constant

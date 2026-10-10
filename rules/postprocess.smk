@@ -378,7 +378,7 @@ rule plot_interactive_bus_balance:
 if config["foresight"] == "perfect":
 
     rule build_datarecord:
-        """Exports the network handed to the solver as a datarecord with its mathspec fragments."""
+        """Exports the network handed to the solver as a datarecord with its constraint math."""
         input:
             network=resources(f"networks/composed_{config['planning_horizons'][-1]}.nc"),
         output:

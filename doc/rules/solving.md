@@ -26,8 +26,11 @@ rolling horizon.
 ## Exporting a datarecord
 
 The export writes the network that the solver gets as a datarecord, with the
-mathspec of its constraints. It runs for perfect foresight only, and it needs
-the pixi environment `datarecord`:
+mathspec of its constraints. The math is static: `scripts/lib/mathspec/` holds
+the global constraints and the custom constraints of `solve_network`, and the
+record holds their data as tables. A constraint has rows only where the record
+holds its data. The export runs for perfect foresight only, and it needs the
+pixi environment `datarecord`:
 `pixi run -e datarecord snakemake -call build_datarecord`.
 
 {{ rules("build_datarecord") }}

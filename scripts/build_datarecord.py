@@ -7,11 +7,14 @@ Exports the network handed to the solver as a datarecord with its mathspec.
 Reads the composed network of the last planning horizon (for perfect foresight
 the stacked multi-period network) and applies the same preparation that
 `solve_network` applies before it builds the model. It writes the network as a
-datarecord with `datarecord.tools.pypsa.PyPSA`, copies the base mathspec spec
-that datarecord ships, and writes two fragments next to it: the global
-constraints of the network and the custom constraints of `solve_network`.
-The script merges the three files, loads them with mathspec and checks that
-every name the merged spec binds to is in the written record.
+datarecord with `datarecord.tools.pypsa.PyPSA`, together with the data of the
+constraints that PyPSA's model does not hold: the global constraints of the
+network and the custom constraints of `solve_network`
+(`scripts.lib.mathspec_constraints`). It copies the base mathspec spec that
+datarecord ships and the static math of those constraints
+(`scripts/lib/mathspec/`) into `math/`, merges the three files, loads them
+with mathspec and checks that every name the merged spec binds to is in the
+written record.
 
 The script needs the `datarecord` pixi environment:
 `pixi run -e datarecord snakemake -call build_datarecord`.
@@ -24,12 +27,11 @@ from pathlib import Path
 import mathspec
 import numpy as np
 import pypsa
-import yaml
-from datarecord import Record, connect, write_record
+from datarecord import Record, combine, connect, write_record
 from datarecord.tools.pypsa import MATHSPEC, PyPSA
 
 from scripts._helpers import configure_logging, set_scenario_config
-from scripts.lib.mathspec_fragments import extra_functionality, global_constraints
+from scripts.lib.mathspec_constraints import SPECS, constraint_data, extension
 from scripts.solve_network import prepare_network
 
 logger = logging.getLogger(__name__)
@@ -57,28 +59,27 @@ def drop_bus_country_duplicates(n: pypsa.Network) -> None:
         c.static.drop(columns="country", inplace=True)
 
 
-def prefix_shared_bus_columns(n: pypsa.Network) -> None:
+def prefix_shared_entity_columns(n: pypsa.Network) -> None:
     """
-    Prefix a custom bus column with ``bus_`` where a component has it too.
+    Prefix a custom component column with ``entity_`` where a bus column has its name.
 
-    A record has one flat attribute namespace, and datarecord refuses a custom
-    bus column whose name a custom component column also takes (``tags``,
-    ``under_construction`` from OSM). This applies the prefix that datarecord
-    applies to registry clashes such as ``bus_x``.
+    A record has one flat attribute namespace, so a custom component column
+    whose name a bus column also takes (``location``, ``unit``, ``v_nom``, or
+    ``tags`` from OSM) cannot be told apart from it. The bus column keeps its
+    name, as the bus registry fixes most of them.
     """
-    registry = set(n.components.buses.defaults.index)
-    entity_columns = {
-        column
-        for c in n.components
-        if c.name not in ("Bus", "Carrier", "GlobalConstraint", "Shape")
-        for column in c.static.columns
-    }
-    shared = [
-        column
-        for column in n.buses.columns
-        if column not in registry and column in entity_columns
-    ]
-    n.buses.rename(columns={column: f"bus_{column}" for column in shared}, inplace=True)
+    bus_columns = set(n.buses.columns) | set(n.components.buses.defaults.index)
+    for c in n.components:
+        if c.name in ("Bus", "Carrier", "GlobalConstraint", "Shape"):
+            continue
+        shared = [
+            column
+            for column in c.static.columns
+            if column in bus_columns and column not in c.defaults.index
+        ]
+        c.static.rename(
+            columns={column: f"entity_{column}" for column in shared}, inplace=True
+        )
 
 
 def rename_shared_one_port_names(n: pypsa.Network) -> None:
@@ -105,28 +106,34 @@ def rename_shared_one_port_names(n: pypsa.Network) -> None:
             n.buses["generator"] = n.buses.generator.replace(mapping)
 
 
+def add_zero_gas_usage(n: pypsa.Network) -> None:
+    """
+    Give every carrier a `gas_usage` of zero where no gas limit set one.
+
+    The static math of primary energy limits reads `gas_usage` beside
+    `co2_emissions`, so the record carries it for every network.
+    """
+    if "gas_usage" not in n.carriers:
+        n.carriers["gas_usage"] = 0.0
+
+
 def export_datarecord(
     n: pypsa.Network,
     config: dict,
     custom_extra_functionality: str | None,
     output: Path,
 ) -> None:
-    """Write the record, the base spec and both fragments, then check them."""
+    """Write the record with the constraint data, copy the static math, then check them."""
+    base = PyPSA.to_datarecord(n)
+    data = constraint_data(n, config, custom_extra_functionality)
+    record = combine(base, extension(data, base.schema))
     con = connect()
-    write_record(None, PyPSA.to_datarecord(n), con, uri=str(output / "record"))
+    write_record(None, record, con, uri=str(output / "record"))
     math = output / "math"
     math.mkdir(parents=True)
-    shutil.copy(MATHSPEC, math / MATHSPEC.name)
-    base = yaml.safe_load(MATHSPEC.read_text())
-    fragments = {
-        "global_constraints.yaml": global_constraints(n, base),
-        "extra_functionality.yaml": extra_functionality(
-            n, config, custom_extra_functionality, base
-        ),
-    }
-    for name, fragment in fragments.items():
-        (math / name).write_text(yaml.safe_dump(fragment, sort_keys=False))
-    spec = mathspec.merge([math / MATHSPEC.name, *(math / name for name in fragments)])
+    for source in (MATHSPEC, *SPECS):
+        shutil.copy(source, math / source.name)
+    spec = mathspec.merge([math / source.name for source in (MATHSPEC, *SPECS)])
     PyPSA.check_spec(spec, Record.at(str(output / "record"), con))
     logger.info(
         f"Wrote the datarecord and a spec of {len(spec.constraints)} constraints "
@@ -161,7 +168,8 @@ if __name__ == "__main__":
     )
     drop_bus_country_duplicates(n)
     rename_shared_one_port_names(n)
-    prefix_shared_bus_columns(n)
+    prefix_shared_entity_columns(n)
+    add_zero_gas_usage(n)
     export_datarecord(
         n,
         snakemake.config,

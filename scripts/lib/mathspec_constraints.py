@@ -1,0 +1,724 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: MIT
+"""
+The data of the constraints a datarecord of a PyPSA-Eur network keeps beside PyPSA's model.
+
+The math is static: `mathspec/global_constraints.yaml` holds the global
+constraints of the network, collapsed by family, and
+`mathspec/extra_functionality.yaml` holds what `solve_network` adds. Both
+compose onto the base spec that datarecord ships. This module writes their
+data as tables of the record: a `datarecord.FrameRecord` whose schema is the
+dims, relations and parameters the two files declare and the network record
+does not. A constraint has data only where the network and the config
+activate it, and an active constraint that the math cannot state raises
+:class:`UnsupportedConstraintError`.
+"""
+
+import ast
+import re
+from collections.abc import Callable, Iterable, Mapping
+from pathlib import Path
+from typing import Any
+
+import narwhals as nw
+import numpy as np
+import pandas as pd
+import pypsa
+import yaml
+from datarecord import AttributeSpec, Dimension, FrameRecord, Group, Schema
+from datarecord.combine import combine_schemas
+
+from scripts.solve_network import emission_stores, get_glc_sense
+
+MATH = Path(__file__).with_name("mathspec")
+SPECS = (MATH / "global_constraints.yaml", MATH / "extra_functionality.yaml")
+DTYPES = {"float": nw.Float64, "int": nw.Int64, "bool": nw.Boolean, "str": nw.String}
+PERIOD_TYPES = {"co2_atmosphere", "Co2Budget"}
+PRIMARY_ENERGY_ATTRIBUTES = {"co2_emissions", "gas_usage"}
+
+Data = dict[str, Any]
+
+
+class UnsupportedConstraintError(NotImplementedError):
+    pass
+
+
+def _declarations() -> dict[str, dict[str, Any]]:
+    specs = [yaml.safe_load(path.read_text()) for path in SPECS]
+    return {
+        kind: {name: entry for spec in specs for name, entry in spec[kind].items()}
+        for kind in ("dimensions", "relations", "parameters")
+    }
+
+
+def _group(relation: Mapping[str, Any]) -> Group:
+    key, values = relation["key"], relation.get("values")
+    if values is None:
+        return Group(over=list(key))
+    if isinstance(values, Mapping):
+        return Group(over={key: key, **values})
+    return Group(over=[key], into=values)
+
+
+def _with_parents(dims: Iterable[str], base: Schema) -> set[str]:
+    closed = set(dims)
+    for dim in list(closed):
+        closed |= (
+            _with_parents(base.dimensions[dim].within, base)
+            if dim in base.dimensions
+            else set()
+        )
+    return closed
+
+
+def extension_schema(base: Schema) -> Schema:
+    """The dims, relations and parameters of the static math that ``base`` lacks."""
+    declared = _declarations()
+    groups = {
+        name: _group(relation)
+        for name, relation in declared["relations"].items()
+        if name not in base.groups and name != "snapshot_period"
+    }
+    attributes = {
+        name: AttributeSpec(
+            dtype=DTYPES[spec.get("dtype", "float")](),
+            dims=frozenset(spec["dims"]),
+            description=spec.get("description"),
+        )
+        for name, spec in declared["parameters"].items()
+    }
+    new = {
+        dim: Dimension(dtype=nw.String(), description=spec.get("description"))
+        for dim, spec in declared["dimensions"].items()
+        if dim not in base.dimensions
+    }
+    used = {d for spec in attributes.values() for d in spec.dims}
+    for group in groups.values():
+        used |= set(group.over.values())
+    shared = _with_parents(used - set(new), base)
+    return Schema(
+        dimensions={d: base.dimensions[d] for d in sorted(shared)} | new,
+        attributes=attributes,
+        groups=groups,
+    )
+
+
+def _long(
+    attribute: str, values: pd.Series | float | str, columns: tuple[str, ...]
+) -> pd.DataFrame:
+    if isinstance(values, pd.Series):
+        frame = values.rename("value").reset_index()
+    else:
+        frame = pd.DataFrame({"value": [values]})
+    frame["attribute"] = attribute
+    frame["breakpoint"] = np.nan
+    return frame[list(columns)]
+
+
+def extension(data: Data, base: Schema) -> FrameRecord:
+    """
+    Pack ``data``, keyed by the name the math reads, into tables of the record.
+
+    A dim maps to its labels, an attribute to a Series over its dims (a scalar
+    for one over no dims), and a relation to a frame of its coordinates.
+    """
+    schema = extension_schema(base)
+    combined = combine_schemas(base, schema)
+    unknown = sorted(
+        set(data) - set(schema.attributes) - set(schema.groups) - set(schema.dimensions)
+    )
+    if unknown:
+        raise ValueError(f"No static math declares {unknown}.")
+    dim_frames: dict[str, pd.DataFrame] = {
+        dim: pd.DataFrame({dim: pd.Index(data.get(dim, []), dtype=str)})
+        for dim in schema.dimensions
+        if dim not in base.dimensions
+    }
+    attribute_frames = {}
+    for name, spec in schema.attributes.items():
+        if name not in data:
+            continue
+        if len(spec.dims) == 1:
+            (dim,) = spec.dims
+            column = data[name].rename(name).rename_axis(dim).reset_index()
+            frame = dim_frames.get(dim)
+            dim_frames[dim] = (
+                column if frame is None else frame.merge(column, on=dim, how="outer")
+            )
+        else:
+            attribute_frames[name] = _long(
+                name, data[name], combined.long_columns_for(name)
+            )
+    group_frames = {
+        name: data[name][list(group.coordinates)]
+        for name, group in schema.groups.items()
+        if name in data
+    }
+    return FrameRecord(
+        schema,
+        dim_frames=dim_frames,
+        group_frames=group_frames,
+        attribute_frames=attribute_frames,
+    )
+
+
+def _require_multi_period(n: pypsa.Network) -> None:
+    if n.investment_periods.empty:
+        raise ValueError("The constraint math needs a network with investment periods.")
+    if n.has_scenarios:
+        raise UnsupportedConstraintError(
+            "The constraint math does not cover stochastic networks."
+        )
+
+
+def _family(name: str, glc: pd.Series) -> str:
+    period = glc.investment_period
+    if pd.isna(period):
+        return name
+    return name.removesuffix(f"-{int(period)}")
+
+
+def _unique(families: pd.DataFrame, column: str) -> pd.Series:
+    values = families.groupby("family")[column].unique()
+    mixed = values.index[values.map(len) > 1]
+    if not mixed.empty:
+        raise UnsupportedConstraintError(
+            f"Global constraint families {list(mixed)} mix values of {column}."
+        )
+    return values.str[0]
+
+
+def _storage_check(n: pypsa.Network, carriers: Iterable[str]) -> None:
+    for c, cyclic, per_period in (
+        (n.c.stores, "e_cyclic", "e_initial_per_period"),
+        (
+            n.c.storage_units,
+            "cyclic_state_of_charge",
+            "state_of_charge_initial_per_period",
+        ),
+    ):
+        static = c.static
+        continuous = static.index[
+            static.carrier.isin(list(carriers))
+            & ~static[cyclic]
+            & ~static[per_period]
+            & static.active
+        ]
+        if not continuous.empty:
+            raise UnsupportedConstraintError(
+                f"Non-cyclic {c.name} components {list(continuous)} deplete over all "
+                "investment periods; PyPSA refuses them where period years differ "
+                "from 1, and the math covers only storage that resets each period."
+            )
+
+
+def _transmission_carriers(attribute: str) -> list[str]:
+    return [re.sub(r"[\[\]\(\)]", "", c.strip()) for c in attribute.split(",")]
+
+
+def global_constraint_data(n: pypsa.Network) -> Data:
+    """Every row of ``n.global_constraints``, collapsed into families."""
+    _require_multi_period(n)
+    glcs = n.global_constraints.copy()
+    if glcs.empty:
+        return {}
+    known = PERIOD_TYPES | {
+        "primary_energy",
+        "operational_limit",
+        "transmission_volume_expansion_limit",
+        "transmission_expansion_cost_limit",
+        "tech_capacity_expansion_limit",
+    }
+    unknown = set(glcs.type) - known
+    if unknown:
+        raise UnsupportedConstraintError(
+            f"No mathspec translation for global constraint types {sorted(unknown)}."
+        )
+    glcs["sense"] = [get_glc_sense(glc) for _, glc in glcs.iterrows()]
+    glcs["family"] = [_family(name, glc) for name, glc in glcs.iterrows()]
+    glcs["per_period"] = glcs.investment_period.notna()
+    types = _unique(glcs, "type")
+    senses = _unique(glcs, "sense")
+    attributes = _unique(glcs, "carrier_attribute")
+    _unique(glcs, "per_period")
+    per_period = glcs[glcs.per_period]
+    horizon = glcs[~glcs.per_period]
+    if not per_period.investment_period.isin(n.investment_periods).all():
+        raise UnsupportedConstraintError(
+            "Global constraints name investment periods the network does not have."
+        )
+    needs_period = horizon.family[horizon.type.isin(PERIOD_TYPES)]
+    if not needs_period.empty:
+        raise ValueError(
+            f"Global constraints {list(needs_period)} need an investment period."
+        )
+    primary = attributes[types == "primary_energy"]
+    odd = primary[~primary.isin(PRIMARY_ENERGY_ATTRIBUTES)]
+    if not odd.empty:
+        raise UnsupportedConstraintError(
+            f"Primary energy limits {list(odd.index)} weight carriers by {list(odd)}; "
+            f"the math reads {sorted(PRIMARY_ENERGY_ATTRIBUTES)}."
+        )
+    co2 = attributes[types.isin(PERIOD_TYPES)]
+    if not co2.eq("co2_emissions").all():
+        raise UnsupportedConstraintError(
+            f"CO2 limits {list(co2.index)} must weight by co2_emissions."
+        )
+    if not co2.empty:
+        emitting = n.carriers.co2_emissions[n.carriers.co2_emissions != 0].index
+        emission_stores(n, emitting)
+    for attribute in primary.unique():
+        weights = n.carriers[attribute]
+        _storage_check(n, weights[weights.fillna(0) != 0].index)
+    _storage_check(n, attributes[types == "operational_limit"])
+    per_bus = glcs.bus.fillna("").ne("") if "bus" in glcs else False
+    capacity = glcs[(glcs.type == "tech_capacity_expansion_limit") & per_bus]
+    if not capacity.empty:
+        raise UnsupportedConstraintError(
+            f"Capacity limits {list(capacity.index)} per bus have no mathspec translation."
+        )
+    selecting = types.index[~types.isin(PERIOD_TYPES | {"primary_energy"})]
+    carriers = pd.DataFrame(
+        [
+            (family, carrier)
+            for family in selecting
+            for carrier in _transmission_carriers(attributes[family])
+            if carrier in n.carriers.index
+        ],
+        columns=["global_constraint", "carrier"],
+    )
+    return {
+        "global_constraint": types.index,
+        "global_constraint_type": types,
+        "global_constraint_sense": senses,
+        "global_constraint_carrier_attribute": primary,
+        "global_constraint_constant": horizon.set_index("family").constant,
+        "global_constraint_period_constant": per_period.set_index(
+            ["family", per_period.investment_period.astype(int).rename("period")]
+        ).constant.rename_axis(["global_constraint", "period"]),
+        "global_constraint_carrier": carriers,
+    }
+
+
+def _pairs(name: str, pairs: Iterable[tuple[str, str]]) -> Data:
+    frame = pd.DataFrame(list(pairs), columns=["entity", "partner"])
+    return {name: frame} if not frame.empty else {}
+
+
+def _positional(left: pd.Index, right: pd.Index, source: str) -> list[tuple[str, str]]:
+    if len(left) != len(right):
+        raise UnsupportedConstraintError(
+            f"{source} pairs {len(left)} with {len(right)} entities; linopy aligns "
+            "them by an outer join then, which the math does not state."
+        )
+    return list(zip(left, right))
+
+
+def bau_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_BAU_constraints``."""
+    mincaps = pd.Series(config["electricity"]["BAU_mincapacities"])
+    carriers = n.generators.query("p_nom_extendable").carrier.unique()
+    return {"bau_mincapacity": mincaps[carriers].astype(float)}
+
+
+def safe_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_SAFE_constraints``."""
+    peak = n.loads_t.p_set.sum(axis=1).max()
+    conventional = n.carriers.index.intersection(
+        config["electricity"]["conventional_carriers"]
+    )
+    return {
+        "safe_peak_capacity": float(
+            peak * (1.0 + config["electricity"]["SAFE_reservemargin"])
+        ),
+        "safe_conventional": pd.Series(True, index=conventional),
+    }
+
+
+def ccl_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    raise UnsupportedConstraintError(
+        "solve_network.add_CCL_constraints is not implemented for perfect foresight "
+        "(solve_network asserts a planning horizon), so it has no mathspec translation."
+    )
+
+
+def operational_reserve_margin(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_operational_reserve_margin``."""
+    reserve = config["electricity"]["operational_reserve"]
+    vres = [
+        "ror" if c == "hydro" else c
+        for c in config["electricity"]["renewable_carriers"]
+    ]
+    gens = n.generators.query("carrier != 'load'")
+    no_profile = gens.index[gens.carrier.isin(vres)].difference(
+        n.generators_t.p_max_pu.columns
+    )
+    if not no_profile.empty:
+        raise KeyError(
+            f"Renewable generators {list(no_profile)} have no p_max_pu profile."
+        )
+    return {
+        "reserve_provider": pd.Series(True, index=gens.carrier.unique()),
+        "reserve_vres": pd.Series(True, index=n.carriers.index.intersection(vres)),
+        "reserve_epsilon_load": float(reserve["epsilon_load"]),
+        "reserve_epsilon_vres": float(reserve["epsilon_vres"]),
+        "reserve_contingency": float(reserve["contingency"]),
+    }
+
+
+def eq_constraints(n: pypsa.Network, option: str) -> Data:
+    """``solve_network.add_EQ_constraints``, per node."""
+    if option[-1] == "c":
+        raise UnsupportedConstraintError(
+            "add_EQ_constraints per country needs a country dimension; the record "
+            "carries country only as a bus attribute."
+        )
+    static_loads = n.loads.index.difference(n.loads_t.p_set.columns)
+    if n.loads.p_set[static_loads].ne(0).any():
+        raise UnsupportedConstraintError(
+            "add_EQ_constraints reads loads_t.p_set only; the record merges static "
+            f"p_set of loads {list(static_loads)} into it."
+        )
+    return {"equity_min_share": float(re.findall(r"[0-9]*\.?[0-9]+", option)[0])}
+
+
+def solar_potential_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_solar_potential_constraints``."""
+    factor = (
+        config["renewable"]["solar"]["capacity_per_sqkm"]
+        / config["renewable"]["solar-hsat"]["capacity_per_sqkm"]
+    )
+    solar = n.generators[
+        n.generators.carrier.isin(["solar", "solar-hsat"])
+        & n.generators.p_nom_extendable
+    ]
+    if solar.empty:
+        return {}
+    if (
+        solar.index.str.contains("solar-hsat") != (solar.carrier == "solar-hsat")
+    ).any():
+        raise UnsupportedConstraintError(
+            "add_solar_potential_constraints scales generators by name; names and "
+            "carriers of the solar generators disagree."
+        )
+    return {
+        "solar_potential_factor": pd.Series({"solar": 1.0, "solar-hsat": factor}),
+        "solar_potential_reference": pd.Series({"solar": True}),
+    }
+
+
+def tes_energy_to_power_ratio_constraints(n: pypsa.Network) -> Data:
+    """``solve_network.add_TES_energy_to_power_ratio_constraints``."""
+    chargers = n.links.index[
+        n.links.index.str.contains("water tanks charger|water pits charger")
+        & n.links.p_nom_extendable
+    ]
+    stores = n.stores.index[
+        n.stores.index.str.contains("water tanks|water pits")
+        & n.stores.e_nom_extendable
+    ]
+    if chargers.empty or stores.empty:
+        return {}
+    pairs = list(zip(stores, chargers))
+    for tes, charger in pairs:
+        if tes != charger.replace(" charger", ""):
+            raise RuntimeError(f"Charger {charger} and TES {tes} do not match.")
+    ratio = n.links.loc[[c for _, c in pairs], "energy to power ratio"].set_axis(
+        [s for s, _ in pairs]
+    )
+    return _pairs("tes_store_charger", pairs) | {"tes_energy_to_power_ratio": ratio}
+
+
+def tes_charger_ratio_constraints(n: pypsa.Network) -> Data:
+    """``solve_network.add_TES_charger_ratio_constraints``."""
+    kinds = "water tanks {0}|water pits {0}|aquifer thermal energy storage {0}"
+    ext = n.links.p_nom_extendable
+    chargers = n.links.index[n.links.index.str.contains(kinds.format("charger")) & ext]
+    dischargers = n.links.index[
+        n.links.index.str.contains(kinds.format("discharger")) & ext
+    ]
+    if chargers.empty or dischargers.empty:
+        return {}
+    pairs = list(zip(chargers, dischargers))
+    for charger, discharger in pairs:
+        if charger.replace(" charger", " ") != discharger.replace(" discharger", " "):
+            raise RuntimeError(
+                f"Charger {charger} and discharger {discharger} do not match."
+            )
+    return _pairs("tes_charger_discharger", pairs) | {
+        "discharger_efficiency": _partner_efficiency(n, pairs)
+    }
+
+
+def _partner_efficiency(n: pypsa.Network, pairs: list[tuple[str, str]]) -> pd.Series:
+    return n.links.efficiency[[d for _, d in pairs]].set_axis([c for c, _ in pairs])
+
+
+def battery_constraints(n: pypsa.Network) -> Data:
+    """``solve_network.add_battery_constraints``."""
+    ext = n.links.query("p_nom_extendable")
+    if ext.empty:
+        return {}
+    dischargers = ext.index[ext.index.str.contains("battery discharger")]
+    chargers = ext.index[ext.index.str.contains("battery charger")]
+    pairs = _positional(chargers, dischargers, "solve_network.add_battery_constraints")
+    return _pairs("battery_charger_discharger", pairs) | {
+        "discharger_efficiency": _partner_efficiency(n, pairs)
+    }
+
+
+def lossy_bidirectional_link_constraints(n: pypsa.Network) -> Data:
+    """``solve_network.add_lossy_bidirectional_link_constraints``."""
+    links = n.links
+    if (
+        not links.p_nom_extendable.any()
+        or "reversed" not in links
+        or not links.reversed.any()
+    ):
+        return {}
+    carriers = links.loc[links.reversed, "carrier"].unique()
+    backwards = links.index[
+        links.carrier.isin(carriers)
+        & links.p_nom_extendable
+        & links.reversed
+        & links.active
+    ]
+    forwards = backwards.str.replace("-reversed", "")
+    missing = forwards.difference(links.index[links.p_nom_extendable])
+    if not missing.empty:
+        raise KeyError(
+            f"Forward links {list(missing)} of reversed links are not extendable."
+        )
+    return _pairs("reversed_forward", zip(backwards, forwards))
+
+
+def pipe_retrofit_constraint(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_pipe_retrofit_constraint``."""
+    links = n.links.assign(
+        reversed=n.links["reversed"] if "reversed" in n.links else False
+    )
+    candidates = links.p_nom_extendable & ~links.reversed.astype(bool) & links.active
+    gas = links.index[candidates & (links.carrier == "gas pipeline")]
+    h2 = links.index[candidates & (links.carrier == "H2 pipeline retrofitted")]
+    if gas.empty or h2.empty:
+        return {}
+    pairs = _positional(gas, h2, "solve_network.add_pipe_retrofit_constraint")
+    return _pairs("pipe_retrofit", pairs) | {
+        "pipe_retrofit_ch4_per_h2": 1 / config["sector"]["H2_retrofit_capacity_per_CH4"]
+    }
+
+
+def flexible_egs_constraint(n: pypsa.Network) -> Data:
+    """``solve_network.add_flexible_egs_constraint``."""
+    wells = n.links.index[n.links.carrier == "geothermal heat"]
+    storage = n.storage_units.index[n.storage_units.carrier == "geothermal heat"]
+    return _pairs(
+        "egs_storage_well",
+        _positional(storage, wells, "solve_network.add_flexible_egs_constraint"),
+    )
+
+
+def import_limit_constraint(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
+    """``solve_network.add_import_limit_constraint``."""
+    links = n.links.index[n.links.carrier.str.contains("import")]
+    gens = n.generators.index[n.generators.carrier.str.contains("import")]
+    limit = config["sector"]["imports"]["limit"]
+    if (links.empty and gens.empty) or not np.isfinite(limit):
+        return {}
+    nyears = n.snapshot_weightings.generators.sum() / 8760
+    sense = config["sector"]["imports"]["limit_sense"]
+    return {
+        "import_weight": pd.concat(
+            [pd.Series(1.0, index=gens), n.links.efficiency[links]]
+        ),
+        "import_limit": float(limit * 1e6 * nyears),
+        "import_limit_sense": "==" if sense == "=" else sense,
+    }
+
+
+def retrofit_gas_boiler_constraint(n: pypsa.Network) -> Data:
+    """
+    ``solve_network.add_retrofit_gas_boiler_constraint``.
+
+    Each existing gas boiler and the H2 boiler at its position (linopy aligns
+    the two by position) follow the heat load at the gas boiler's ``bus1``,
+    over its peak in each period, times the gas boiler's ``p_nom``.
+    """
+    gas = n.links.index[
+        n.links.carrier.str.contains("gas boiler") & ~n.links.p_nom_extendable
+    ]
+    h2 = n.links.index[n.links.carrier.str.contains("retrofitted H2 boiler")]
+    if gas.empty or h2.empty:
+        return {}
+    source = "solve_network.add_retrofit_gas_boiler_constraint"
+    pairs = _positional(gas, h2, source)
+    columns = n.loads_t.p_set.columns
+    heat = columns[
+        columns.str.contains("heat")
+        & ~columns.str.contains("industry")
+        & ~columns.str.contains("agriculture")
+    ]
+    loads = pd.Series(heat, index=n.loads.bus[heat])
+    if loads.index.duplicated().any():
+        raise UnsupportedConstraintError(f"{source}: a bus carries several heat loads.")
+    following = [
+        (boiler, loads[n.links.bus1[boiler]])
+        for boiler, _ in pairs
+        if n.links.bus1[boiler] in loads.index
+    ]
+    p_set = n.loads_t.p_set[sorted({load for _, load in following})]
+    profile = (
+        (p_set / p_set.groupby(level=0).transform("max")).replace(np.inf, 0).fillna(0)
+    )
+    profile = profile.rename_axis(
+        index=["period", "snapshot"], columns="entity"
+    ).stack()
+    return (
+        _pairs("gas_retrofit", pairs)
+        | _pairs("gas_retrofit_heat_load", following)
+        | {"heat_load_profile": profile}
+    )
+
+
+def land_use_check(n: pypsa.Network) -> None:
+    """
+    Fail unless every ``nom_*`` bus column is the limit ``add_land_use_constraint`` sets.
+
+    The math states the land-use limit from ``p_nom_max`` itself, so a bus
+    column with any other meaning would be a PyPSA constraint it misses.
+    """
+    gens = n.generators[n.generators.p_nom_extendable]
+    limits = gens.groupby(["carrier", "bus", "build_year"]).p_nom_max.min()
+    limits = limits[np.isfinite(limits)]
+    for column in n.buses.columns[n.buses.columns.str.startswith("nom_")]:
+        if not re.fullmatch(r"nom_max_.+_\d{4}", column):
+            raise UnsupportedConstraintError(
+                f"Bus column '{column}' is a PyPSA capacity limit per bus and carrier "
+                "that add_land_use_constraint does not set."
+            )
+        carrier, period = column.removeprefix("nom_max_").rsplit("_", 1)
+        actual = n.buses[column].dropna().sort_index()
+        expected = limits.xs((carrier, int(period)), level=["carrier", "build_year"])
+        if not actual.equals(
+            expected.sort_index().rename(column).rename_axis(actual.index.name)
+        ):
+            raise UnsupportedConstraintError(
+                f"Bus column '{column}' is not the land-use limit that "
+                "add_land_use_constraint derives from p_nom_max."
+            )
+
+
+def growth_check(n: pypsa.Network) -> None:
+    """Fail where PyPSA clips a negative relative growth that the math reads as is."""
+    negative = n.carriers.index[n.carriers.max_relative_growth < 0]
+    if not negative.empty:
+        raise UnsupportedConstraintError(
+            f"Carriers {list(negative)} have a negative max_relative_growth, which PyPSA clips to 0."
+        )
+
+
+def _custom_extra_functionality_is_empty(path: str) -> bool:
+    """Whether the custom function only holds a docstring and ``pass``, as the shipped one."""
+    tree = ast.parse(Path(path).read_text())
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == Path(path).stem
+    )
+    return all(
+        isinstance(statement, ast.Pass)
+        or (
+            isinstance(statement, ast.Expr)
+            and isinstance(statement.value, ast.Constant)
+        )
+        for statement in function.body
+    )
+
+
+def _merge(parts: Iterable[Data]) -> Data:
+    merged: Data = {}
+    for part in parts:
+        for name, value in part.items():
+            if name not in merged:
+                merged[name] = value
+            elif isinstance(value, pd.Series):
+                merged[name] = pd.concat([merged[name], value], verify_integrity=True)
+            else:
+                raise ValueError(f"Two constraints set '{name}'.")
+    return merged
+
+
+def extra_functionality_data(
+    n: pypsa.Network, config: Mapping[str, Any], custom_extra_functionality: str | None
+) -> Data:
+    """The data of what ``solve_network`` adds, under the same config switches."""
+    _require_multi_period(n)
+    if custom_extra_functionality and not _custom_extra_functionality_is_empty(
+        custom_extra_functionality
+    ):
+        raise UnsupportedConstraintError(
+            f"Custom extra functionality {custom_extra_functionality} has no math to export."
+        )
+    land_use_check(n)
+    growth_check(n)
+    constraints = config["solving"]["constraints"]
+    extendable_generators = n.generators.p_nom_extendable.any()
+    switched: list[tuple[bool, Callable[[], Data]]] = [
+        (
+            constraints["BAU"] and extendable_generators,
+            lambda: bau_constraints(n, config),
+        ),
+        (
+            constraints["SAFE"] and extendable_generators,
+            lambda: safe_constraints(n, config),
+        ),
+        (
+            constraints["CCL"] and extendable_generators,
+            lambda: ccl_constraints(n, config),
+        ),
+        (
+            config["electricity"]["operational_reserve"]["activate"],
+            lambda: operational_reserve_margin(n, config),
+        ),
+        (
+            bool(constraints["EQ"]),
+            lambda: eq_constraints(n, constraints["EQ"].replace("EQ", "")),
+        ),
+        (
+            {"solar-hsat", "solar"}.issubset(
+                config["electricity"]["renewable_carriers"]
+            )
+            and {"solar-hsat", "solar"}.issubset(
+                config["electricity"]["extendable_carriers"]["Generator"]
+            ),
+            lambda: solar_potential_constraints(n, config),
+        ),
+        (True, lambda: tes_energy_to_power_ratio_constraints(n)),
+        (True, lambda: tes_charger_ratio_constraints(n)),
+        (True, lambda: battery_constraints(n)),
+        (True, lambda: lossy_bidirectional_link_constraints(n)),
+        (True, lambda: pipe_retrofit_constraint(n, config)),
+        (True, lambda: retrofit_gas_boiler_constraint(n)),
+        (
+            config["sector"]["enhanced_geothermal"]["enable"],
+            lambda: flexible_egs_constraint(n),
+        ),
+        (
+            config["sector"]["imports"]["enable"],
+            lambda: import_limit_constraint(n, config),
+        ),
+    ]
+    return _merge(build() for active, build in switched if active)
+
+
+def constraint_data(
+    n: pypsa.Network, config: Mapping[str, Any], custom_extra_functionality: str | None
+) -> Data:
+    """The data of every constraint the static math states, for this network and config."""
+    return _merge(
+        [
+            global_constraint_data(n),
+            extra_functionality_data(n, config, custom_extra_functionality),
+        ]
+    )
