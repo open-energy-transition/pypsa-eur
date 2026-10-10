@@ -266,6 +266,55 @@ def add_co2_emissions(n, costs, carriers):
     ].values
 
 
+def assign_unit_dates(
+    units: pd.DataFrame, default_lifetime: pd.Series, first_horizon: int
+) -> pd.DataFrame:
+    """
+    Set build year and lifetime of individual units from their commissioning and decommissioning years.
+
+    Missing commissioning years are filled with the mean of the carrier, missing
+    decommissioning years with the commissioning year plus the default lifetime
+    (30 years where unknown). Units without commissioning year and units retired
+    before the first planning horizon are dropped.
+
+    Parameters
+    ----------
+    units : pd.DataFrame
+        Units with columns `carrier`, `datein` and `dateout`.
+    default_lifetime : pd.Series
+        Lifetime per unit used where `dateout` is missing.
+    first_horizon : int
+        The first planning horizon.
+
+    Returns
+    -------
+    pd.DataFrame
+        Units with columns `build_year` and `lifetime`.
+    """
+    datein = units.datein.fillna(units.groupby("carrier").datein.transform("mean") // 1)
+    if datein.isna().any():
+        logger.warning(
+            f"Dropping {datein.isna().sum()} units without commissioning year "
+            f"of carriers {units.carrier[datein.isna()].unique().tolist()}."
+        )
+    units = units.assign(datein=datein).dropna(subset="datein")
+    dateout = units.dateout.combine_first(
+        units.datein + default_lifetime.reindex(units.index).fillna(30)
+    )
+    units = units.assign(
+        build_year=units.datein.astype(int), lifetime=dateout - units.datein
+    )
+    retired = units.build_year + units.lifetime <= first_horizon
+    logger.info(f"Dropping {retired.sum()} units retired by {first_horizon}.")
+    return units.loc[~retired]
+
+
+def points_to_wkt(df: pd.DataFrame) -> pd.Series:
+    """Return WKT points in EPSG:4326 from the `lon` and `lat` columns."""
+    points = gpd.GeoSeries(gpd.points_from_xy(df.lon, df.lat), index=df.index)
+    return points.to_wkt()
+
+
 def load_and_aggregate_powerplants(
     ppl_fn: str,
     costs: pd.DataFrame,
@@ -273,6 +322,8 @@ def load_and_aggregate_powerplants(
     aggregation_strategies: dict = None,
     exclude_carriers: list = None,
     estimate_efficiencies: dict | None = None,
+    keep_assets: bool = False,
+    first_horizon: int | None = None,
 ) -> pd.DataFrame:
     if not aggregation_strategies:
         aggregation_strategies = {}
@@ -322,11 +373,18 @@ def load_and_aggregate_powerplants(
             estimate_efficiency(ppl, estimate_efficiencies)
         )
     ppl["efficiency"] = efficiency.combine_first(ppl.efficiency_r)
-    ppl["lifetime"] = (ppl.dateout - ppl.datein).fillna(np.inf)
-    ppl["build_year"] = ppl.datein.fillna(0).astype(int)
     ppl["marginal_cost"] = (
         ppl.carrier.map(costs.VOM) + ppl.carrier.map(costs.fuel) / ppl.efficiency
     )
+
+    if keep_assets:
+        units = assign_unit_dates(ppl, ppl.lifetime, first_horizon)
+        units["geometry"] = points_to_wkt(units)
+        units.index = units.bus + " " + units.carrier + " " + units.index.astype(str)
+        return units
+
+    ppl["lifetime"] = (ppl.dateout - ppl.datein).fillna(np.inf)
+    ppl["build_year"] = ppl.datein.fillna(0).astype(int)
 
     strategies = {
         **DEFAULT_ONE_PORT_STRATEGIES,
@@ -475,6 +533,7 @@ def attach_wind_and_solar(
     extendable_carriers: list | set,
     line_length_factor: float = 1.0,
     landfall_lengths: dict = None,
+    keep_assets: bool = False,
 ) -> None:
     """
     Attach wind and solar generators to the network.
@@ -495,6 +554,8 @@ def attach_wind_and_solar(
         Factor to scale the line length, by default 1.0.
     landfall_lengths : dict, optional
         Dictionary containing the landfall lengths for offshore wind, by default None.
+    keep_assets : bool, optional
+        If True, add the resource class and the class region as WKT geometry.
     """
     add_missing_carriers(n, carriers)
 
@@ -573,6 +634,52 @@ def attach_wind_and_solar(
                 lifetime=costs.at[supcar, "lifetime"],
             )
 
+            if keep_assets:
+                names = bus_bins + " " + car
+                class_regions = gpd.read_file(profile_filenames[f"class_regions_{car}"])
+                geometry = class_regions.set_index(["bus", "bin"]).geometry.to_wkt()
+                geometry.index = geometry.index.map(flatten) + " " + car
+                n.generators.loc[names, "resource_class"] = ds.indexes[
+                    "bus_bin"
+                ].get_level_values("bin")
+                n.generators.loc[names, "geometry"] = geometry.reindex(names)
+                n.generators.loc[names, "asset_status"] = "candidate"
+
+
+def conventional_candidates(
+    n: pypsa.Network, costs: pd.DataFrame, carriers: list
+) -> pd.DataFrame:
+    """
+    Build one extendable candidate per AC bus and carrier with zero capacity.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network with the candidate buses.
+    costs : pd.DataFrame
+        DataFrame containing the cost data.
+    carriers : list
+        The carriers of the candidates.
+
+    Returns
+    -------
+    pd.DataFrame
+        Candidates in the format of the power plant data, indexed by `{bus} {carrier}`.
+    """
+    buses = n.buses.index[n.buses.carrier == "AC"]
+    index = pd.MultiIndex.from_product([buses, carriers], names=["bus", "carrier"])
+    candidates = index.to_frame(index=False)
+    candidates.index = candidates.bus + " " + candidates.carrier
+    tech = costs.loc[candidates.carrier].set_axis(candidates.index)
+    return candidates.assign(
+        p_nom=0.0,
+        efficiency=tech.efficiency,
+        marginal_cost=tech.VOM + tech.fuel / tech.efficiency,
+        capital_cost=tech.capital_cost,
+        build_year=0,
+        lifetime=tech.lifetime,
+    )
+
 
 def attach_conventional_generators(
     n: pypsa.Network,
@@ -585,6 +692,7 @@ def attach_conventional_generators(
     conventional_inputs: dict,
     unit_commitment: pd.DataFrame = None,
     fuel_price: pd.DataFrame = None,
+    keep_assets: bool = False,
 ):
     """
     Attach conventional generators to the network.
@@ -611,6 +719,9 @@ def attach_conventional_generators(
         DataFrame containing unit commitment data, by default None.
     fuel_price : pd.DataFrame, optional
         DataFrame containing fuel price data, by default None.
+    keep_assets : bool, optional
+        If True, existing units of conventional carriers are fixed and one
+        extendable candidate per bus is added for each extendable carrier.
     """
     if ppl.empty:
         return
@@ -619,6 +730,14 @@ def attach_conventional_generators(
         set(conventional_carriers)
         | set(extendable_carriers["Generator"]) - set(renewable_carriers)
     )
+
+    candidates_i = pd.Index([])
+    if keep_assets:
+        candidates = conventional_candidates(
+            n, costs, sorted(set(extendable_carriers["Generator"]) & set(carriers))
+        )
+        candidates_i = candidates.index
+        ppl = pd.concat([ppl.query("carrier in @conventional_carriers"), candidates])
 
     ppl = ppl.query("carrier in @carriers").copy()
 
@@ -663,7 +782,11 @@ def attach_conventional_generators(
         bus=ppl.bus,
         p_nom_min=ppl.p_nom.where(ppl.carrier.isin(conventional_carriers), 0),
         p_nom=ppl.p_nom.where(ppl.carrier.isin(conventional_carriers), 0),
-        p_nom_extendable=ppl.carrier.isin(extendable_carriers["Generator"]),
+        p_nom_extendable=(
+            ppl.index.isin(candidates_i)
+            if keep_assets
+            else ppl.carrier.isin(extendable_carriers["Generator"])
+        ),
         efficiency=ppl.efficiency,
         marginal_cost=marginal_cost,
         capital_cost=ppl.capital_cost,
@@ -905,6 +1028,114 @@ def attach_hydro(
         )
 
 
+def renewable_powerplants(
+    smk_inputs: dict, tech_map: dict[str, str]
+) -> dict[str, gpd.GeoDataFrame]:
+    """
+    Read renewable power plants and join them to the resource class regions.
+
+    Parameters
+    ----------
+    smk_inputs : dict
+        The rule inputs with `powerplants` and `class_regions_{carrier}`.
+    tech_map : dict[str, str]
+        A dictionary mapping fuel types to carrier names.
+
+    Returns
+    -------
+    dict[str, gpd.GeoDataFrame]
+        Power plants with columns `bus` and `bin` of their class region, by carrier.
+    """
+    df = pd.read_csv(smk_inputs["powerplants"], index_col=0).drop("bus", axis=1)
+    technology_b = ~df.Technology.isin(["Onshore", "Offshore"])
+    df["Fueltype"] = df.Fueltype.where(technology_b, df.Technology).replace(
+        {"Solar": "PV"}
+    )
+
+    plants = {}
+    for fueltype, carrier in tech_map.items():
+        class_regions = gpd.read_file(smk_inputs.get(f"class_regions_{carrier}"))
+        df_fueltype = df.query("Fueltype == @fueltype")
+        geometry = gpd.points_from_xy(df_fueltype.lon, df_fueltype.lat)
+        caps = gpd.GeoDataFrame(df_fueltype, geometry=geometry, crs=4326)
+        plants[carrier] = caps.sjoin(class_regions)
+    return plants
+
+
+def add_fixed_copies_of_candidates(
+    n: pypsa.Network, candidates: pd.Index, names: pd.Index, **attrs
+) -> None:
+    """
+    Add non-extendable generators with the attributes and profiles of renewable candidates.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network with the candidates.
+    candidates : pd.Index
+        The candidate of each new generator.
+    names : pd.Index
+        The names of the new generators.
+    **attrs
+        Further attributes of the new generators, aligned with `names`.
+    """
+    static = n.generators.loc[candidates].set_axis(names)
+    p_max_pu = n.generators_t.p_max_pu[candidates].set_axis(names, axis=1)
+    n.add(
+        "Generator",
+        names,
+        bus=static.bus,
+        carrier=static.carrier,
+        marginal_cost=static.marginal_cost,
+        capital_cost=static.capital_cost,
+        efficiency=static.efficiency,
+        resource_class=static.resource_class,
+        p_max_pu=p_max_pu,
+        p_nom_extendable=False,
+        asset_status="existing",
+        **attrs,
+    )
+
+
+def attach_renewable_units(
+    n: pypsa.Network,
+    tech_map: dict[str, str],
+    smk_inputs: dict,
+    first_horizon: int,
+) -> None:
+    """
+    Attach each renewable power plant as a fixed generator with the profile of its resource class.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network with the renewable candidates.
+    tech_map : dict[str, str]
+        A dictionary mapping fuel types to carrier names.
+    smk_inputs : dict
+        The rule inputs with `powerplants` and `class_regions_{carrier}`.
+    first_horizon : int
+        The first planning horizon.
+    """
+    for carrier, plants in renewable_powerplants(smk_inputs, tech_map).items():
+        plants = plants.rename(columns=str.lower).assign(carrier=carrier)
+        candidates = plants.bus + " " + plants.bin.astype(str) + " " + carrier
+        lifetime = candidates.map(n.generators.lifetime)
+        units = assign_unit_dates(plants, lifetime, first_horizon)
+        candidates = candidates[units.index]
+        names = candidates + " " + units.index.astype(str)
+        logger.info(f"Adding {len(units)} {carrier} units.")
+        add_fixed_copies_of_candidates(
+            n,
+            pd.Index(candidates),
+            pd.Index(names),
+            p_nom=units.capacity.set_axis(names),
+            build_year=units.build_year.set_axis(names),
+            lifetime=units.lifetime.set_axis(names),
+            geometry=points_to_wkt(units).set_axis(names),
+        )
+
+
 def attach_renewable_powerplants(
     n: pypsa.Network, tech_map: dict[str, list[str]], smk_inputs: list[str]
 ) -> None:
@@ -923,25 +1154,115 @@ def attach_renewable_powerplants(
         f"Using powerplantmatching renewable capacities for carriers {tech_string}."
     )
 
-    df = pd.read_csv(smk_inputs["powerplants"], index_col=0).drop("bus", axis=1)
-    technology_b = ~df.Technology.isin(["Onshore", "Offshore"])
-    df["Fueltype"] = df.Fueltype.where(technology_b, df.Technology).replace(
-        {"Solar": "PV"}
-    )
-
-    for fueltype, carrier in tech_map.items():
-        fn = smk_inputs.get(f"class_regions_{carrier}")
-        class_regions = gpd.read_file(fn)
-
-        df_fueltype = df.query("Fueltype == @fueltype")
-        geometry = gpd.points_from_xy(df_fueltype.lon, df_fueltype.lat)
-        caps = gpd.GeoDataFrame(df_fueltype, geometry=geometry, crs=4326)
-        caps = caps.sjoin(class_regions)
+    for carrier, caps in renewable_powerplants(smk_inputs, tech_map).items():
         caps = caps.groupby(["bus", "bin"]).Capacity.sum()
         caps.index = caps.index.map(flatten) + " " + carrier
 
         n.generators.update({"p_nom": caps.dropna()})
         n.generators.update({"p_nom_min": caps.dropna()})
+
+
+def irena_capacities(year: int, tech_map: dict, countries: list) -> pd.Series:
+    """Return IRENASTAT capacities by technology and country for a year."""
+    capacities = pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
+    capacities = capacities.query(
+        "Year == @year and Technology in @tech_map and Country in @countries"
+    )
+    capacities = capacities.groupby(["Technology", "Country"]).Capacity.sum()
+
+    logger.info(
+        f"Heuristics applied to distribute renewable capacities [GW]: "
+        f"\n{capacities.groupby('Technology').sum().div(1e3).round(2)}"
+    )
+    return capacities
+
+
+def country_capacities(
+    capacities: pd.Series, ppm_technology: str, countries: list
+) -> pd.Series:
+    """Return the capacities of one technology for all countries, zero where missing."""
+    if ppm_technology in capacities.index.get_level_values("Technology"):
+        return capacities.loc[ppm_technology].reindex(countries, fill_value=0.0)
+    return pd.Series(0.0, index=countries)
+
+
+def attach_renewable_estimates(
+    n: pypsa.Network, year: int, tech_map: dict, countries: list
+) -> None:
+    """
+    Attach the IRENASTAT capacities not covered by renewable units as fixed estimate generators.
+
+    The remainder per country is distributed to the candidates of the country
+    with the heuristic `n.generators_t.p_max_pu.mean() * n.generators.p_nom_max`.
+    Each estimate is named `{candidate} estimate`, is built in `year` and has
+    the lifetime of its candidate.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network with renewable units and candidates.
+    year : int
+        The year of the IRENASTAT capacities.
+    tech_map : dict
+        A dictionary mapping fuel types to carrier names.
+    countries : list
+        The country codes to estimate capacities for.
+    """
+    if not len(countries) or not len(tech_map):
+        return
+
+    capacities = irena_capacities(year, tech_map, countries)
+    country = n.generators.bus.map(n.buses.country)
+    dist = n.generators_t.p_max_pu.mean() * n.generators.p_nom_max
+
+    for ppm_technology, tech in tech_map.items():
+        is_tech = n.generators.carrier == tech
+        is_candidate = n.generators.asset_status == "candidate"
+        candidates_i = n.generators.index[is_tech & is_candidate]
+        units_i = n.generators.index[is_tech & ~is_candidate]
+        stats = country_capacities(capacities, ppm_technology, countries)
+        existent = n.generators.p_nom[units_i].groupby(country[units_i]).sum()
+        missing = stats - existent.reindex(countries, fill_value=0.0)
+        p_nom = (
+            dist[candidates_i]
+            .groupby(country[candidates_i])
+            .transform(lambda s: normed(s) * missing[s.name])
+        )
+        p_nom = p_nom[p_nom > 0.1]
+        logger.info(f"Adding {len(p_nom)} {tech} estimates.")
+        if p_nom.empty:
+            continue
+        names = p_nom.index + " estimate"
+        add_fixed_copies_of_candidates(
+            n,
+            p_nom.index,
+            names,
+            p_nom=p_nom.set_axis(names),
+            build_year=year,
+            lifetime=n.generators.lifetime[p_nom.index].set_axis(names),
+        )
+        n.generators.loc[names, "asset_status"] = "estimate"
+
+
+def reduce_candidate_potentials(n: pypsa.Network, carriers: list) -> None:
+    """
+    Reduce the potential of renewable candidates by the capacity of fixed generators in their class.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network with renewable units, estimates and candidates.
+    carriers : list
+        The renewable carriers.
+    """
+    gens = n.generators.query("carrier in @carriers")
+    candidates = gens.query("asset_status == 'candidate'")
+    fixed = gens.query("asset_status != 'candidate'")
+    stem = fixed.bus + " " + fixed.resource_class.astype(int).astype(str)
+    used = fixed.p_nom.groupby(stem + " " + fixed.carrier).sum()
+    n.generators.loc[candidates.index, "p_nom_max"] = (
+        candidates.p_nom_max - used.reindex(candidates.index, fill_value=0.0)
+    ).clip(lower=0.0)
 
 
 def estimate_renewable_capacities(
@@ -971,23 +1292,11 @@ def estimate_renewable_capacities(
     if not len(countries) or not len(tech_map):
         return
 
-    capacities = pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
-    capacities = capacities.query(
-        "Year == @year and Technology in @tech_map and Country in @countries"
-    )
-    capacities = capacities.groupby(["Technology", "Country"]).Capacity.sum()
-
-    logger.info(
-        f"Heuristics applied to distribute renewable capacities [GW]: "
-        f"\n{capacities.groupby('Technology').sum().div(1e3).round(2)}"
-    )
+    capacities = irena_capacities(year, tech_map, countries)
 
     for ppm_technology, tech in tech_map.items():
         tech_i = n.generators.query("carrier == @tech").index
-        if ppm_technology in capacities.index.get_level_values("Technology"):
-            stats = capacities.loc[ppm_technology].reindex(countries, fill_value=0.0)
-        else:
-            stats = pd.Series(0.0, index=countries)
+        stats = country_capacities(capacities, ppm_technology, countries)
         country = n.generators.bus[tech_i].map(n.buses.country)
         existent = n.generators.p_nom[tech_i].groupby(country).sum()
         missing = stats - existent
@@ -1225,6 +1534,8 @@ def main(
 ) -> None:
     logger.info("Adding electricity components")
     foresight = params.foresight
+    keep_assets = params.clustering["keep_assets"]
+    first_horizon = params.horizons[0]
 
     landfall_lengths = {
         tech: settings["landfall_length"]
@@ -1242,6 +1553,8 @@ def main(
             aggregation_strategies=params.clustering["aggregation_strategies"],
             exclude_carriers=params.clustering["exclude_carriers"],
             estimate_efficiencies=params.conventional["estimate_efficiencies"],
+            keep_assets=keep_assets,
+            first_horizon=first_horizon,
         )
     else:
         ppl = pd.DataFrame()
@@ -1290,6 +1603,7 @@ def main(
         conventional_inputs=conventional_inputs,
         unit_commitment=unit_commitment,
         fuel_price=fuel_price,
+        keep_assets=keep_assets,
     )
 
     attach_wind_and_solar(
@@ -1300,6 +1614,7 @@ def main(
         extendable_carriers,
         params.lines["length_factor"],
         landfall_lengths,
+        keep_assets=keep_assets,
     )
 
     if "hydro" in renewable_carriers:
@@ -1316,7 +1631,16 @@ def main(
         )
 
     estimate_renewable_caps = params.electricity["estimate_renewable_capacities"]
-    if estimate_renewable_caps["enable"]:
+    if keep_assets and estimate_renewable_caps["enable"]:
+        tech_map = estimate_renewable_caps["technology_mapping"]
+        if estimate_renewable_caps["from_powerplantmatching"]:
+            attach_renewable_units(n, tech_map, inputs, first_horizon)
+        if estimate_renewable_caps["from_irenastat"]:
+            attach_renewable_estimates(
+                n, estimate_renewable_caps["year"], tech_map, params.countries
+            )
+        reduce_candidate_potentials(n, sorted(renewable_carriers - {"hydro"}))
+    elif estimate_renewable_caps["enable"]:
         if foresight != "overnight":
             logger.info(
                 "Skipping renewable capacity estimation because they are added later "
@@ -1345,5 +1669,10 @@ def main(
 
     if params.electricity["estimate_battery_capacities"]:
         attach_existing_batteries(n, costs, ppl)
+
+    if keep_assets and not ppl.empty:
+        for c in n.components[["Generator", "StorageUnit"]]:
+            units_i = c.static.index.intersection(ppl.index)
+            c.static.loc[units_i, "geometry"] = ppl.geometry[units_i]
 
     logger.info("Completed electricity components")

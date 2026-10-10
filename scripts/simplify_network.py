@@ -413,21 +413,32 @@ def remove_converters(n: pypsa.Network) -> pypsa.Network:
     return n, converter_map
 
 
-if __name__ == "__main__":
-    if "snakemake" not in globals():
-        from scripts._helpers import mock_snakemake
+def simplify(
+    n: pypsa.Network,
+    params: dict,
+    linetype_380: str,
+    admin_shapes: str,
+) -> tuple[pypsa.Network, list[pd.Series]]:
+    """
+    Simplify the network topology.
 
-        snakemake = mock_snakemake("simplify_network")
-    configure_logging(snakemake)
-    set_scenario_config(snakemake)
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network to simplify. It is modified in place.
+    params : dict
+        The rule parameters.
+    linetype_380 : str
+        The line type for 380 kV lines.
+    admin_shapes : str
+        The path to the administrative regions.
 
-    params = snakemake.params
-
-    n = pypsa.Network(snakemake.input.network)
-    buses_prev, lines_prev, links_prev = len(n.buses), len(n.lines), len(n.links)
-
+    Returns
+    -------
+    tuple[pypsa.Network, list[pd.Series]]
+        The simplified network and the busmaps of each simplification step.
+    """
     if params.simplify_network["to_380"]:
-        linetype_380 = snakemake.config["lines"]["types"][380]
         n, trafo_map = simplify_network_to_380(n, linetype_380)
     else:
         trafo_map = n.buses.index.to_series()
@@ -449,7 +460,7 @@ if __name__ == "__main__":
     if params.simplify_network["remove_stubs"]:
         if params.mode == "administrative":
             n, stub_map = remove_stubs_within_admin(
-                n, params.simplify_network, snakemake.input.admin_shapes
+                n, params.simplify_network, admin_shapes
             )
             busmaps.append(stub_map)
         else:
@@ -490,18 +501,52 @@ if __name__ == "__main__":
         )
         busmaps.append(busmap_hac)
 
-    busmap_s = reduce(lambda x, y: x.map(y), busmaps[1:], busmaps[0])
-    busmap_s = sanitize_busmap(busmap_s)
-    busmap_s.to_csv(snakemake.output.busmap)
+    return n, busmaps
+
+
+def compose_busmaps(busmaps: list[pd.Series]) -> pd.Series:
+    return sanitize_busmap(reduce(lambda x, y: x.map(y), busmaps[1:], busmaps[0]))
+
+
+if __name__ == "__main__":
+    if "snakemake" not in globals():
+        from scripts._helpers import mock_snakemake
+
+        snakemake = mock_snakemake("simplify_network")
+    configure_logging(snakemake)
+    set_scenario_config(snakemake)
+
+    params = snakemake.params
+
+    n = pypsa.Network(snakemake.input.network)
+    buses_prev, lines_prev, links_prev = len(n.buses), len(n.lines), len(n.links)
+    linetype_380 = snakemake.config["lines"]["types"][380]
+    meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
+
+    if params.keep_assets:
+        n_reference, busmaps_reference = simplify(
+            n.copy(), params, linetype_380, snakemake.input.admin_shapes
+        )
+        busmaps = [n.buses.index.to_series()]
+        regions_busmaps = [remove_converters(n.copy())[1]]
+    else:
+        n, busmaps = simplify(n, params, linetype_380, snakemake.input.admin_shapes)
+        n_reference, busmaps_reference = n, busmaps
+        regions_busmaps = busmaps
+
+    compose_busmaps(busmaps).to_csv(snakemake.output.busmap)
+    compose_busmaps(busmaps_reference).to_csv(snakemake.output.busmap_reference)
 
     for which in ["onshore_regions", "offshore_regions"]:
         regions = gpd.read_file(snakemake.input[which])
-        clustered_regions = cluster_regions(busmaps, regions, with_country=True)
+        clustered_regions = cluster_regions(regions_busmaps, regions, with_country=True)
         clustered_regions.to_file(snakemake.output[which])
         # append_bus_shapes(n, clustered_regions, type=which.split("_")[1])
 
-    n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
+    n.meta = meta
     n.export_to_netcdf(snakemake.output.network)
+    n_reference.meta = meta
+    n_reference.export_to_netcdf(snakemake.output.network_reference)
 
     logger.info(
         f"Simplified network:\n"

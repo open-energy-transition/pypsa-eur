@@ -689,6 +689,71 @@ def get_snapshots(
     return time
 
 
+ASSET_COMPONENTS = ["Generator", "Link", "StorageUnit", "Store", "Line", "Transformer"]
+
+
+def assign_technology_groups(n: pypsa.Network) -> None:
+    """
+    Fill the `technology_group` and `asset_status` columns of all assets with a carrier.
+
+    The technology group is the carrier, or `{carrier} class{resource_class}`
+    where a resource class is set. Missing asset states are `candidate` for
+    extendable and `existing` for other assets.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network to modify in place.
+    """
+    for c in n.components[ASSET_COMPONENTS]:
+        static = c.static
+        if "carrier" not in static.columns:
+            continue
+        group = static.carrier.astype(str)
+        if "resource_class" in static.columns:
+            has_class = static.resource_class.notna()
+            resource_class = static.resource_class[has_class].astype(int).astype(str)
+            group[has_class] = group[has_class] + " class" + resource_class
+        static["technology_group"] = group
+        default_status = pd.Series("existing", index=static.index)
+        default_status[c.extendables] = "candidate"
+        if "asset_status" not in static.columns:
+            static["asset_status"] = np.nan
+        static["asset_status"] = static.asset_status.fillna(default_status)
+
+
+def extend_busmaps(n: pypsa.Network) -> None:
+    """
+    Fill the `busmap_*` columns for buses added after clustering.
+
+    A bus with an electricity location maps to the busmap entry of its location
+    plus its name without the location, e.g. `DE0 1 H2` for bus `way/1-380 H2`
+    with `busmap_5` of `way/1-380` equal to `DE0 1`. Buses without such a
+    location map to themselves.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network to modify in place.
+    """
+    columns = n.buses.columns[n.buses.columns.str.startswith("busmap_")]
+    if columns.empty:
+        raise ValueError("Network has no busmap columns to extend.")
+    buses = n.buses
+    mapped_i = buses.index[buses[columns[0]].notna()]
+    location = buses.location[~buses.index.isin(mapped_i)]
+    location = location[location.isin(mapped_i)]
+    no_prefix = [b for b, loc in location.items() if not b.startswith(loc)]
+    if no_prefix:
+        raise ValueError(f"Bus names do not start with their location: {no_prefix}")
+    suffix = pd.Series(
+        [b[len(loc) :] for b, loc in location.items()], index=location.index
+    )
+    for col in columns:
+        extended = location.map(buses[col]) + suffix
+        buses[col] = buses[col].fillna(extended).fillna(buses.index.to_series())
+
+
 def sanitize_custom_columns(n: pypsa.Network):
     """
     Sanitize non-standard columns used throughout the workflow.

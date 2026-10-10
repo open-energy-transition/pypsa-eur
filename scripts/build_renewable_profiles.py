@@ -104,6 +104,22 @@ if __name__ == "__main__":
     if snakemake.wildcards.technology.startswith("offwind"):
         # for offshore regions, the shortest distance to the shoreline is used
         offshore_regions = availability.coords["bus"].values
+        without_onshore = pd.Index(offshore_regions).difference(regions.index)
+        if not without_onshore.empty:
+            country = (
+                gpd.read_file(snakemake.input.resource_regions)
+                .set_index("name")
+                .country[without_onshore]
+            )
+            shore = regions.dissolve("country").geometry.reindex(country)
+            regions = pd.concat(
+                [
+                    regions,
+                    gpd.GeoDataFrame(
+                        geometry=shore.values, index=without_onshore, crs=regions.crs
+                    ),
+                ]
+            )
         regions = regions.loc[offshore_regions]
         regions = regions.map(lambda g: _simplify_polys(g, minarea=1)).set_crs(
             regions.crs

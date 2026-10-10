@@ -4,6 +4,7 @@
 
 """Tests for config schema synchronization."""
 
+import copy
 import difflib
 import tempfile
 from functools import reduce
@@ -11,6 +12,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from snakemake.utils import update_config
 
 from scripts.lib.validation.config import (
     DEPRECATED_KEYS,
@@ -195,6 +197,48 @@ def test_deprecated_keys_not_in_default_config(old, config_file):
     *parents, key = old.split(".")
     defaults = yaml.safe_load(config_file.read_text())
     assert key not in reduce(dict.get, parents, defaults)
+
+
+class TestKeepAssets:
+    base = {
+        "foresight": "perfect",
+        "countries": ["BE", "NL"],
+        "clustering": {
+            "keep_assets": True,
+            "cluster_network": {"n_clusters": "all"},
+        },
+    }
+
+    def test_accepts_valid_config(self):
+        assert validate_config(self.base).clustering.keep_assets
+
+    @pytest.mark.parametrize(
+        ("override", "match"),
+        [
+            ({"clustering": {"cluster_network": {"n_clusters": 10}}}, "n_clusters"),
+            (
+                {"clustering": {"simplify_network": {"to_substations": True}}},
+                "to_substations",
+            ),
+            ({"clustering": {"cluster_network": {"algorithm": "hac"}}}, "hac"),
+            ({"foresight": "myopic"}, "foresight"),
+            ({"electricity": {"everywhere_powerplants": ["OCGT"]}}, "everywhere"),
+            (
+                {
+                    "electricity": {
+                        "estimate_renewable_capacities": {"expansion_limit": 0.1}
+                    }
+                },
+                "expansion_limit",
+            ),
+            ({"clustering": {"keep_assets_busmaps": [1, 10]}}, "keep_assets_busmaps"),
+        ],
+    )
+    def test_rejects_invalid_config(self, override, match):
+        cfg = copy.deepcopy(self.base)
+        update_config(cfg, override)
+        with pytest.raises(ValueError, match=match):
+            validate_config(cfg)
 
 
 def _load_config(path: str) -> dict:

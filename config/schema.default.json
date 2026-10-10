@@ -681,6 +681,18 @@
               "description": "Use every `n`-th snapshot as representative."
             }
           }
+        },
+        "keep_assets": {
+          "default": false,
+          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+          "type": "boolean"
+        },
+        "keep_assets_busmaps": {
+          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
         }
       }
     },
@@ -14072,6 +14084,18 @@
               "description": "Use every `n`-th snapshot as representative."
             }
           }
+        },
+        "keep_assets": {
+          "default": false,
+          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+          "type": "boolean"
+        },
+        "keep_assets_busmaps": {
+          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
         }
       }
     },

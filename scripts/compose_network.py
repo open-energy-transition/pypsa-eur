@@ -25,7 +25,9 @@ import logging
 import pypsa
 
 from scripts._helpers import (
+    assign_technology_groups,
     configure_logging,
+    extend_busmaps,
     load_costs,
     sanitize_custom_columns,
     set_scenario_config,
@@ -130,6 +132,9 @@ if __name__ == "__main__":
     maybe_adjust_costs_and_potentials(n, adjustments["electricity"], current_horizon)
     maybe_adjust_costs_and_potentials(n, adjustments["sector"], current_horizon)
 
+    if params.clustering["keep_assets"]:
+        assign_technology_groups(n)
+        extend_busmaps(n)
     sanitize_custom_columns(n)
     sanitize_carriers(n, config)
     sanitize_locations(n)

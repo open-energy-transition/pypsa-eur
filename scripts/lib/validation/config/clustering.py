@@ -189,3 +189,29 @@ class ClusteringConfig(BaseModel):
         default_factory=_TemporalConfig,
         description="Options for temporal resolution.",
     )
+    keep_assets: bool = Field(
+        False,
+        description="Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+    )
+    keep_assets_busmaps: list[int] = Field(
+        default_factory=lambda: [5, 10],
+        description="Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+    )
+
+    @model_validator(mode="after")
+    def check_keep_assets(self):
+        if not self.keep_assets:
+            return self
+        if self.cluster_network.n_clusters != "all":
+            raise ValueError(
+                "clustering.keep_assets requires clustering.cluster_network.n_clusters: all."
+            )
+        if self.simplify_network.to_substations:
+            raise ValueError(
+                "clustering.keep_assets requires clustering.simplify_network.to_substations: false."
+            )
+        if self.cluster_network.algorithm == "hac":
+            raise ValueError(
+                "clustering.keep_assets does not support clustering.cluster_network.algorithm: hac."
+            )
+        return self

@@ -248,3 +248,25 @@ class ConfigSchema(BaseModel):
                 "CORINE_API_TOKEN). You can set these in a .env file in the project root."
             )
         return data
+
+    @model_validator(mode="after")
+    def check_keep_assets(self):
+        if not self.clustering.keep_assets:
+            return self
+        if self.foresight.root != "perfect":
+            raise ValueError("clustering.keep_assets requires foresight: perfect.")
+        if self.electricity.everywhere_powerplants:
+            raise ValueError(
+                "clustering.keep_assets adds conventional candidates at every bus and requires electricity.everywhere_powerplants: []."
+            )
+        if self.electricity.estimate_renewable_capacities.expansion_limit:
+            raise ValueError(
+                "clustering.keep_assets requires electricity.estimate_renewable_capacities.expansion_limit: false."
+            )
+        n_countries = len(self.countries.root)
+        too_small = [n for n in self.clustering.keep_assets_busmaps if n < n_countries]
+        if too_small:
+            raise ValueError(
+                f"clustering.keep_assets_busmaps entries {too_small} are smaller than the number of countries ({n_countries})."
+            )
+        return self

@@ -1235,6 +1235,10 @@ clustering:
     averaging: false
     segmentation: false
     representative: false
+  keep_assets: false
+  keep_assets_busmaps:
+  - 5
+  - 10
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#adjustments_cf
 adjustments:

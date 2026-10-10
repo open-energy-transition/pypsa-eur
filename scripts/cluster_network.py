@@ -55,6 +55,7 @@ from shapely.algorithms.polylabel import polylabel
 from shapely.geometry import MultiPolygon, Polygon
 
 from scripts._helpers import configure_logging, sanitize_busmap, set_scenario_config
+from scripts.base_network import append_bus_shapes
 
 PD_GE_2_2 = parse(pd.__version__) >= Version("2.2")
 
@@ -641,6 +642,141 @@ def update_bus_coordinates(
     n.buses["y"] = busmap_df["y"]
 
 
+def busmap_for_config(
+    n: pypsa.Network,
+    n_clusters: int,
+    load: pd.Series,
+    params: dict,
+    inputs: dict,
+    solver_name: str,
+) -> pd.Series:
+    """
+    Determine the busmap for the configured clustering mode and algorithm.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network to cluster. It may be modified in place.
+    n_clusters : int
+        The number of clusters.
+    load : pd.Series
+        The mean load per bus, used as cluster weights.
+    params : dict
+        The rule parameters.
+    inputs : dict
+        The rule inputs.
+    solver_name : str
+        The solver used to distribute the clusters to countries.
+
+    Returns
+    -------
+    pd.Series
+        The busmap from buses of `n` to cluster buses.
+    """
+    mode = params.mode
+    if mode == "administrative":
+        busmap = busmap_for_admin_regions(n, inputs.admin_shapes, params)
+        # Update x, y coordinates, ensuring that bus locations are inside the administrative region
+        update_bus_coordinates(n, busmap, inputs.admin_shapes)
+    elif mode == "custom_busshapes":
+        n.determine_network_topology()
+        custom_shapes = gpd.read_file(inputs.custom_busshapes)
+        custom_busmap = busmap_from_shapes(n, custom_shapes)
+        logger.info(f"Imported custom shapes from {inputs.custom_busshapes}")
+        busmap = sanitize_busmap(custom_busmap)
+    elif mode == "custom_busmap":
+        custom_busmap = pd.read_csv(inputs.custom_busmap, index_col=0).squeeze()
+        custom_busmap.index = custom_busmap.index.astype(str)
+        logger.info(f"Imported custom busmap from {inputs.custom_busmap}")
+        busmap = sanitize_busmap(custom_busmap)
+    else:
+        algorithm = params.cluster_network["algorithm"]
+        features = None
+        if algorithm == "hac":
+            features = get_feature_data_for_hac(inputs.hac_features)
+            fix_country_assignment_for_hac(n)
+
+        n.determine_network_topology()
+
+        n_clusters_c = distribute_n_clusters_to_countries(
+            n,
+            n_clusters,
+            load,
+            focus_weights=params.focus_weights,
+            solver_name=solver_name,
+        )
+
+        busmap = busmap_for_n_clusters(
+            n,
+            n_clusters_c,
+            cluster_weights=load,
+            algorithm=algorithm,
+            features=features,
+        )
+
+    return apply_carrier_mixing_policy(
+        n, busmap, params.cluster_network["allow_ac_dc_mixing_in_bus_clusters"]
+    )
+
+
+def reference_busmaps(
+    buses_i: pd.Index,
+    load: pd.Series,
+    params: dict,
+    inputs: dict,
+    solver_name: str,
+) -> pd.DataFrame:
+    """
+    Map each bus to the buses of the normally simplified and clustered networks.
+
+    Parameters
+    ----------
+    buses_i : pd.Index
+        The buses to map.
+    load : pd.Series
+        The mean load per bus of `buses_i`.
+    params : dict
+        The rule parameters.
+    inputs : dict
+        The rule inputs.
+    solver_name : str
+        The solver used to distribute the clusters to countries.
+
+    Returns
+    -------
+    pd.DataFrame
+        One column `busmap_all` with the bus of the normally simplified network
+        and one column `busmap_{n}` per entry of `keep_assets_busmaps`.
+    """
+    n_reference = pypsa.Network(inputs.network_reference)
+    busmap_all = pd.read_csv(inputs.busmap_reference, index_col=0).squeeze()
+    busmap_all.index = busmap_all.index.astype(str)
+    busmap_all = busmap_all.astype(str).reindex(buses_i)
+    if busmap_all.isna().any():
+        raise ValueError(
+            f"Buses missing in the reference busmap: {busmap_all.index[busmap_all.isna()].tolist()}"
+        )
+
+    load_reference = (
+        load.groupby(busmap_all).sum().reindex(n_reference.buses.index, fill_value=0.0)
+    )
+    busmaps = {"busmap_all": busmap_all}
+    for n_clusters in params.keep_assets_busmaps:
+        busmap = busmap_for_config(
+            n_reference.copy(),
+            n_clusters,
+            load_reference,
+            params,
+            inputs,
+            solver_name,
+        )
+        busmaps[f"busmap_{n_clusters}"] = busmap_all.map(busmap)
+    busmaps = pd.DataFrame(busmaps)
+    if busmaps.isna().any().any():
+        raise ValueError("Reference busmaps do not cover all buses.")
+    return busmaps
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -669,71 +805,9 @@ if __name__ == "__main__":
         linemap = n.lines.index.to_series()
         clustering = pypsa.clustering.spatial.Clustering(n, busmap, linemap)
     else:
-        if mode == "administrative":
-            busmap = busmap_for_admin_regions(
-                n,
-                snakemake.input.admin_shapes,
-                params,
-            )
-            # Update x, y coordinates, ensuring that bus locations are inside the administrative region
-            update_bus_coordinates(
-                n,
-                busmap,
-                snakemake.input.admin_shapes,
-            )
-        elif mode == "custom_busshapes":
-            n.determine_network_topology()
-            custom_shapes = gpd.read_file(snakemake.input.custom_busshapes)
-            custom_busmap = busmap_from_shapes(
-                n,
-                custom_shapes,
-            )
-            logger.info(
-                f"Imported custom shapes from {snakemake.input.custom_busshapes}"
-            )
-
-            busmap = sanitize_busmap(custom_busmap)
-        elif mode == "custom_busmap":
-            custom_busmap = pd.read_csv(
-                snakemake.input.custom_busmap, index_col=0
-            ).squeeze()
-            custom_busmap.index = custom_busmap.index.astype(str)
-            logger.info(f"Imported custom busmap from {snakemake.input.custom_busmap}")
-            busmap = sanitize_busmap(custom_busmap)
-        else:
-            n_clusters = params.n_clusters
-            algorithm = params.cluster_network["algorithm"]
-            features = None
-            if algorithm == "hac":
-                features = get_feature_data_for_hac(snakemake.input.hac_features)
-                fix_country_assignment_for_hac(n)
-
-            n.determine_network_topology()
-
-            n_clusters_c = distribute_n_clusters_to_countries(
-                n,
-                n_clusters,
-                load,
-                focus_weights=params.focus_weights,
-                solver_name=solver_name,
-            )
-
-            busmap = busmap_for_n_clusters(
-                n,
-                n_clusters_c,
-                cluster_weights=load,
-                algorithm=algorithm,
-                features=features,
-            )
-
-        allow_ac_dc_mixing_in_bus_clusters = params.cluster_network[
-            "allow_ac_dc_mixing_in_bus_clusters"
-        ]
-
-        busmap = apply_carrier_mixing_policy(
-            n, busmap, allow_ac_dc_mixing_in_bus_clusters
+        busmap = busmap_for_config(
+            n, params.n_clusters, load, params, snakemake.input, solver_name
         )
-
         clustering = clustering_for_n_clusters(
             n,
             busmap,
@@ -749,6 +823,12 @@ if __name__ == "__main__":
     cluster_busmap.to_csv(snakemake.output.busmap)
     clustering.linemap.to_csv(snakemake.output.linemap)
 
+    if params.keep_assets:
+        busmaps = reference_busmaps(
+            nc.buses.index, load, params, snakemake.input, solver_name
+        )
+        nc.buses[busmaps.columns] = busmaps
+
     # nc.shapes = n.shapes.copy()
     for which in ["onshore_regions", "offshore_regions"]:
         regions = gpd.read_file(snakemake.input[which])
@@ -756,7 +836,8 @@ if __name__ == "__main__":
             (cluster_busmap,), regions, with_country=True
         )
         clustered_regions.to_file(snakemake.output[which])
-        # append_bus_shapes(nc, clustered_regions, type=which.split("_")[1])
+        if params.keep_assets:
+            append_bus_shapes(nc, clustered_regions, type=which.split("_")[0])
 
     nc.buses["location"] = nc.buses.index
     nc.buses["unit"] = "MWh_el"

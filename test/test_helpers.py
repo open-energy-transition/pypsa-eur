@@ -7,7 +7,12 @@ import pypsa
 import pytest
 from pydantic import ValidationError
 
-from scripts._helpers import get_temporal_resolution, rename_network_component
+from scripts._helpers import (
+    assign_technology_groups,
+    extend_busmaps,
+    get_temporal_resolution,
+    rename_network_component,
+)
 from scripts.lib.validation.config.clustering import _TemporalConfig
 
 
@@ -80,3 +85,46 @@ def test_get_temporal_resolution(temporal, expected):
 def test_temporal_config_rejects_invalid_settings(temporal):
     with pytest.raises(ValidationError):
         _TemporalConfig(**temporal)
+
+
+def test_assign_technology_groups():
+    n = pypsa.Network()
+    n.add("Bus", "b")
+    n.add("Generator", ["unit", "cand"], bus="b", carrier="onwind")
+    n.generators["resource_class"] = [1.0, 2.0]
+    n.generators.loc["cand", "p_nom_extendable"] = True
+    n.add("Generator", "est", bus="b", carrier="solar", asset_status="estimate")
+    n.add("Link", "l", bus0="b", bus1="b", carrier="DC")
+
+    assign_technology_groups(n)
+
+    assert n.generators.technology_group.to_dict() == {
+        "unit": "onwind class1",
+        "cand": "onwind class2",
+        "est": "solar",
+    }
+    assert n.generators.asset_status.to_dict() == {
+        "unit": "existing",
+        "cand": "candidate",
+        "est": "estimate",
+    }
+    assert n.links.loc["l", ["technology_group", "asset_status"]].tolist() == [
+        "DC",
+        "existing",
+    ]
+
+
+def test_extend_busmaps():
+    n = pypsa.Network()
+    n.add("Bus", ["way/1-380", "way/2-380"], busmap_5=["DE0 0", "DE0 1"])
+    n.add("Bus", "way/2-380 H2", location="way/2-380")
+    n.add("Bus", "EU gas", location="EU")
+
+    extend_busmaps(n)
+
+    assert n.buses.busmap_5.to_dict() == {
+        "way/1-380": "DE0 0",
+        "way/2-380": "DE0 1",
+        "way/2-380 H2": "DE0 1 H2",
+        "EU gas": "EU gas",
+    }

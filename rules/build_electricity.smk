@@ -691,6 +691,8 @@ rule simplify_network:
         onshore_regions=resources("onshore_regions_simplified.geojson"),
         offshore_regions=resources("offshore_regions_simplified.geojson"),
         busmap=resources("busmap_simplify_network.csv"),
+        network_reference=resources("networks/simplified_reference.nc"),
+        busmap_reference=resources("busmap_simplify_network_reference.csv"),
     log:
         logs("simplify_network.log"),
     benchmark:
@@ -709,6 +711,7 @@ rule simplify_network:
         ),
         p_max_pu=config_provider("links", "p_max_pu", default=1.0),
         p_min_pu=config_provider("links", "p_min_pu", default=-1.0),
+        keep_assets=config_provider("clustering", "keep_assets"),
     script:
         scripts("simplify_network.py")
 
@@ -760,6 +763,16 @@ rule cluster_network:
             else []
         ),
         load=resources("electricity_demand_simplified.nc"),
+        network_reference=lambda w: (
+            resources("networks/simplified_reference.nc")
+            if config_provider("clustering", "keep_assets")(w)
+            else []
+        ),
+        busmap_reference=lambda w: (
+            resources("busmap_simplify_network_reference.csv")
+            if config_provider("clustering", "keep_assets")(w)
+            else []
+        ),
     output:
         network=resources("networks/clustered.nc"),
         onshore_regions=resources("onshore_regions.geojson"),
@@ -791,6 +804,8 @@ rule cluster_network:
         length_factor=config_provider("lines", "length_factor"),
         cluster_mode=config_provider("clustering", "mode"),
         copperplate_regions=config_provider("clustering", "copperplate_regions"),
+        keep_assets=config_provider("clustering", "keep_assets"),
+        keep_assets_busmaps=config_provider("clustering", "keep_assets_busmaps"),
     script:
         scripts("cluster_network.py")
 

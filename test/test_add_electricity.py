@@ -10,10 +10,13 @@ import pypsa
 import xarray as xr
 
 from scripts.add_electricity import (
+    assign_unit_dates,
     attach_load,
     attach_storageunits,
     attach_stores,
+    conventional_candidates,
     estimate_efficiency,
+    reduce_candidate_potentials,
 )
 from scripts.lib.validation.config.conventional import _EstimateEfficienciesConfig
 
@@ -122,3 +125,65 @@ def test_estimate_efficiency():
         np.nan,
     ]
     np.testing.assert_allclose(eta, expected)
+
+
+def test_assign_unit_dates():
+    units = pd.DataFrame(
+        {
+            "carrier": ["CCGT", "CCGT", "CCGT", "coal"],
+            "datein": [2000.0, np.nan, 1990.0, np.nan],
+            "dateout": [np.nan, 2045.0, 2025.0, 2040.0],
+        }
+    )
+    lifetime = pd.Series(40.0, index=units.index)
+
+    result = assign_unit_dates(units, lifetime, first_horizon=2030)
+
+    assert result.index.tolist() == [0, 1]
+    assert result.build_year.tolist() == [2000, 1995]
+    assert result.lifetime.tolist() == [40.0, 50.0]
+
+
+def test_conventional_candidates():
+    n = pypsa.Network()
+    n.add("Bus", ["ac", "dc"], carrier=["AC", "DC"])
+    costs = pd.DataFrame(
+        {
+            "efficiency": [0.4],
+            "VOM": [5.0],
+            "fuel": [20.0],
+            "capital_cost": [1e4],
+            "lifetime": [25.0],
+        },
+        index=["OCGT"],
+    )
+
+    candidates = conventional_candidates(n, costs, ["OCGT"])
+
+    assert candidates.index.tolist() == ["ac OCGT"]
+    assert candidates.loc[
+        "ac OCGT", ["p_nom", "build_year", "marginal_cost"]
+    ].tolist() == [
+        0.0,
+        0,
+        55.0,
+    ]
+
+
+def test_reduce_candidate_potentials():
+    n = pypsa.Network()
+    n.add("Bus", "b")
+    n.add(
+        "Generator",
+        ["b 0 onwind", "b 1 onwind", "b 0 onwind 7", "b 0 onwind estimate"],
+        bus="b",
+        carrier="onwind",
+        p_nom=[0.0, 0.0, 30.0, 80.0],
+        p_nom_max=[100.0, 100.0, np.inf, np.inf],
+        asset_status=["candidate", "candidate", "existing", "estimate"],
+        resource_class=[0, 1, 0, 0],
+    )
+
+    reduce_candidate_potentials(n, ["onwind"])
+
+    assert n.generators.p_nom_max[["b 0 onwind", "b 1 onwind"]].tolist() == [0.0, 100.0]
