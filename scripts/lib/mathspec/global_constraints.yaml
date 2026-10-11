@@ -25,24 +25,10 @@ given:
   expressions:
     capital_weight: {dims: [entity, period]}
   parameters:
-    entity_group: {dims: [entity], dtype: str}
-    role: {dims: [entity, bus], dtype: str}
-    efficiency: {dims: [scenario, snapshot, entity, bus]}
-    active: {dims: [entity], dtype: bool}
-    build_year: {dims: [entity], dtype: int}
-    lifetime: {dims: [entity]}
-    period_year: {dims: [period], dtype: int}
     period_weighting_years: {dims: [period]}
     snapshot_weighting_generators: {dims: [snapshot]}
-    p_nom_extendable: {dims: [entity], dtype: bool}
-    s_nom_extendable: {dims: [entity], dtype: bool}
-    e_nom_extendable: {dims: [entity], dtype: bool}
-    e_cyclic: {dims: [entity], dtype: bool}
     e_initial: {dims: [entity]}
-    e_initial_per_period: {dims: [entity], dtype: bool}
-    cyclic_state_of_charge: {dims: [entity], dtype: bool}
     state_of_charge_initial: {dims: [entity]}
-    state_of_charge_initial_per_period: {dims: [entity], dtype: bool}
     capital_cost: {dims: [entity]}
     length: {dims: [entity]}
     co2_emissions: {dims: [carrier]}
@@ -88,41 +74,53 @@ parameters:
     dims: [global_constraint, period]
     missing: absent
     description: the limit of a family in each investment period it binds in
+  glc_generator: {dims: [entity], dtype: int, missing: 0, description: 1 for a generator}
+  glc_generator_fuel:
+    dims: [entity]
+    missing: 0
+    description: the fuel a generator burns per unit of output, one over its efficiency
+  glc_store_final:
+    dims: [snapshot, entity]
+    missing: 0
+    description: >-
+      the years of the period at its last snapshot, for an active non-cyclic store
+      that resets each period
+  glc_storage_unit_final:
+    dims: [snapshot, entity]
+    missing: 0
+    description: >-
+      the years of the period at its last snapshot, for an active non-cyclic
+      storage unit that resets each period
+  glc_co2_store:
+    dims: [snapshot, entity]
+    dtype: int
+    missing: 0
+    description: 1 at the last snapshot of each period for a non-cyclic store on a bus of an emitting carrier
+  glc_branch_period:
+    dims: [entity, period]
+    dtype: int
+    missing: 0
+    description: 1 for an extendable line or link in each period it stands in
+  glc_branch_horizon:
+    dims: [entity]
+    dtype: int
+    missing: 0
+    description: 1 for an extendable line or link that stands in some period
+  glc_extendable_period:
+    dims: [entity, period]
+    dtype: int
+    missing: 0
+    description: 1 for an extendable entity in each period it stands in
+  glc_extendable_horizon:
+    dims: [entity]
+    dtype: int
+    missing: 0
+    description: 1 for an active extendable entity
 
 expressions:
-  glc_extendable:
-    dims: [entity]
-    cases:
-      extendable: {when: p_nom_extendable OR s_nom_extendable OR e_nom_extendable, expression: 1}
-    otherwise: 0
-  glc_standing:
-    dims: [entity, period]
-    cases:
-      standing:
-        when: active AND build_year <= period_year AND build_year + lifetime > period_year
-        expression: 1
-    otherwise: 0
   glc_period_weight:
     dims: [snapshot]
     expression: snapshot_weighting_generators * at(period_weighting_years, by=snapshot_period[period])
-  glc_generator:
-    dims: [entity]
-    cases:
-      generator: {when: "entity_group == 'Generator'", expression: 1}
-    otherwise: 0
-  glc_generator_port:
-    dims: [entity, bus]
-    cases:
-      generator: {when: "entity_group == 'Generator' AND role == 'attached'", expression: 1}
-    otherwise: 0
-  glc_generator_efficiency:
-    dims: [scenario, snapshot, entity]
-    expression: sum(efficiency * glc_generator_port, over=bus)
-  glc_generator_fuel:
-    dims: [scenario, snapshot, entity]
-    cases:
-      generator: {when: "entity_group == 'Generator'", expression: 1 / glc_generator_efficiency}
-    otherwise: 0
   glc_output:
     dims: [scenario, carrier, period]
     description: what the generators of a carrier produce in a period, weighted by snapshot and period years
@@ -135,25 +133,6 @@ expressions:
     expression: >-
       sum(sum(p * glc_generator_fuel, over=entity, by=entity_carrier[carrier]) * glc_period_weight,
       over=snapshot, by=snapshot_period[period])
-  glc_store_final:
-    dims: [snapshot, entity]
-    cases:
-      final:
-        when: >-
-          entity_group == 'Store' AND active AND NOT e_cyclic AND e_initial_per_period
-          AND position(snapshot, within=snapshot_period[period]) == -1
-        expression: at(period_weighting_years, by=snapshot_period[period])
-    otherwise: 0
-  glc_storage_unit_final:
-    dims: [snapshot, entity]
-    cases:
-      final:
-        when: >-
-          entity_group == 'StorageUnit' AND active AND NOT cyclic_state_of_charge
-          AND state_of_charge_initial_per_period
-          AND position(snapshot, within=snapshot_period[period]) == -1
-        expression: at(period_weighting_years, by=snapshot_period[period])
-    otherwise: 0
   glc_drawdown:
     dims: [scenario, carrier, period]
     description: >-
@@ -165,57 +144,30 @@ expressions:
       - sum(e * glc_store_final, over=entity, by=entity_carrier[carrier])
       - sum(e * glc_storage_unit_final, over=entity, by=entity_carrier[carrier]),
       over=snapshot, by=snapshot_period[period])
-  glc_co2_store:
-    dims: [snapshot, entity, bus]
-    cases:
-      final:
-        when: >-
-          entity_group == 'Store' AND NOT e_cyclic AND role == 'attached'
-          AND at(co2_emissions != 0, by=bus_carrier[carrier])
-          AND position(snapshot, within=snapshot_period[period]) == -1
-        expression: 1
-    otherwise: 0
   glc_co2_level:
     dims: [scenario, period]
     description: the level of the stores on emission buses at the end of a period
-    expression: sum(sum(e * glc_co2_store, over=[entity, bus]), over=snapshot, by=snapshot_period[period])
-  glc_branch:
-    dims: [entity]
-    cases:
-      branch: {when: "entity_group == 'Line' OR entity_group == 'Link'", expression: glc_extendable}
-    otherwise: 0
-  glc_branch_standing:
-    dims: [entity]
-    cases:
-      standing:
-        when: count(active AND build_year <= period_year AND build_year + lifetime > period_year, over=period) >= 1
-        expression: glc_branch
-    otherwise: 0
+    expression: sum(sum(e * glc_co2_store, over=entity), over=snapshot, by=snapshot_period[period])
   glc_volume:
     dims: [carrier, period]
-    expression: sum(nom * length * glc_branch * glc_standing, over=entity, by=entity_carrier[carrier])
+    expression: sum(nom * length * glc_branch_period, over=entity, by=entity_carrier[carrier])
   glc_volume_horizon:
     dims: [carrier]
-    expression: sum(nom * length * glc_branch_standing, over=entity, by=entity_carrier[carrier])
+    expression: sum(nom * length * glc_branch_horizon, over=entity, by=entity_carrier[carrier])
   glc_cost:
     dims: [carrier, period]
-    expression: sum(nom * capital_cost * glc_branch * glc_standing, over=entity, by=entity_carrier[carrier])
+    expression: sum(nom * capital_cost * glc_branch_period, over=entity, by=entity_carrier[carrier])
   glc_cost_horizon:
     dims: [carrier]
     expression: >-
-      sum(nom * capital_cost * sum(capital_weight, over=period) * glc_branch_standing,
+      sum(nom * capital_cost * sum(capital_weight, over=period) * glc_branch_horizon,
       over=entity, by=entity_carrier[carrier])
   glc_capacity:
     dims: [carrier, period]
-    expression: sum(nom * glc_extendable * glc_standing, over=entity, by=entity_carrier[carrier])
-  glc_active:
-    dims: [entity]
-    cases:
-      active: {when: active, expression: glc_extendable}
-    otherwise: 0
+    expression: sum(nom * glc_extendable_period, over=entity, by=entity_carrier[carrier])
   glc_capacity_horizon:
     dims: [carrier]
-    expression: sum(nom * glc_active, over=entity, by=entity_carrier[carrier])
+    expression: sum(nom * glc_extendable_horizon, over=entity, by=entity_carrier[carrier])
   glc_period_total:
     dims: [scenario, global_constraint, period]
     description: the left-hand side of a family in one investment period

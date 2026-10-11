@@ -59,6 +59,28 @@ def drop_bus_country_duplicates(n: pypsa.Network) -> None:
         c.static.drop(columns="country", inplace=True)
 
 
+def drop_port_voltages(n: pypsa.Network) -> None:
+    """
+    Drop the ``voltage_bus0`` and ``voltage_bus1`` columns of a branch.
+
+    They repeat ``v_nom`` of the bus at each port, which the record carries on
+    the bus. A branch whose port voltage differs from ``v_nom`` of its bus raises.
+    """
+    for c in n.components[list(n.branch_components)]:
+        for port in c.ports:
+            column = f"voltage_bus{port}"
+            if column not in c.static:
+                continue
+            bus_v_nom = c.static[f"bus{port}"].map(n.buses.v_nom)
+            clash = c.static.index[c.static[column] != bus_v_nom]
+            if not clash.empty:
+                raise ValueError(
+                    f"{c.name} components {list(clash)} carry a {column} that differs "
+                    "from v_nom of their bus."
+                )
+            c.static.drop(columns=column, inplace=True)
+
+
 def prefix_shared_entity_columns(n: pypsa.Network) -> None:
     """
     Prefix a custom component column with ``entity_`` where a bus column has its name.
@@ -167,6 +189,7 @@ if __name__ == "__main__":
         rolling_horizon=solve_opts["rolling_horizon"],
     )
     drop_bus_country_duplicates(n)
+    drop_port_voltages(n)
     rename_shared_one_port_names(n)
     prefix_shared_entity_columns(n)
     add_zero_gas_usage(n)

@@ -211,13 +211,20 @@ SWITCHES = {
             "global_constraint_period_constant",
             "battery_charger_discharger",
             "reversed_forward",
-            "solar_potential_factor",
+            "solar_potential_generator",
+            "solar_potential_limit",
+            "land_use_limit",
+            "growth_first",
+            "glc_branch_period",
         },
     ),
-    "BAU": ({"BAU": True}, {"bau_mincapacity"}),
-    "SAFE": ({"SAFE": True}, {"safe_peak_capacity", "safe_conventional"}),
-    "EQ": ({"EQ": "EQ0.7"}, {"equity_min_share"}),
-    "reserve": ({"operational_reserve": True}, {"reserve_contingency", "reserve_vres"}),
+    "BAU": ({"BAU": True}, {"bau_mincapacity", "bau_generator"}),
+    "SAFE": ({"SAFE": True}, {"safe_peak_capacity", "safe_extendable"}),
+    "EQ": ({"EQ": "EQ0.7"}, {"equity_min_share", "equity_bus", "equity_load"}),
+    "reserve": (
+        {"operational_reserve": True},
+        {"reserve_contingency", "reserve_generator", "reserve_vres_extendable"},
+    ),
 }
 
 

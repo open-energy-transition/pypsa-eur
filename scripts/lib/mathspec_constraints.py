@@ -36,6 +36,8 @@ SPECS = (MATH / "global_constraints.yaml", MATH / "extra_functionality.yaml")
 DTYPES = {"float": nw.Float64, "int": nw.Int64, "bool": nw.Boolean, "str": nw.String}
 PERIOD_TYPES = {"co2_atmosphere", "Co2Budget"}
 PRIMARY_ENERGY_ATTRIBUTES = {"co2_emissions", "gas_usage"}
+CAPACITY_TYPES = ["Generator", "Line", "Transformer", "Link", "Store", "StorageUnit"]
+ONE_PORT_TYPES = ["Generator", "StorageUnit", "Store"]
 
 Data = dict[str, Any]
 
@@ -161,6 +163,61 @@ def extension(data: Data, base: Schema) -> FrameRecord:
         group_frames=group_frames,
         attribute_frames=attribute_frames,
     )
+
+
+def _ones(index: pd.Index | pd.MultiIndex) -> pd.Series:
+    return pd.Series(1, index=index)
+
+
+def _standing(n: pypsa.Network) -> pd.DataFrame:
+    """Whether each entity with a capacity stands in each period, by PyPSA's activity rule."""
+    return pd.concat(
+        [
+            pd.concat({p: c.get_active_assets(p) for p in n.investment_periods}, axis=1)
+            for c in n.components[CAPACITY_TYPES]
+        ]
+    )
+
+
+def _extendable(n: pypsa.Network) -> pd.Index:
+    return pd.Index(
+        [name for c in n.components[CAPACITY_TYPES] for name in c.extendables]
+    )
+
+
+def _entity_carriers(n: pypsa.Network) -> pd.Series:
+    return pd.concat(
+        [
+            c.static.carrier
+            for c in n.components[CAPACITY_TYPES]
+            if "carrier" in c.static
+        ]
+    )
+
+
+def _indicator(mask: pd.DataFrame) -> pd.Series:
+    stacked = mask.rename_axis(index="entity", columns="period").stack()
+    return _ones(stacked.index[stacked])
+
+
+def _at_bus(values: pd.Series, buses: pd.Series) -> pd.Series:
+    """``values``, keyed by entity first, with the bus of each entity after it."""
+    frame = values.rename("value").reset_index()
+    frame.insert(1, "bus", frame.entity.map(buses).to_numpy())
+    return frame.set_index(list(frame.columns[:-1])).value
+
+
+def _one_port_buses(n: pypsa.Network) -> pd.Series:
+    return pd.concat([c.static.bus for c in n.components[ONE_PORT_TYPES]])
+
+
+def _period_ends(n: pypsa.Network, entities: pd.Index, values: pd.Series) -> pd.Series:
+    """``values`` of each period at its last snapshot, for each of ``entities``."""
+    ends = n.snapshots.to_frame(index=False).groupby("period").tail(1)
+    ends.columns = ["period", "snapshot"]
+    frame = ends.merge(pd.DataFrame({"entity": entities}), how="cross")
+    frame["value"] = frame.period.map(values).to_numpy()
+    return frame.set_index(["period", "snapshot", "entity"]).value
 
 
 def _require_multi_period(n: pypsa.Network) -> None:
@@ -298,6 +355,41 @@ def global_constraint_data(n: pypsa.Network) -> Data:
             ["family", per_period.investment_period.astype(int).rename("period")]
         ).constant.rename_axis(["global_constraint", "period"]),
         "global_constraint_carrier": carriers,
+    } | global_constraint_weights(n)
+
+
+def global_constraint_weights(n: pypsa.Network) -> Data:
+    """The entities each family of global constraints sums over, as weights per entity."""
+    if not n.generators_t.efficiency.empty:
+        raise UnsupportedConstraintError(
+            f"Generators {list(n.generators_t.efficiency.columns)} have a time-varying "
+            "efficiency; the math reads one fuel weight per generator."
+        )
+    extendable = _standing(n).loc[_extendable(n)]
+    branches = extendable[extendable.index.isin(n.lines.index.union(n.links.index))]
+    active = pd.concat([c.static.active for c in n.components[CAPACITY_TYPES]])
+    years = n.investment_period_weightings.years
+    stores, units = n.stores, n.storage_units
+    final_stores = stores.index[
+        stores.active & ~stores.e_cyclic & stores.e_initial_per_period
+    ]
+    final_units = units.index[
+        units.active
+        & ~units.cyclic_state_of_charge
+        & units.state_of_charge_initial_per_period
+    ]
+    emitting = stores.bus.map(n.buses.carrier).map(n.carriers.co2_emissions)
+    co2_stores = stores.index[~stores.e_cyclic & emitting.fillna(0).ne(0)]
+    return {
+        "glc_generator": _ones(n.generators.index),
+        "glc_generator_fuel": 1 / n.generators.efficiency,
+        "glc_store_final": _period_ends(n, final_stores, years),
+        "glc_storage_unit_final": _period_ends(n, final_units, years),
+        "glc_co2_store": _period_ends(n, co2_stores, _ones(years.index)),
+        "glc_branch_period": _indicator(branches),
+        "glc_branch_horizon": _ones(branches.index[branches.any(axis=1)]),
+        "glc_extendable_period": _indicator(extendable),
+        "glc_extendable_horizon": _ones(extendable.index[active[extendable.index]]),
     }
 
 
@@ -318,21 +410,25 @@ def _positional(left: pd.Index, right: pd.Index, source: str) -> list[tuple[str,
 def bau_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
     """``solve_network.add_BAU_constraints``."""
     mincaps = pd.Series(config["electricity"]["BAU_mincapacities"])
-    carriers = n.generators.query("p_nom_extendable").carrier.unique()
-    return {"bau_mincapacity": mincaps[carriers].astype(float)}
+    extendable = n.generators.query("p_nom_extendable")
+    return {
+        "bau_mincapacity": mincaps[extendable.carrier.unique()].astype(float),
+        "bau_generator": _ones(extendable.index),
+    }
 
 
 def safe_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
     """``solve_network.add_SAFE_constraints``."""
     peak = n.loads_t.p_set.sum(axis=1).max()
-    conventional = n.carriers.index.intersection(
-        config["electricity"]["conventional_carriers"]
-    )
+    gens = n.generators[
+        n.generators.carrier.isin(config["electricity"]["conventional_carriers"])
+    ]
     return {
         "safe_peak_capacity": float(
             peak * (1.0 + config["electricity"]["SAFE_reservemargin"])
         ),
-        "safe_conventional": pd.Series(True, index=conventional),
+        "safe_extendable": _ones(gens.index[gens.p_nom_extendable]),
+        "safe_fixed": _ones(gens.index[~gens.p_nom_extendable]),
     }
 
 
@@ -358,9 +454,12 @@ def operational_reserve_margin(n: pypsa.Network, config: Mapping[str, Any]) -> D
         raise KeyError(
             f"Renewable generators {list(no_profile)} have no p_max_pu profile."
         )
+    vres_gens = gens[gens.carrier.isin(vres)]
     return {
-        "reserve_provider": pd.Series(True, index=gens.carrier.unique()),
-        "reserve_vres": pd.Series(True, index=n.carriers.index.intersection(vres)),
+        "reserve_generator": pd.Series(True, index=gens.index),
+        "reserve_load": _ones(n.loads.index),
+        "reserve_vres_extendable": _ones(vres_gens.index[vres_gens.p_nom_extendable]),
+        "reserve_vres_fixed": _ones(vres_gens.index[~vres_gens.p_nom_extendable]),
         "reserve_epsilon_load": float(reserve["epsilon_load"]),
         "reserve_epsilon_vres": float(reserve["epsilon_vres"]),
         "reserve_contingency": float(reserve["contingency"]),
@@ -380,7 +479,20 @@ def eq_constraints(n: pypsa.Network, option: str) -> Data:
             "add_EQ_constraints reads loads_t.p_set only; the record merges static "
             f"p_set of loads {list(static_loads)} into it."
         )
-    return {"equity_min_share": float(re.findall(r"[0-9]*\.?[0-9]+", option)[0])}
+    return {
+        "equity_min_share": float(re.findall(r"[0-9]*\.?[0-9]+", option)[0]),
+        "equity_bus": pd.Series(True, index=pd.Index(n.loads.bus.unique())),
+        **{
+            f"equity_{name}": _at_bus(
+                _ones(c.static.index.rename("entity")), c.static.bus
+            )
+            for name, c in (
+                ("generator", n.c.generators),
+                ("load", n.c.loads),
+                ("storage_unit", n.c.storage_units),
+            )
+        },
+    }
 
 
 def solar_potential_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
@@ -402,9 +514,26 @@ def solar_potential_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> 
             "add_solar_potential_constraints scales generators by name; names and "
             "carriers of the solar generators disagree."
         )
+    factors = pd.Series({"solar": 1.0, "solar-hsat": factor})
+    factors = factors[factors > 0]
+    weighted = solar[solar.carrier.isin(factors.index)]
+    reference = weighted[weighted.carrier == "solar"]
+    tracking = n.generators[
+        n.generators.carrier.isin(factors.index.drop("solar", errors="ignore"))
+    ]
+    left = (
+        reference.groupby("bus")
+        .p_nom_max.sum()
+        .sub(
+            (tracking.p_nom * tracking.carrier.map(factors)).groupby(tracking.bus).sum()
+        )
+    )
+    limit = left.dropna().clip(lower=0)
     return {
-        "solar_potential_factor": pd.Series({"solar": 1.0, "solar-hsat": factor}),
-        "solar_potential_reference": pd.Series({"solar": True}),
+        "solar_potential_generator": _at_bus(
+            weighted.carrier.map(factors).rename_axis("entity"), weighted.bus
+        ),
+        "solar_potential_limit": limit[np.isfinite(limit)],
     }
 
 
@@ -581,6 +710,37 @@ def retrofit_gas_boiler_constraint(n: pypsa.Network) -> Data:
     )
 
 
+def land_use_data(n: pypsa.Network) -> Data:
+    """The limits PyPSA builds from the ``nom_max_{carrier}_{period}`` bus columns."""
+    gens = n.generators[
+        n.generators.p_nom_extendable
+        & np.isfinite(n.generators.p_nom_max)
+        & n.generators.build_year.isin(n.investment_periods)
+    ]
+    if gens.empty:
+        return {}
+    one_ports = _one_port_buses(n)
+    standing = _standing(n).loc[_extendable(n).intersection(one_ports.index)]
+    keys = [gens.index, gens.bus, gens.build_year.astype(int)]
+    return {
+        "land_use_limit": gens.p_nom_max.set_axis(
+            pd.MultiIndex.from_arrays(keys, names=["entity", "bus", "period"])
+        ),
+        "land_use_weight": _at_bus(_indicator(standing), one_ports),
+    }
+
+
+def growth_data(n: pypsa.Network) -> Data:
+    """PyPSA's ``define_growth_limit``: an extendable entity counts in the first period it stands in."""
+    limited = n.carriers.index[np.isfinite(n.carriers.max_growth)]
+    extendable = _standing(n).loc[_extendable(n)]
+    carriers = _entity_carriers(n).reindex(extendable.index)
+    extendable = extendable[carriers.isin(limited)]
+    if extendable.empty:
+        return {}
+    return {"growth_first": _indicator(extendable.cumsum(axis=1) == 1)}
+
+
 def land_use_check(n: pypsa.Network) -> None:
     """
     Fail unless every ``nom_*`` bus column is the limit ``add_land_use_constraint`` sets.
@@ -694,6 +854,8 @@ def extra_functionality_data(
             ),
             lambda: solar_potential_constraints(n, config),
         ),
+        (True, lambda: land_use_data(n)),
+        (True, lambda: growth_data(n)),
         (True, lambda: tes_energy_to_power_ratio_constraints(n)),
         (True, lambda: tes_charger_ratio_constraints(n)),
         (True, lambda: battery_constraints(n)),
