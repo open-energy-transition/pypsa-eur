@@ -14,14 +14,14 @@ description: >-
 
 given:
   variables:
-    nom: {dims: [entity]}
+    capacity: {dims: [entity]}
     p: {dims: [scenario, snapshot, entity]}
     spill: {dims: [scenario, snapshot, entity]}
   parameters:
     extendable: {dims: [entity], dtype: bool}
     snapshot_weighting_generators: {dims: [snapshot]}
     snapshot_weighting_stores: {dims: [snapshot]}
-    capacity: {dims: [entity]}
+    nom: {dims: [entity]}
     p_max_pu: {dims: [scenario, snapshot, entity]}
     p_set: {dims: [scenario, snapshot, entity]}
     inflow: {dims: [scenario, snapshot, entity]}
@@ -167,10 +167,10 @@ parameters:
 expressions:
   land_use_capacity:
     dims: [bus, carrier, period]
-    expression: sum(nom * land_use_weight, over=entity, by=entity_carrier[carrier])
+    expression: sum(capacity * land_use_weight, over=entity, by=entity_carrier[carrier])
   growth_capacity:
     dims: [carrier, period]
-    expression: sum(nom * growth_first, over=entity, by=entity_carrier[carrier])
+    expression: sum(capacity * growth_first, over=entity, by=entity_carrier[carrier])
 
 variables:
   Generator_r:
@@ -200,42 +200,42 @@ constraints:
     dims: [carrier]
     description: "`add_BAU_constraints`"
     where: bau_mincapacity
-    expression: sum(nom * bau_generator, over=entity, by=entity_carrier[carrier]) >= bau_mincapacity
+    expression: sum(capacity * bau_generator, over=entity, by=entity_carrier[carrier]) >= bau_mincapacity
   safe_mintotalcap:
     dims: []
     description: "`add_SAFE_constraints`"
     where: safe_peak_capacity
-    expression: sum(nom * safe_extendable, over=entity) >= safe_peak_capacity - sum(capacity * safe_fixed, over=entity)
+    expression: sum(capacity * safe_extendable, over=entity) >= safe_peak_capacity - sum(nom * safe_fixed, over=entity)
   reserve_margin:
     dims: [scenario, snapshot]
     description: "`add_operational_reserve_margin`: the reserve requirement"
     where: reserve_contingency
     expression: >-
       sum(Generator_r, over=entity)
-      - reserve_epsilon_vres * sum(nom * p_max_pu * reserve_vres_extendable, over=entity)
+      - reserve_epsilon_vres * sum(capacity * p_max_pu * reserve_vres_extendable, over=entity)
       >= reserve_epsilon_load * sum(p_set * reserve_load, over=entity)
-      + reserve_epsilon_vres * sum(p_max_pu * capacity * reserve_vres_fixed, over=entity)
+      + reserve_epsilon_vres * sum(p_max_pu * nom * reserve_vres_fixed, over=entity)
       + reserve_contingency
   Generator_p_reserve_upper_extendable:
     dims: [scenario, snapshot, entity]
     description: "`add_operational_reserve_margin`: dispatch and reserve within extendable capacity"
     where: Generator_r AND p AND extendable
-    expression: p + Generator_r - p_max_pu * nom <= 0
+    expression: p + Generator_r - p_max_pu * capacity <= 0
   Generator_p_reserve_upper_extendable_idle:
     dims: [scenario, snapshot, entity]
     description: "`add_operational_reserve_margin`: reserve within extendable capacity where the unit does not dispatch"
     where: Generator_r AND NOT p AND extendable
-    expression: Generator_r - p_max_pu * nom <= 0
+    expression: Generator_r - p_max_pu * capacity <= 0
   Generator_p_reserve_upper_fixed:
     dims: [scenario, snapshot, entity]
     description: "`add_operational_reserve_margin`: dispatch and reserve within fixed capacity"
     where: Generator_r AND p AND NOT extendable
-    expression: p + Generator_r <= p_max_pu * capacity
+    expression: p + Generator_r <= p_max_pu * nom
   Generator_p_reserve_upper_fixed_idle:
     dims: [scenario, snapshot, entity]
     description: "`add_operational_reserve_margin`: reserve within fixed capacity where the unit does not dispatch"
     where: Generator_r AND NOT p AND NOT extendable
-    expression: Generator_r <= p_max_pu * capacity
+    expression: Generator_r <= p_max_pu * nom
   equity_min:
     dims: [scenario, bus]
     description: "`add_EQ_constraints` per node"
@@ -249,47 +249,47 @@ constraints:
     dims: [bus]
     description: "`add_solar_potential_constraints`"
     where: solar_potential_limit
-    expression: sum(nom * solar_potential_generator, over=entity) <= solar_potential_limit
+    expression: sum(capacity * solar_potential_generator, over=entity) <= solar_potential_limit
   TES_energy_to_power_ratio:
     dims: [entity]
     description: "`add_TES_energy_to_power_ratio_constraints`"
     where: tes_store_charger AND tes_energy_to_power_ratio
-    expression: nom - tes_energy_to_power_ratio * at(nom, by=tes_store_charger[partner]) == 0
+    expression: capacity - tes_energy_to_power_ratio * at(capacity, by=tes_store_charger[partner]) == 0
   TES_charger_ratio:
     dims: [entity]
     description: "`add_TES_charger_ratio_constraints`"
     where: tes_charger_discharger AND discharger_efficiency
-    expression: nom - discharger_efficiency * at(nom, by=tes_charger_discharger[partner]) == 0
+    expression: capacity - discharger_efficiency * at(capacity, by=tes_charger_discharger[partner]) == 0
   Link_charger_ratio:
     dims: [entity]
     description: "`add_battery_constraints`"
     where: battery_charger_discharger AND discharger_efficiency
-    expression: nom - discharger_efficiency * at(nom, by=battery_charger_discharger[partner]) == 0
+    expression: capacity - discharger_efficiency * at(capacity, by=battery_charger_discharger[partner]) == 0
   Link_bidirectional_sync:
     dims: [entity]
     description: "`add_lossy_bidirectional_link_constraints`"
     where: reversed_forward
-    expression: nom - at(nom, by=reversed_forward[partner]) == 0
+    expression: capacity - at(capacity, by=reversed_forward[partner]) == 0
   Link_pipe_retrofit:
     dims: [entity]
     description: "`add_pipe_retrofit_constraint`"
     where: pipe_retrofit AND pipe_retrofit_ch4_per_h2
-    expression: nom + pipe_retrofit_ch4_per_h2 * at(nom, by=pipe_retrofit[partner]) == capacity
+    expression: capacity + pipe_retrofit_ch4_per_h2 * at(capacity, by=pipe_retrofit[partner]) == nom
   upper_bound_charging_capacity_of_geothermal_reservoir:
     dims: [entity]
     description: "`add_flexible_egs_constraint`"
     where: egs_storage_well
-    expression: nom - at(nom, by=egs_storage_well[partner]) <= 0
+    expression: capacity - at(capacity, by=egs_storage_well[partner]) <= 0
   gas_retrofit:
     dims: [scenario, snapshot, entity]
     description: "`add_retrofit_gas_boiler_constraint`, where both boilers dispatch"
     where: gas_retrofit AND gas_retrofit_heat_load AND p AND at(p, by=gas_retrofit[partner])
-    expression: p + at(p, by=gas_retrofit[partner]) == capacity * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+    expression: p + at(p, by=gas_retrofit[partner]) == nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
   gas_retrofit_alone:
     dims: [scenario, snapshot, entity]
     description: "`add_retrofit_gas_boiler_constraint`, where the H2 boiler does not dispatch"
     where: gas_retrofit AND gas_retrofit_heat_load AND p AND NOT at(p, by=gas_retrofit[partner])
-    expression: p == capacity * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+    expression: p == nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
   import_limit_upper_constraint:
     dims: [scenario]
     description: "`add_import_limit_constraint`"

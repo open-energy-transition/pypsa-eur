@@ -18,7 +18,7 @@ description: >-
 
 given:
   variables:
-    nom: {dims: [entity]}
+    capacity: {dims: [entity]}
     p: {dims: [scenario, snapshot, entity]}
     e: {dims: [scenario, snapshot, entity]}
   parameters:
@@ -227,11 +227,11 @@ expressions:
     expression: sum((glc_output + glc_drawdown) * msw_limit_carrier, over=carrier)
   glc_volume_horizon:
     dims: [carrier]
-    expression: sum(nom * length * glc_branch_horizon, over=entity, by=entity_carrier[carrier])
+    expression: sum(capacity * length * glc_branch_horizon, over=entity, by=entity_carrier[carrier])
   glc_cost_horizon:
     dims: [carrier]
     expression: >-
-      sum(nom * capital_cost * sum(capital_weight, over=period) * glc_branch_horizon,
+      sum(capacity * capital_cost * sum(capital_weight, over=period) * glc_branch_horizon,
       over=entity, by=entity_carrier[carrier])
 
 constraints:
