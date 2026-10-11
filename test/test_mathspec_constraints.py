@@ -33,6 +33,7 @@ def network() -> pypsa.Network:
     n.investment_period_weightings.loc[:, "objective"] = [10.0, 7.0]
     n.add("Carrier", ["AC", "gas", "solar", "solar-hsat", "co2", "battery", "hydro"])
     n.add("Carrier", ["battery charger", "battery discharger", "H2 pipeline", "H2"])
+    n.add("Carrier", "co2 sequestered")
     n.carriers.loc["gas", ["co2_emissions", "gas_usage"]] = [0.2, 1.0]
     n.carriers.loc["co2", "co2_emissions"] = -1.0
     n.add("Bus", ["b0", "b1"], carrier="AC", country="DE")
@@ -159,20 +160,11 @@ def network() -> pypsa.Network:
     )
     n.add(
         "GlobalConstraint",
-        "hydro limit",
+        "co2_sequestration_limit-2040",
         type="operational_limit",
-        carrier_attribute="hydro",
-        sense="<=",
-        constant=1e3,
-        investment_period=2040,
-    )
-    n.add(
-        "GlobalConstraint",
-        "solar cap",
-        type="tech_capacity_expansion_limit",
-        carrier_attribute="solar",
-        sense="<=",
-        constant=1e3,
+        carrier_attribute="co2 sequestered",
+        sense=">=",
+        constant=-1e3,
         investment_period=2040,
     )
     add_land_use_constraint(n)
@@ -208,14 +200,15 @@ SWITCHES = {
     "defaults": (
         {},
         {
-            "global_constraint_period_constant",
+            "co2_atmosphere_upper",
+            "co2_budget_upper",
             "battery_charger_discharger",
             "reversed_forward",
             "solar_potential_generator",
             "solar_potential_limit",
             "land_use_limit",
             "growth_first",
-            "glc_branch_period",
+            "glc_branch_horizon",
         },
     ),
     "BAU": ({"BAU": True}, {"bau_mincapacity", "bau_generator"}),
@@ -261,39 +254,18 @@ def test_constraint_data_binds_to_the_static_math(
     assert expected <= set(data)
 
 
-def test_global_constraints_collapse_by_family(mc, network: pypsa.Network) -> None:
+def test_global_constraints_set_one_limit_per_kind_and_sense(
+    mc, network: pypsa.Network
+) -> None:
     data = mc.global_constraint_data(network)
-    assert data["global_constraint_type"].to_dict() == {
-        "CO2Limit-upper": "co2_atmosphere",
-        "CO2Budget": "Co2Budget",
-        "GasLimit": "primary_energy",
-        "lv_limit": "transmission_volume_expansion_limit",
-        "lc_limit": "transmission_expansion_cost_limit",
-        "hydro limit": "operational_limit",
-        "solar cap": "tech_capacity_expansion_limit",
-    }
-    assert data["global_constraint_period_constant"].to_dict() == {
-        ("CO2Limit-upper", 2030): 1000.0,
-        ("CO2Limit-upper", 2040): 500.0,
-        ("CO2Budget", 2040): 1e4,
-        ("hydro limit", 2040): 1e3,
-        ("solar cap", 2040): 1e3,
-    }
-    assert data["global_constraint_constant"].to_dict() == {
-        "GasLimit": 1e5,
-        "lv_limit": 1e4,
-        "lc_limit": 1e6,
-    }
-    assert data["global_constraint_carrier_attribute"].to_dict() == {
-        "GasLimit": "gas_usage"
-    }
-    carriers = data["global_constraint_carrier"]
-    assert set(map(tuple, carriers.values)) == {
-        ("lv_limit", "AC"),
-        ("lc_limit", "AC"),
-        ("hydro limit", "hydro"),
-        ("solar cap", "solar"),
-    }
+    assert data["co2_atmosphere_upper"].to_dict() == {2030: 1000.0, 2040: 500.0}
+    assert data["co2_budget_upper"].to_dict() == {2040: 1e4}
+    assert data["co2_sequestration_limit_lower"].to_dict() == {2040: -1e3}
+    assert data["gas_limit_horizon_upper"] == 1e5
+    assert data["transmission_volume_limit_horizon_upper"] == 1e4
+    assert data["transmission_cost_limit_horizon_upper"] == 1e6
+    assert data["transmission_volume_limit_carrier"].to_dict() == {"AC": 1}
+    assert data["co2_sequestration_limit_carrier"].to_dict() == {"co2 sequestered": 1}
 
 
 def test_battery_pairs_carry_the_discharger_efficiency(
@@ -315,13 +287,24 @@ def test_battery_pairs_carry_the_discharger_efficiency(
     [
         {"name": "odd", "type": "odd_type"},
         {
-            "name": "CO2Limit-upper-2030",
+            "name": "solar cap",
+            "type": "tech_capacity_expansion_limit",
+            "carrier_attribute": "solar",
+        },
+        {
+            "name": "co2 limit-equal",
             "type": "co2_atmosphere",
-            "sense": ">=",
+            "sense": "==",
             "investment_period": 2030,
         },
+        {
+            "name": "CO2Limit-upper-2040-again",
+            "type": "co2_atmosphere",
+            "sense": "<=",
+            "investment_period": 2040,
+        },
     ],
-    ids=["unknown type", "family with two senses"],
+    ids=["unknown type", "tech capacity", "co2 equal", "co2 twice"],
 )
 def test_untranslatable_global_constraint_raises(
     mc, network: pypsa.Network, glc: dict
@@ -331,8 +314,7 @@ def test_untranslatable_global_constraint_raises(
         "GlobalConstraint",
         glc.pop("name"),
         constant=1.0,
-        carrier_attribute="co2_emissions",
-        **glc,
+        **{"carrier_attribute": "co2_emissions", **glc},
     )
     with pytest.raises(mc.UnsupportedConstraintError):
         mc.global_constraint_data(network)

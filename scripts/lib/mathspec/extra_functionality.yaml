@@ -160,8 +160,9 @@ parameters:
     dims: [entity]
     missing: absent
     description: what one unit of flow of an import generator or link counts toward the import limit
-  import_limit: {dims: [], missing: absent, description: "`sector.imports.limit` over the modelled years"}
-  import_limit_sense: {dims: [], dtype: str, missing: absent, description: "`sector.imports.limit_sense`"}
+  import_limit_upper: {dims: [], missing: absent, description: "`sector.imports.limit` over the modelled years, where `limit_sense` is `<=`"}
+  import_limit_lower: {dims: [], missing: absent, description: "`sector.imports.limit` over the modelled years, where `limit_sense` is `>=`"}
+  import_limit_equal: {dims: [], missing: absent, description: "`sector.imports.limit` over the modelled years, where `limit_sense` is `==`"}
 
 expressions:
   land_use_capacity:
@@ -289,18 +290,18 @@ constraints:
     description: "`add_retrofit_gas_boiler_constraint`, where the H2 boiler does not dispatch"
     where: gas_retrofit AND gas_retrofit_heat_load AND p AND NOT at(p, by=gas_retrofit[partner])
     expression: p == nominal * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
-  import_limit_upper:
+  import_limit_upper_constraint:
     dims: [scenario]
     description: "`add_import_limit_constraint`"
-    where: "import_limit AND import_limit_sense == '<='"
-    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) <= import_limit
-  import_limit_lower:
+    where: import_limit_upper
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) <= import_limit_upper
+  import_limit_lower_constraint:
     dims: [scenario]
     description: "`add_import_limit_constraint`"
-    where: "import_limit AND import_limit_sense == '>='"
-    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) >= import_limit
-  import_limit_equal:
+    where: import_limit_lower
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) >= import_limit_lower
+  import_limit_equal_constraint:
     dims: [scenario]
     description: "`add_import_limit_constraint`"
-    where: "import_limit AND import_limit_sense == '=='"
-    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) == import_limit
+    where: import_limit_equal
+    expression: sum(p * import_weight * snapshot_weighting_generators, over=[snapshot, entity]) == import_limit_equal

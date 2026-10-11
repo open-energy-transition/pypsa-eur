@@ -34,8 +34,21 @@ from scripts.solve_network import emission_stores, get_glc_sense
 MATH = Path(__file__).with_name("mathspec")
 SPECS = (MATH / "global_constraints.yaml", MATH / "extra_functionality.yaml")
 DTYPES = {"float": nw.Float64, "int": nw.Int64, "bool": nw.Boolean, "str": nw.String}
-PERIOD_TYPES = {"co2_atmosphere", "Co2Budget"}
-PRIMARY_ENERGY_ATTRIBUTES = {"co2_emissions", "gas_usage"}
+BOUNDS = {"<=": "upper", ">=": "lower", "==": "equal"}
+KINDS = {
+    ("primary_energy", "co2_emissions"): "co2_limit",
+    ("primary_energy", "gas_usage"): "gas_limit",
+    ("co2_atmosphere", "co2_emissions"): "co2_atmosphere",
+    ("Co2Budget", "co2_emissions"): "co2_budget",
+    ("operational_limit", "co2 sequestered"): "co2_sequestration_limit",
+    ("operational_limit", "solid biomass"): "biomass_limit",
+    ("operational_limit", "unsustainable solid biomass"): "unsustainable_biomass_limit",
+    ("operational_limit", "municipal solid waste"): "msw_limit",
+}
+TRANSMISSION_KINDS = {
+    "transmission_volume_expansion_limit": "transmission_volume_limit",
+    "transmission_expansion_cost_limit": "transmission_cost_limit",
+}
 CAPACITY_TYPES = ["Generator", "Line", "Transformer", "Link", "Store", "StorageUnit"]
 ONE_PORT_TYPES = ["Generator", "StorageUnit", "Store"]
 
@@ -229,23 +242,6 @@ def _require_multi_period(n: pypsa.Network) -> None:
         )
 
 
-def _family(name: str, glc: pd.Series) -> str:
-    period = glc.investment_period
-    if pd.isna(period):
-        return name
-    return name.removesuffix(f"-{int(period)}")
-
-
-def _unique(families: pd.DataFrame, column: str) -> pd.Series:
-    values = families.groupby("family")[column].unique()
-    mixed = values.index[values.map(len) > 1]
-    if not mixed.empty:
-        raise UnsupportedConstraintError(
-            f"Global constraint families {list(mixed)} mix values of {column}."
-        )
-    return values.str[0]
-
-
 def _storage_check(n: pypsa.Network, carriers: Iterable[str]) -> None:
     for c, cyclic, per_period in (
         (n.c.stores, "e_cyclic", "e_initial_per_period"),
@@ -274,88 +270,84 @@ def _transmission_carriers(attribute: str) -> list[str]:
     return [re.sub(r"[\[\]\(\)]", "", c.strip()) for c in attribute.split(",")]
 
 
+def _glc_kind(name: str, glc: pd.Series) -> tuple[str, list[str]]:
+    """The constraint a row of ``n.global_constraints`` is, and the carriers it selects."""
+    if glc.type in TRANSMISSION_KINDS:
+        return TRANSMISSION_KINDS[glc.type], _transmission_carriers(
+            glc.carrier_attribute
+        )
+    kind = KINDS.get((glc.type, glc.carrier_attribute))
+    if kind is None:
+        raise UnsupportedConstraintError(
+            f"Global constraint {name} of type {glc.type} on {glc.carrier_attribute!r} "
+            "has no mathspec translation."
+        )
+    selects = glc.type == "operational_limit"
+    return kind, [glc.carrier_attribute] if selects else []
+
+
 def global_constraint_data(n: pypsa.Network) -> Data:
-    """Every row of ``n.global_constraints``, collapsed into families."""
+    """
+    The limits of ``n.global_constraints``, one parameter per constraint and sense.
+
+    A row binding per investment period sets ``<kind>_<bound>[period]``, one over
+    the horizon ``<kind>_horizon_<bound>``, the bound being the row's sense.
+    A constraint that selects carriers reads them from ``<kind>_carrier``.
+    """
     _require_multi_period(n)
-    glcs = n.global_constraints.copy()
+    glcs = n.global_constraints
     if glcs.empty:
         return {}
-    known = PERIOD_TYPES | {
-        "primary_energy",
-        "operational_limit",
-        "transmission_volume_expansion_limit",
-        "transmission_expansion_cost_limit",
-        "tech_capacity_expansion_limit",
-    }
-    unknown = set(glcs.type) - known
-    if unknown:
-        raise UnsupportedConstraintError(
-            f"No mathspec translation for global constraint types {sorted(unknown)}."
-        )
-    glcs["sense"] = [get_glc_sense(glc) for _, glc in glcs.iterrows()]
-    glcs["family"] = [_family(name, glc) for name, glc in glcs.iterrows()]
-    glcs["per_period"] = glcs.investment_period.notna()
-    types = _unique(glcs, "type")
-    senses = _unique(glcs, "sense")
-    attributes = _unique(glcs, "carrier_attribute")
-    _unique(glcs, "per_period")
-    per_period = glcs[glcs.per_period]
-    horizon = glcs[~glcs.per_period]
-    if not per_period.investment_period.isin(n.investment_periods).all():
-        raise UnsupportedConstraintError(
-            "Global constraints name investment periods the network does not have."
-        )
-    needs_period = horizon.family[horizon.type.isin(PERIOD_TYPES)]
-    if not needs_period.empty:
-        raise ValueError(
-            f"Global constraints {list(needs_period)} need an investment period."
-        )
-    primary = attributes[types == "primary_energy"]
-    odd = primary[~primary.isin(PRIMARY_ENERGY_ATTRIBUTES)]
-    if not odd.empty:
-        raise UnsupportedConstraintError(
-            f"Primary energy limits {list(odd.index)} weight carriers by {list(odd)}; "
-            f"the math reads {sorted(PRIMARY_ENERGY_ATTRIBUTES)}."
-        )
-    co2 = attributes[types.isin(PERIOD_TYPES)]
-    if not co2.eq("co2_emissions").all():
-        raise UnsupportedConstraintError(
-            f"CO2 limits {list(co2.index)} must weight by co2_emissions."
-        )
-    if not co2.empty:
+    declared = _declarations()["parameters"]
+    limits: dict[str, dict[int | None, float]] = {}
+    selections: dict[str, list[str]] = {}
+    for name, glc in glcs.iterrows():
+        kind, carriers = _glc_kind(name, glc)
+        bound = BOUNDS[get_glc_sense(glc)]
+        per_period = pd.notna(glc.investment_period)
+        parameter = f"{kind}_{bound}" if per_period else f"{kind}_horizon_{bound}"
+        if parameter not in declared:
+            raise UnsupportedConstraintError(
+                f"Global constraint {name} would set '{parameter}', which no static "
+                "math declares."
+            )
+        period = int(glc.investment_period) if per_period else None
+        if per_period and period not in n.investment_periods:
+            raise UnsupportedConstraintError(
+                f"Global constraint {name} names period {period}, which the network does not have."
+            )
+        if period in limits.setdefault(parameter, {}):
+            raise UnsupportedConstraintError(
+                f"Global constraints set '{parameter}' twice for {period}."
+            )
+        limits[parameter][period] = float(glc.constant)
+        if carriers and selections.setdefault(kind, carriers) != carriers:
+            raise UnsupportedConstraintError(
+                f"Global constraints of '{kind}' select different carriers."
+            )
+    kinds = {_glc_kind(name, glc)[0] for name, glc in glcs.iterrows()}
+    if kinds & {"co2_atmosphere", "co2_budget"}:
         emitting = n.carriers.co2_emissions[n.carriers.co2_emissions != 0].index
         emission_stores(n, emitting)
-    for attribute in primary.unique():
-        weights = n.carriers[attribute]
-        _storage_check(n, weights[weights.fillna(0) != 0].index)
-    _storage_check(n, attributes[types == "operational_limit"])
-    per_bus = glcs.bus.fillna("").ne("") if "bus" in glcs else False
-    capacity = glcs[(glcs.type == "tech_capacity_expansion_limit") & per_bus]
-    if not capacity.empty:
-        raise UnsupportedConstraintError(
-            f"Capacity limits {list(capacity.index)} per bus have no mathspec translation."
+    for kind, attribute in (("co2_limit", "co2_emissions"), ("gas_limit", "gas_usage")):
+        if kind in kinds:
+            weights = n.carriers[attribute]
+            _storage_check(n, weights[weights.fillna(0) != 0].index)
+    for carriers in selections.values():
+        _storage_check(n, carriers)
+    data: Data = {
+        parameter: values[None]
+        if None in values
+        else pd.Series(values).rename_axis("period")
+        for parameter, values in limits.items()
+    }
+    data |= {
+        f"{kind}_carrier": _ones(
+            pd.Index([c for c in carriers if c in n.carriers.index], name="carrier")
         )
-    selecting = types.index[~types.isin(PERIOD_TYPES | {"primary_energy"})]
-    carriers = pd.DataFrame(
-        [
-            (family, carrier)
-            for family in selecting
-            for carrier in _transmission_carriers(attributes[family])
-            if carrier in n.carriers.index
-        ],
-        columns=["global_constraint", "carrier"],
-    )
-    return {
-        "global_constraint": types.index,
-        "global_constraint_type": types,
-        "global_constraint_sense": senses,
-        "global_constraint_carrier_attribute": primary,
-        "global_constraint_constant": horizon.set_index("family").constant,
-        "global_constraint_period_constant": per_period.set_index(
-            ["family", per_period.investment_period.astype(int).rename("period")]
-        ).constant.rename_axis(["global_constraint", "period"]),
-        "global_constraint_carrier": carriers,
-    } | global_constraint_weights(n)
+        for kind, carriers in selections.items()
+    }
+    return data | global_constraint_weights(n)
 
 
 def global_constraint_weights(n: pypsa.Network) -> Data:
@@ -367,7 +359,6 @@ def global_constraint_weights(n: pypsa.Network) -> Data:
         )
     extendable = _standing(n).loc[_extendable(n)]
     branches = extendable[extendable.index.isin(n.lines.index.union(n.links.index))]
-    active = pd.concat([c.static.active for c in n.components[CAPACITY_TYPES]])
     years = n.investment_period_weightings.years
     stores, units = n.stores, n.storage_units
     final_stores = stores.index[
@@ -386,10 +377,7 @@ def global_constraint_weights(n: pypsa.Network) -> Data:
         "glc_store_final": _period_ends(n, final_stores, years),
         "glc_storage_unit_final": _period_ends(n, final_units, years),
         "glc_co2_store": _period_ends(n, co2_stores, _ones(years.index)),
-        "glc_branch_period": _indicator(branches),
         "glc_branch_horizon": _ones(branches.index[branches.any(axis=1)]),
-        "glc_extendable_period": _indicator(extendable),
-        "glc_extendable_horizon": _ones(extendable.index[active[extendable.index]]),
     }
 
 
@@ -661,8 +649,9 @@ def import_limit_constraint(n: pypsa.Network, config: Mapping[str, Any]) -> Data
         "import_weight": pd.concat(
             [pd.Series(1.0, index=gens), n.links.efficiency[links]]
         ),
-        "import_limit": float(limit * 1e6 * nyears),
-        "import_limit_sense": "==" if sense == "=" else sense,
+        f"import_limit_{BOUNDS['==' if sense == '=' else sense]}": float(
+            limit * 1e6 * nyears
+        ),
     }
 
 

@@ -3,16 +3,15 @@
 # SPDX-License-Identifier: MIT
 
 description: >-
-  The global constraints of a PyPSA-Eur network, collapsed by family: one
-  `global_constraint` label per family, a limit per period where the family
-  binds per investment period (`global_constraint_period_constant`) and one
-  limit where it binds over the horizon (`global_constraint_constant`). The
-  type, sense and carrier selection of a family are attributes of its label;
-  the weight of a carrier is an attribute of the carrier dim. Translated from
-  PyPSA's `define_primary_energy_limit`, `define_operational_limit`,
-  `define_transmission_volume_expansion_limit`,
-  `define_transmission_expansion_cost_limit` and
-  `define_tech_capacity_expansion_limit`, and from PyPSA-Eur's
+  The global constraints of a PyPSA-Eur network. Each kind of global
+  constraint and each sense is a constraint of its own, which binds where the
+  record holds its limit: `<kind>_<bound>` over `period` for a constraint per
+  investment period, `<kind>_horizon_<bound>` for one over the horizon. A
+  constraint that selects carriers reads them from `<kind>_carrier`, and the
+  carrier weights are the carrier attributes `co2_emissions` and `gas_usage`.
+  Translated from PyPSA's `define_primary_energy_limit`,
+  `define_operational_limit`, `define_transmission_volume_expansion_limit` and
+  `define_transmission_expansion_cost_limit`, and from PyPSA-Eur's
   `solve_network.add_carbon_constraint` (`co2_atmosphere`) and
   `add_carbon_budget_constraint` (`Co2Budget`). Composes onto
   `pypsa.mathspec.yaml`.
@@ -40,39 +39,103 @@ dimensions:
   entity: {}
   bus: {}
   carrier: {}
-  global_constraint:
-    description: a family of PyPSA global constraints, one per name less its period suffix
 
 relations:
   snapshot_period: {key: snapshot, values: period}
   entity_carrier: {key: entity, values: carrier, missing: absent}
   bus_carrier: {key: bus, values: carrier, missing: absent}
-  global_constraint_carrier:
-    key: [global_constraint, carrier]
-    description: the carriers a family selects (`carrier_attribute` of an operational, transmission or capacity limit)
 
 parameters:
-  global_constraint_type:
-    dims: [global_constraint]
-    dtype: str
-    description: "`type` of the family's `GlobalConstraint` rows"
-  global_constraint_sense:
-    dims: [global_constraint]
-    dtype: str
-    description: "`sense` of the family's rows: `<=`, `>=` or `==`"
-  global_constraint_carrier_attribute:
-    dims: [global_constraint]
-    dtype: str
+  co2_limit_upper:
+    dims: [period]
     missing: absent
-    description: the carrier attribute a primary energy limit weights carriers by
-  global_constraint_constant:
-    dims: [global_constraint]
+    description: "the upper limit of PyPSA's `primary_energy` limit on CO2 (`co2_emissions`) in each investment period"
+  co2_limit_lower:
+    dims: [period]
     missing: absent
-    description: the limit of a family that binds over the horizon
-  global_constraint_period_constant:
-    dims: [global_constraint, period]
+    description: "the lower limit of PyPSA's `primary_energy` limit on CO2 (`co2_emissions`) in each investment period"
+  co2_limit_horizon_upper:
+    dims: []
     missing: absent
-    description: the limit of a family in each investment period it binds in
+    description: "the upper limit of PyPSA's `primary_energy` limit on CO2 (`co2_emissions`) over the horizon"
+  co2_limit_horizon_lower:
+    dims: []
+    missing: absent
+    description: "the lower limit of PyPSA's `primary_energy` limit on CO2 (`co2_emissions`) over the horizon"
+  gas_limit_horizon_upper:
+    dims: []
+    missing: absent
+    description: "the upper limit of PyPSA's `primary_energy` limit on gas (`gas_usage`, `GasLimit`) over the horizon"
+  co2_atmosphere_upper:
+    dims: [period]
+    missing: absent
+    description: "the upper limit of `solve_network.add_carbon_constraint`: the change of the CO2 stores over a period (`co2_atmosphere`) in each investment period"
+  co2_atmosphere_lower:
+    dims: [period]
+    missing: absent
+    description: "the lower limit of `solve_network.add_carbon_constraint`: the change of the CO2 stores over a period (`co2_atmosphere`) in each investment period"
+  co2_budget_upper:
+    dims: [period]
+    missing: absent
+    description: "the upper limit of `solve_network.add_carbon_budget_constraint`: the CO2 stores at the end of a period, times its years (`Co2Budget`) in each investment period"
+  co2_budget_lower:
+    dims: [period]
+    missing: absent
+    description: "the lower limit of `solve_network.add_carbon_budget_constraint`: the CO2 stores at the end of a period, times its years (`Co2Budget`) in each investment period"
+  co2_sequestration_limit_lower:
+    dims: [period]
+    missing: absent
+    description: "the lower limit of `solve_network.add_co2_sequestration_limit`: PyPSA's operational limit on `co2 sequestered` in each investment period"
+  biomass_limit_horizon_upper:
+    dims: []
+    missing: absent
+    description: "the upper limit of PyPSA's operational limit on `solid biomass` (`biomass limit`) over the horizon"
+  unsustainable_biomass_limit_horizon_equal:
+    dims: []
+    missing: absent
+    description: "the equal limit of PyPSA's operational limit on `unsustainable solid biomass` over the horizon"
+  msw_limit_horizon_equal:
+    dims: []
+    missing: absent
+    description: "the equal limit of PyPSA's operational limit on `municipal solid waste` (`msw limit`) over the horizon"
+  transmission_volume_limit_horizon_upper:
+    dims: []
+    missing: absent
+    description: "the upper limit of PyPSA's `transmission_volume_expansion_limit` (`lv_limit`) over the horizon"
+  transmission_cost_limit_horizon_upper:
+    dims: []
+    missing: absent
+    description: "the upper limit of PyPSA's `transmission_expansion_cost_limit` (`lc_limit`) over the horizon"
+  co2_sequestration_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that `solve_network.add_co2_sequestration_limit`: PyPSA's operational limit on `co2 sequestered` selects"
+  biomass_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that PyPSA's operational limit on `solid biomass` (`biomass limit`) selects"
+  unsustainable_biomass_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that PyPSA's operational limit on `unsustainable solid biomass` selects"
+  msw_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that PyPSA's operational limit on `municipal solid waste` (`msw limit`) selects"
+  transmission_volume_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that PyPSA's `transmission_volume_expansion_limit` (`lv_limit`) selects"
+  transmission_cost_limit_carrier:
+    dims: [carrier]
+    dtype: int
+    missing: 0
+    description: "1 for a carrier that PyPSA's `transmission_expansion_cost_limit` (`lc_limit`) selects"
   glc_generator: {dims: [entity], dtype: int, missing: 0, description: 1 for a generator}
   glc_generator_fuel:
     dims: [entity]
@@ -95,26 +158,11 @@ parameters:
     dtype: int
     missing: 0
     description: 1 at the last snapshot of each period for a non-cyclic store on a bus of an emitting carrier
-  glc_branch_period:
-    dims: [entity, period]
-    dtype: int
-    missing: 0
-    description: 1 for an extendable line or link in each period it stands in
   glc_branch_horizon:
     dims: [entity]
     dtype: int
     missing: 0
     description: 1 for an extendable line or link that stands in some period
-  glc_extendable_period:
-    dims: [entity, period]
-    dtype: int
-    missing: 0
-    description: 1 for an extendable entity in each period it stands in
-  glc_extendable_horizon:
-    dims: [entity]
-    dtype: int
-    missing: 0
-    description: 1 for an active extendable entity
 
 expressions:
   glc_period_weight:
@@ -147,103 +195,118 @@ expressions:
     dims: [scenario, period]
     description: the level of the stores on emission buses at the end of a period
     expression: sum(sum(e * glc_co2_store, over=entity), over=snapshot, by=snapshot_period[period])
-  glc_volume:
-    dims: [carrier, period]
-    expression: sum(nom * length * glc_branch_period, over=entity, by=entity_carrier[carrier])
+  glc_co2_emitted:
+    dims: [scenario, period]
+    description: the CO2 the generators and the storage drawdown emit in a period
+    expression: sum((glc_fuel + glc_drawdown) * co2_emissions, over=carrier)
+  glc_gas_used:
+    dims: [scenario, period]
+    description: the gas the generators and the storage drawdown use in a period
+    expression: sum((glc_fuel + glc_drawdown) * gas_usage, over=carrier)
+  glc_co2_change:
+    dims: [scenario, period]
+    expression: glc_co2_level - shift(glc_co2_level, along=period, offset=1, edge=0)
+  glc_co2_budget:
+    dims: [scenario, period]
+    expression: glc_co2_level * period_weighting_years
+  glc_co2_sequestration_limit_use:
+    dims: [scenario, period]
+    description: what the generators and the storage drawdown of the carriers of `co2_sequestration_limit` give in a period
+    expression: sum((glc_output + glc_drawdown) * co2_sequestration_limit_carrier, over=carrier)
+  glc_biomass_limit_use:
+    dims: [scenario, period]
+    description: what the generators and the storage drawdown of the carriers of `biomass_limit` give in a period
+    expression: sum((glc_output + glc_drawdown) * biomass_limit_carrier, over=carrier)
+  glc_unsustainable_biomass_limit_use:
+    dims: [scenario, period]
+    description: what the generators and the storage drawdown of the carriers of `unsustainable_biomass_limit` give in a period
+    expression: sum((glc_output + glc_drawdown) * unsustainable_biomass_limit_carrier, over=carrier)
+  glc_msw_limit_use:
+    dims: [scenario, period]
+    description: what the generators and the storage drawdown of the carriers of `msw_limit` give in a period
+    expression: sum((glc_output + glc_drawdown) * msw_limit_carrier, over=carrier)
   glc_volume_horizon:
     dims: [carrier]
     expression: sum(nom * length * glc_branch_horizon, over=entity, by=entity_carrier[carrier])
-  glc_cost:
-    dims: [carrier, period]
-    expression: sum(nom * capital_cost * glc_branch_period, over=entity, by=entity_carrier[carrier])
   glc_cost_horizon:
     dims: [carrier]
     expression: >-
       sum(nom * capital_cost * sum(capital_weight, over=period) * glc_branch_horizon,
       over=entity, by=entity_carrier[carrier])
-  glc_capacity:
-    dims: [carrier, period]
-    expression: sum(nom * glc_extendable_period, over=entity, by=entity_carrier[carrier])
-  glc_capacity_horizon:
-    dims: [carrier]
-    expression: sum(nom * glc_extendable_horizon, over=entity, by=entity_carrier[carrier])
-  glc_period_total:
-    dims: [scenario, global_constraint, period]
-    description: the left-hand side of a family in one investment period
-    cases:
-      primary_energy_co2:
-        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'co2_emissions'"
-        expression: sum((glc_fuel + glc_drawdown) * co2_emissions, over=carrier)
-      primary_energy_gas:
-        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'gas_usage'"
-        expression: sum((glc_fuel + glc_drawdown) * gas_usage, over=carrier)
-      operational_limit:
-        when: "global_constraint_type == 'operational_limit'"
-        expression: sum(glc_output + glc_drawdown, over=carrier, by=global_constraint_carrier[global_constraint])
-      transmission_volume:
-        when: "global_constraint_type == 'transmission_volume_expansion_limit'"
-        expression: sum(glc_volume, over=carrier, by=global_constraint_carrier[global_constraint])
-      transmission_cost:
-        when: "global_constraint_type == 'transmission_expansion_cost_limit'"
-        expression: sum(glc_cost, over=carrier, by=global_constraint_carrier[global_constraint])
-      tech_capacity:
-        when: "global_constraint_type == 'tech_capacity_expansion_limit'"
-        expression: sum(glc_capacity, over=carrier, by=global_constraint_carrier[global_constraint])
-      co2_atmosphere:
-        when: "global_constraint_type == 'co2_atmosphere'"
-        expression: glc_co2_level - shift(glc_co2_level, along=period, offset=1, edge=0)
-      co2_budget:
-        when: "global_constraint_type == 'Co2Budget'"
-        expression: glc_co2_level * period_weighting_years
-    otherwise: 0
-  glc_horizon_total:
-    dims: [scenario, global_constraint]
-    description: the left-hand side of a family over the horizon
-    cases:
-      primary_energy_co2:
-        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'co2_emissions'"
-        expression: sum((glc_fuel + glc_drawdown) * co2_emissions, over=[carrier, period])
-      primary_energy_gas:
-        when: "global_constraint_type == 'primary_energy' AND global_constraint_carrier_attribute == 'gas_usage'"
-        expression: sum((glc_fuel + glc_drawdown) * gas_usage, over=[carrier, period])
-      operational_limit:
-        when: "global_constraint_type == 'operational_limit'"
-        expression: >-
-          sum(sum(glc_output + glc_drawdown, over=period),
-          over=carrier, by=global_constraint_carrier[global_constraint])
-      transmission_volume:
-        when: "global_constraint_type == 'transmission_volume_expansion_limit'"
-        expression: sum(glc_volume_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
-      transmission_cost:
-        when: "global_constraint_type == 'transmission_expansion_cost_limit'"
-        expression: sum(glc_cost_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
-      tech_capacity:
-        when: "global_constraint_type == 'tech_capacity_expansion_limit'"
-        expression: sum(glc_capacity_horizon, over=carrier, by=global_constraint_carrier[global_constraint])
-    otherwise: 0
 
 constraints:
-  GlobalConstraint_period_upper:
-    dims: [scenario, global_constraint, period]
-    where: "global_constraint_period_constant AND global_constraint_sense == '<='"
-    expression: glc_period_total <= global_constraint_period_constant
-  GlobalConstraint_period_lower:
-    dims: [scenario, global_constraint, period]
-    where: "global_constraint_period_constant AND global_constraint_sense == '>='"
-    expression: glc_period_total >= global_constraint_period_constant
-  GlobalConstraint_period_equal:
-    dims: [scenario, global_constraint, period]
-    where: "global_constraint_period_constant AND global_constraint_sense == '=='"
-    expression: glc_period_total == global_constraint_period_constant
-  GlobalConstraint_horizon_upper:
-    dims: [scenario, global_constraint]
-    where: "global_constraint_constant AND global_constraint_sense == '<='"
-    expression: glc_horizon_total <= global_constraint_constant
-  GlobalConstraint_horizon_lower:
-    dims: [scenario, global_constraint]
-    where: "global_constraint_constant AND global_constraint_sense == '>='"
-    expression: glc_horizon_total >= global_constraint_constant
-  GlobalConstraint_horizon_equal:
-    dims: [scenario, global_constraint]
-    where: "global_constraint_constant AND global_constraint_sense == '=='"
-    expression: glc_horizon_total == global_constraint_constant
+  GlobalConstraint_co2_limit_upper:
+    dims: [scenario, period]
+    description: PyPSA's `primary_energy` limit on CO2 (`co2_emissions`)
+    where: co2_limit_upper
+    expression: glc_co2_emitted <= co2_limit_upper
+  GlobalConstraint_co2_limit_lower:
+    dims: [scenario, period]
+    description: PyPSA's `primary_energy` limit on CO2 (`co2_emissions`)
+    where: co2_limit_lower
+    expression: glc_co2_emitted >= co2_limit_lower
+  GlobalConstraint_co2_limit_horizon_upper:
+    dims: [scenario]
+    description: PyPSA's `primary_energy` limit on CO2 (`co2_emissions`)
+    where: co2_limit_horizon_upper
+    expression: sum(glc_co2_emitted, over=period) <= co2_limit_horizon_upper
+  GlobalConstraint_co2_limit_horizon_lower:
+    dims: [scenario]
+    description: PyPSA's `primary_energy` limit on CO2 (`co2_emissions`)
+    where: co2_limit_horizon_lower
+    expression: sum(glc_co2_emitted, over=period) >= co2_limit_horizon_lower
+  GlobalConstraint_gas_limit_horizon_upper:
+    dims: [scenario]
+    description: PyPSA's `primary_energy` limit on gas (`gas_usage`, `GasLimit`)
+    where: gas_limit_horizon_upper
+    expression: sum(glc_gas_used, over=period) <= gas_limit_horizon_upper
+  GlobalConstraint_co2_atmosphere_upper:
+    dims: [scenario, period]
+    description: "`solve_network.add_carbon_constraint`: the change of the CO2 stores over a period (`co2_atmosphere`)"
+    where: co2_atmosphere_upper
+    expression: glc_co2_change <= co2_atmosphere_upper
+  GlobalConstraint_co2_atmosphere_lower:
+    dims: [scenario, period]
+    description: "`solve_network.add_carbon_constraint`: the change of the CO2 stores over a period (`co2_atmosphere`)"
+    where: co2_atmosphere_lower
+    expression: glc_co2_change >= co2_atmosphere_lower
+  GlobalConstraint_co2_budget_upper:
+    dims: [scenario, period]
+    description: "`solve_network.add_carbon_budget_constraint`: the CO2 stores at the end of a period, times its years (`Co2Budget`)"
+    where: co2_budget_upper
+    expression: glc_co2_budget <= co2_budget_upper
+  GlobalConstraint_co2_budget_lower:
+    dims: [scenario, period]
+    description: "`solve_network.add_carbon_budget_constraint`: the CO2 stores at the end of a period, times its years (`Co2Budget`)"
+    where: co2_budget_lower
+    expression: glc_co2_budget >= co2_budget_lower
+  GlobalConstraint_co2_sequestration_limit_lower:
+    dims: [scenario, period]
+    description: "`solve_network.add_co2_sequestration_limit`: PyPSA's operational limit on `co2 sequestered`"
+    where: co2_sequestration_limit_lower
+    expression: glc_co2_sequestration_limit_use >= co2_sequestration_limit_lower
+  GlobalConstraint_biomass_limit_horizon_upper:
+    dims: [scenario]
+    description: PyPSA's operational limit on `solid biomass` (`biomass limit`)
+    where: biomass_limit_horizon_upper
+    expression: sum(glc_biomass_limit_use, over=period) <= biomass_limit_horizon_upper
+  GlobalConstraint_unsustainable_biomass_limit_horizon_equal:
+    dims: [scenario]
+    description: PyPSA's operational limit on `unsustainable solid biomass`
+    where: unsustainable_biomass_limit_horizon_equal
+    expression: sum(glc_unsustainable_biomass_limit_use, over=period) == unsustainable_biomass_limit_horizon_equal
+  GlobalConstraint_msw_limit_horizon_equal:
+    dims: [scenario]
+    description: PyPSA's operational limit on `municipal solid waste` (`msw limit`)
+    where: msw_limit_horizon_equal
+    expression: sum(glc_msw_limit_use, over=period) == msw_limit_horizon_equal
+  GlobalConstraint_transmission_volume_limit_horizon_upper:
+    dims: []
+    description: PyPSA's `transmission_volume_expansion_limit` (`lv_limit`)
+    where: transmission_volume_limit_horizon_upper
+    expression: sum(glc_volume_horizon * transmission_volume_limit_carrier, over=carrier) <= transmission_volume_limit_horizon_upper
+  GlobalConstraint_transmission_cost_limit_horizon_upper:
+    dims: []
+    description: PyPSA's `transmission_expansion_cost_limit` (`lc_limit`)
+    where: transmission_cost_limit_horizon_upper
+    expression: sum(glc_cost_horizon * transmission_cost_limit_carrier, over=carrier) <= transmission_cost_limit_horizon_upper
