@@ -95,14 +95,16 @@ def test_assign_technology_groups():
     n.generators.loc["cand", "p_nom_extendable"] = True
     n.add("Generator", "est", bus="b", carrier="solar", asset_status="estimate")
     n.add("Link", "l", bus0="b", bus1="b", carrier="DC")
+    n.add("Store", "s", bus="b", carrier="solar")
 
     assign_technology_groups(n)
 
     assert n.generators.technology_group.to_dict() == {
-        "unit": "onwind class1",
-        "cand": "onwind class2",
-        "est": "solar",
+        "unit": "onwind",
+        "cand": "onwind",
+        "est": "solar (Generator)",
     }
+    assert n.stores.technology_group.to_dict() == {"s": "solar (Store)"}
     assert n.generators.asset_status.to_dict() == {
         "unit": "existing",
         "cand": "candidate",

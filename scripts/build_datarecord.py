@@ -139,6 +139,18 @@ def add_zero_gas_usage(n: pypsa.Network) -> None:
         n.carriers["gas_usage"] = 0.0
 
 
+def drop_land_use_columns(n: pypsa.Network) -> None:
+    """
+    Drop the ``nom_max_{carrier}_{period}`` bus columns of the land-use limit.
+
+    ``land_use_check`` confirms they hold the limit that the math states from
+    ``land_use_limit``, which carries the period as a dim.
+    """
+    n.buses.drop(
+        columns=n.buses.columns[n.buses.columns.str.startswith("nom_")], inplace=True
+    )
+
+
 def export_datarecord(
     n: pypsa.Network,
     config: dict,
@@ -146,8 +158,9 @@ def export_datarecord(
     output: Path,
 ) -> None:
     """Write the record with the constraint data, copy the static math, then check them."""
-    base = PyPSA.to_datarecord(n)
     data = constraint_data(n, config, custom_extra_functionality)
+    drop_land_use_columns(n)
+    base = PyPSA.to_datarecord(n)
     record = combine(base, extension(data, base.schema))
     con = connect()
     write_record(None, record, con, uri=str(output / "record"))

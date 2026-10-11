@@ -22,9 +22,8 @@ given:
     nom: {dims: [entity]}
     p: {dims: [scenario, snapshot, entity]}
     e: {dims: [scenario, snapshot, entity]}
-  expressions:
-    capital_weight: {dims: [entity, period]}
   parameters:
+    capital_weight: {dims: [entity, period]}
     period_weighting_years: {dims: [period]}
     snapshot_weighting_generators: {dims: [snapshot]}
     e_initial: {dims: [entity]}
