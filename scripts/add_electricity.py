@@ -1132,8 +1132,8 @@ def attach_renewable_units(
             p_nom=units.capacity.set_axis(names),
             build_year=units.build_year.set_axis(names),
             lifetime=units.lifetime.set_axis(names),
-            geometry=points_to_wkt(units).set_axis(names),
         )
+        n.generators.loc[names, "geometry"] = points_to_wkt(units).set_axis(names)
 
 
 def attach_renewable_powerplants(

@@ -17,11 +17,13 @@ description: >-
   `pypsa.mathspec.yaml`.
 
 given:
-  variables:
+  expressions:
     capacity: {dims: [entity]}
+  variables:
     p: {dims: [scenario, snapshot, entity]}
     e: {dims: [scenario, snapshot, entity]}
   parameters:
+    entity_group: {dims: [entity], dtype: str}
     capital_weight: {dims: [entity, period]}
     period_weighting_years: {dims: [period]}
     snapshot_weighting_generators: {dims: [snapshot]}
@@ -136,7 +138,6 @@ parameters:
     dtype: int
     missing: 0
     description: "1 for a carrier that PyPSA's `transmission_expansion_cost_limit` (`lc_limit`) selects"
-  glc_generator: {dims: [entity], dtype: int, missing: 0, description: 1 for a generator}
   glc_generator_fuel:
     dims: [entity]
     missing: 0
@@ -168,6 +169,11 @@ expressions:
   glc_period_weight:
     dims: [snapshot]
     expression: snapshot_weighting_generators * at(period_weighting_years, by=snapshot_period[period])
+  glc_generator:
+    dims: [entity]
+    cases:
+      generator: {when: "entity_group == 'Generator'", expression: 1}
+    otherwise: 0
   glc_output:
     dims: [scenario, carrier, period]
     description: what the generators of a carrier produce in a period, weighted by snapshot and period years

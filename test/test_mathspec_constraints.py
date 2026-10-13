@@ -211,9 +211,9 @@ SWITCHES = {
             "glc_branch_horizon",
         },
     ),
-    "BAU": ({"BAU": True}, {"bau_mincapacity", "bau_generator"}),
+    "BAU": ({"BAU": True}, {"bau_mincapacity"}),
     "SAFE": ({"SAFE": True}, {"safe_peak_capacity", "safe_extendable"}),
-    "EQ": ({"EQ": "EQ0.7"}, {"equity_min_share", "equity_bus", "equity_load"}),
+    "EQ": ({"EQ": "EQ0.7"}, {"equity_min_share"}),
     "reserve": (
         {"operational_reserve": True},
         {"reserve_contingency", "reserve_generator", "reserve_vres_extendable"},

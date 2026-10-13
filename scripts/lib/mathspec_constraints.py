@@ -372,7 +372,6 @@ def global_constraint_weights(n: pypsa.Network) -> Data:
     emitting = stores.bus.map(n.buses.carrier).map(n.carriers.co2_emissions)
     co2_stores = stores.index[~stores.e_cyclic & emitting.fillna(0).ne(0)]
     return {
-        "glc_generator": _ones(n.generators.index),
         "glc_generator_fuel": 1 / n.generators.efficiency,
         "glc_store_final": _period_ends(n, final_stores, years),
         "glc_storage_unit_final": _period_ends(n, final_units, years),
@@ -399,10 +398,7 @@ def bau_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
     """``solve_network.add_BAU_constraints``."""
     mincaps = pd.Series(config["electricity"]["BAU_mincapacities"])
     extendable = n.generators.query("p_nom_extendable")
-    return {
-        "bau_mincapacity": mincaps[extendable.carrier.unique()].astype(float),
-        "bau_generator": _ones(extendable.index),
-    }
+    return {"bau_mincapacity": mincaps[extendable.carrier.unique()].astype(float)}
 
 
 def safe_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:
@@ -445,7 +441,6 @@ def operational_reserve_margin(n: pypsa.Network, config: Mapping[str, Any]) -> D
     vres_gens = gens[gens.carrier.isin(vres)]
     return {
         "reserve_generator": pd.Series(True, index=gens.index),
-        "reserve_load": _ones(n.loads.index),
         "reserve_vres_extendable": _ones(vres_gens.index[vres_gens.p_nom_extendable]),
         "reserve_vres_fixed": _ones(vres_gens.index[~vres_gens.p_nom_extendable]),
         "reserve_epsilon_load": float(reserve["epsilon_load"]),
@@ -467,20 +462,7 @@ def eq_constraints(n: pypsa.Network, option: str) -> Data:
             "add_EQ_constraints reads loads_t.p_set only; the record merges static "
             f"p_set of loads {list(static_loads)} into it."
         )
-    return {
-        "equity_min_share": float(re.findall(r"[0-9]*\.?[0-9]+", option)[0]),
-        "equity_bus": pd.Series(True, index=pd.Index(n.loads.bus.unique())),
-        **{
-            f"equity_{name}": _at_bus(
-                _ones(c.static.index.rename("entity")), c.static.bus
-            )
-            for name, c in (
-                ("generator", n.c.generators),
-                ("load", n.c.loads),
-                ("storage_unit", n.c.storage_units),
-            )
-        },
-    }
+    return {"equity_min_share": float(re.findall(r"[0-9]*\.?[0-9]+", option)[0])}
 
 
 def solar_potential_constraints(n: pypsa.Network, config: Mapping[str, Any]) -> Data:

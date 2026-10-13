@@ -13,15 +13,19 @@ description: >-
   `pypsa.mathspec.yaml`.
 
 given:
-  variables:
+  masks:
+    extendable: {dims: [entity]}
+  expressions:
     capacity: {dims: [entity]}
+  variables:
     p: {dims: [scenario, snapshot, entity]}
     spill: {dims: [scenario, snapshot, entity]}
   parameters:
-    extendable: {dims: [entity], dtype: bool}
+    entity_group: {dims: [entity], dtype: str}
+    role: {dims: [entity, bus], dtype: str}
     snapshot_weighting_generators: {dims: [snapshot]}
     snapshot_weighting_stores: {dims: [snapshot]}
-    nom: {dims: [entity]}
+    p_nom: {dims: [entity]}
     p_max_pu: {dims: [scenario, snapshot, entity]}
     p_set: {dims: [scenario, snapshot, entity]}
     inflow: {dims: [scenario, snapshot, entity]}
@@ -92,7 +96,6 @@ parameters:
     missing: 0
     description: 1 for an extendable entity in the first period it stands in (PyPSA's `add_max_growth`)
   bau_mincapacity: {dims: [carrier], missing: absent, description: "`electricity.BAU_mincapacities`"}
-  bau_generator: {dims: [entity], dtype: int, missing: 0, description: 1 for an extendable generator}
   safe_peak_capacity:
     dims: []
     missing: absent
@@ -112,7 +115,6 @@ parameters:
     dtype: bool
     missing: neutral
     description: a generator that holds operational reserve (all but load shedding)
-  reserve_load: {dims: [entity], dtype: int, missing: 0, description: 1 for a load}
   reserve_vres_extendable:
     dims: [entity]
     dtype: int
@@ -127,10 +129,6 @@ parameters:
   reserve_epsilon_vres: {dims: [], missing: absent, description: "`operational_reserve.epsilon_vres`"}
   reserve_contingency: {dims: [], missing: absent, description: "`operational_reserve.contingency`"}
   equity_min_share: {dims: [], missing: absent, description: the share of its demand a node produces (`EQ`)}
-  equity_bus: {dims: [bus], dtype: bool, missing: neutral, description: a bus with a load}
-  equity_generator: {dims: [entity, bus], dtype: int, missing: 0, description: 1 for a generator at its bus}
-  equity_load: {dims: [entity, bus], dtype: int, missing: 0, description: 1 for a load at its bus}
-  equity_storage_unit: {dims: [entity, bus], dtype: int, missing: 0, description: 1 for a storage unit at its bus}
   solar_potential_generator:
     dims: [entity, bus]
     missing: 0
@@ -171,6 +169,31 @@ expressions:
   growth_capacity:
     dims: [carrier, period]
     expression: sum(capacity * growth_first, over=entity, by=entity_carrier[carrier])
+  bau_generator:
+    dims: [entity]
+    cases:
+      extendable: {when: "entity_group == 'Generator' AND extendable", expression: 1}
+    otherwise: 0
+  reserve_load:
+    dims: [entity]
+    cases:
+      load: {when: "entity_group == 'Load'", expression: 1}
+    otherwise: 0
+  equity_generator:
+    dims: [entity, bus]
+    cases:
+      generator: {when: "entity_group == 'Generator' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  equity_load:
+    dims: [entity, bus]
+    cases:
+      load: {when: "entity_group == 'Load' AND role == 'attached'", expression: 1}
+    otherwise: 0
+  equity_storage_unit:
+    dims: [entity, bus]
+    cases:
+      storage_unit: {when: "entity_group == 'StorageUnit' AND role == 'attached'", expression: 1}
+    otherwise: 0
 
 variables:
   Generator_r:
@@ -205,7 +228,7 @@ constraints:
     dims: []
     description: "`add_SAFE_constraints`"
     where: safe_peak_capacity
-    expression: sum(capacity * safe_extendable, over=entity) >= safe_peak_capacity - sum(nom * safe_fixed, over=entity)
+    expression: sum(capacity * safe_extendable, over=entity) >= safe_peak_capacity - sum(p_nom * safe_fixed, over=entity)
   reserve_margin:
     dims: [scenario, snapshot]
     description: "`add_operational_reserve_margin`: the reserve requirement"
@@ -214,32 +237,22 @@ constraints:
       sum(Generator_r, over=entity)
       - reserve_epsilon_vres * sum(capacity * p_max_pu * reserve_vres_extendable, over=entity)
       >= reserve_epsilon_load * sum(p_set * reserve_load, over=entity)
-      + reserve_epsilon_vres * sum(p_max_pu * nom * reserve_vres_fixed, over=entity)
+      + reserve_epsilon_vres * sum(p_max_pu * p_nom * reserve_vres_fixed, over=entity)
       + reserve_contingency
-  Generator_p_reserve_upper_extendable:
+  Generator_p_reserve_upper:
     dims: [scenario, snapshot, entity]
-    description: "`add_operational_reserve_margin`: dispatch and reserve within extendable capacity"
-    where: Generator_r AND p AND extendable
-    expression: p + Generator_r - p_max_pu * capacity <= 0
-  Generator_p_reserve_upper_extendable_idle:
+    description: "`add_operational_reserve_margin`: dispatch and reserve within capacity"
+    where: Generator_r AND p
+    expression: p + Generator_r <= p_max_pu * capacity
+  Generator_p_reserve_upper_idle:
     dims: [scenario, snapshot, entity]
-    description: "`add_operational_reserve_margin`: reserve within extendable capacity where the unit does not dispatch"
-    where: Generator_r AND NOT p AND extendable
-    expression: Generator_r - p_max_pu * capacity <= 0
-  Generator_p_reserve_upper_fixed:
-    dims: [scenario, snapshot, entity]
-    description: "`add_operational_reserve_margin`: dispatch and reserve within fixed capacity"
-    where: Generator_r AND p AND NOT extendable
-    expression: p + Generator_r <= p_max_pu * nom
-  Generator_p_reserve_upper_fixed_idle:
-    dims: [scenario, snapshot, entity]
-    description: "`add_operational_reserve_margin`: reserve within fixed capacity where the unit does not dispatch"
-    where: Generator_r AND NOT p AND NOT extendable
-    expression: Generator_r <= p_max_pu * nom
+    description: "`add_operational_reserve_margin`: reserve within capacity where the unit does not dispatch"
+    where: Generator_r AND NOT p
+    expression: Generator_r <= p_max_pu * capacity
   equity_min:
     dims: [scenario, bus]
     description: "`add_EQ_constraints` per node"
-    where: equity_min_share AND equity_bus
+    where: "equity_min_share AND count(entity_group == 'Load' AND role == 'attached', over=entity) >= 1"
     expression: >-
       0.1 * sum(p * equity_generator * snapshot_weighting_generators, over=[snapshot, entity])
       - 0.1 * sum(spill * equity_storage_unit * snapshot_weighting_stores, over=[snapshot, entity])
@@ -274,7 +287,7 @@ constraints:
     dims: [entity]
     description: "`add_pipe_retrofit_constraint`"
     where: pipe_retrofit AND pipe_retrofit_ch4_per_h2
-    expression: capacity + pipe_retrofit_ch4_per_h2 * at(capacity, by=pipe_retrofit[partner]) == nom
+    expression: capacity + pipe_retrofit_ch4_per_h2 * at(capacity, by=pipe_retrofit[partner]) == p_nom
   upper_bound_charging_capacity_of_geothermal_reservoir:
     dims: [entity]
     description: "`add_flexible_egs_constraint`"
@@ -284,12 +297,12 @@ constraints:
     dims: [scenario, snapshot, entity]
     description: "`add_retrofit_gas_boiler_constraint`, where both boilers dispatch"
     where: gas_retrofit AND gas_retrofit_heat_load AND p AND at(p, by=gas_retrofit[partner])
-    expression: p + at(p, by=gas_retrofit[partner]) == nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+    expression: p + at(p, by=gas_retrofit[partner]) == p_nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
   gas_retrofit_alone:
     dims: [scenario, snapshot, entity]
     description: "`add_retrofit_gas_boiler_constraint`, where the H2 boiler does not dispatch"
     where: gas_retrofit AND gas_retrofit_heat_load AND p AND NOT at(p, by=gas_retrofit[partner])
-    expression: p == nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
+    expression: p == p_nom * at(heat_load_profile, by=gas_retrofit_heat_load[partner])
   import_limit_upper_constraint:
     dims: [scenario]
     description: "`add_import_limit_constraint`"

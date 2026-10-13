@@ -11,7 +11,6 @@ import pypsa
 import pytest
 
 from scripts.prepare_sector_network import (
-    connect_existing_chp_units,
     convert_existing_units_to_links,
     existing_units,
 )
@@ -51,19 +50,30 @@ def unit_costs() -> pd.DataFrame:
     ).reindex(["CCGT", "nuclear", "central solid biomass CHP", "gas", "uranium"])
 
 
-def test_convert_existing_units_to_links(unit_network, unit_costs):
-    n = unit_network
-    spatial = SimpleNamespace(
+@pytest.fixture
+def unit_spatial() -> SimpleNamespace:
+    return SimpleNamespace(
         gas=SimpleNamespace(nodes=["b1 gas", "b2 gas"], locations=["b1", "b2"]),
         uranium=SimpleNamespace(nodes=["EU uranium"], locations=["EU"]),
         biomass=SimpleNamespace(nodes=["EU solid biomass"], locations=["EU"]),
     )
+
+
+@pytest.mark.parametrize(
+    ("heat_buses", "chp_bus2"),
+    [(["b2 urban central heat"], "b2 urban central heat"), ([], "")],
+)
+def test_convert_existing_units_to_links(
+    unit_network, unit_costs, unit_spatial, heat_buses, chp_bus2
+):
+    n = unit_network
+    n.add("Bus", ["b1 gas", "EU uranium", "EU solid biomass", "co2 atmosphere"])
+    n.add("Bus", heat_buses)
     unit_costs.loc["gas", "CO2 intensity"] = 0.2
     unit_costs.loc["uranium", "CO2 intensity"] = 0.0
 
-    fuels = convert_existing_units_to_links(n, existing_units(n), unit_costs, spatial)
+    convert_existing_units_to_links(n, existing_units(n), unit_costs, unit_spatial)
 
-    assert fuels == {"gas", "uranium", "biomass"}
     assert n.generators.index.tolist() == ["b1 OCGT", "b1 solar"]
     links = n.links
     assert links.loc[
@@ -82,23 +92,20 @@ def test_convert_existing_units_to_links(unit_network, unit_costs):
     assert links.at["b2 nuclear 2", "p_max_pu"] == 0.8
     assert links.at["b2 biomass 3", "carrier"] == "urban central solid biomass CHP"
     assert links.at["b2 biomass 3", "p_nom"] == pytest.approx(100.0)
+    assert links.at["b2 biomass 3", "bus2"] == chp_bus2
+    assert (links.geometry == "POINT (0 0)").all()
     assert (links.build_year.tolist(), links.asset_status.unique().tolist()) == (
         [2000, 1980, 2010],
         ["existing"],
     )
     assert not links.p_nom_extendable.any()
+    assert links[["bus0", "bus1"]].isin(n.buses.index).all().all()
 
 
-def test_connect_existing_chp_units():
-    n = pypsa.Network()
-    n.add("Bus", ["b1", "b2", "b1 urban central heat"])
-    n.add(
-        "Link",
-        ["b1 biomass 1", "b2 biomass 2"],
-        bus1=["b1", "b2"],
-        carrier="urban central solid biomass CHP",
-    )
-
-    connect_existing_chp_units(n)
-
-    assert n.links.bus2.tolist() == ["b1 urban central heat", ""]
+def test_convert_existing_units_to_links_missing_fuel_bus(
+    unit_network, unit_costs, unit_spatial
+):
+    with pytest.raises(ValueError, match="EU solid biomass"):
+        convert_existing_units_to_links(
+            unit_network, existing_units(unit_network), unit_costs, unit_spatial
+        )

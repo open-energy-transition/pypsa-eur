@@ -557,7 +557,7 @@ def convert_existing_units_to_links(
     units: pd.DataFrame,
     costs: pd.DataFrame,
     spatial: SimpleNamespace,
-) -> set[str]:
+) -> None:
     """
     Replace existing conventional unit generators by one link per unit.
 
@@ -565,7 +565,8 @@ def convert_existing_units_to_links(
     and keeps the unit name, build year, lifetime and geometry. Fossil and
     nuclear units keep their efficiency and emit to `co2 atmosphere`. Biomass
     units become `urban central solid biomass CHP` links with cost efficiencies
-    and no heat bus; `connect_existing_chp_units` attaches the heat bus.
+    and feed heat to the urban central heat bus of their location, if it exists.
+    All fuel buses must exist before the call.
 
     Parameters
     ----------
@@ -578,20 +579,17 @@ def convert_existing_units_to_links(
         Technology costs.
     spatial : SimpleNamespace
         Container of spatial data.
-
-    Returns
-    -------
-    set[str]
-        Fuel carriers of the converted units.
     """
     fuel = units.carrier.map(UNIT_FUELS)
     bus0 = fuel_buses(spatial, fuel, units.bus)
+    if missing := sorted(set(bus0) - set(n.buses.index)):
+        raise ValueError(f"Fuel buses of existing units are missing: {missing}")
     logger.info(f"Converting {len(units)} existing units to links")
     n.remove("Generator", n.generators.index.intersection(units.index))
 
-    attrs = units[
-        ["bus", "p_min_pu", "p_max_pu", "build_year", "lifetime", "geometry"]
-    ].rename(columns={"bus": "bus1"})
+    attrs = units[["bus", "p_min_pu", "p_max_pu", "build_year", "lifetime"]].rename(
+        columns={"bus": "bus1"}
+    )
     attrs["asset_status"] = "existing"
 
     is_fossil = units.carrier != "biomass"
@@ -612,12 +610,13 @@ def convert_existing_units_to_links(
     )
 
     chp = units[~is_fossil]
+    heat_bus = chp.bus + " urban central heat"
     key = "central solid biomass CHP"
     n.add(
         "Link",
         chp.index,
         bus0=bus0[chp.index],
-        bus2="",
+        bus2=heat_bus.where(heat_bus.isin(n.buses.index), ""),
         carrier="urban central solid biomass CHP",
         marginal_cost=costs.at[key, "efficiency"] * costs.at[key, "VOM"],
         capital_cost=costs.at[key, "efficiency"] * costs.at[key, "capital_cost"],
@@ -626,24 +625,7 @@ def convert_existing_units_to_links(
         efficiency2=costs.at[key, "efficiency-heat"],
         **attrs.loc[chp.index],
     )
-    return set(fuel)
-
-
-def connect_existing_chp_units(n: pypsa.Network) -> None:
-    """
-    Attach existing biomass CHP units to the urban central heat bus of their location.
-
-    Parameters
-    ----------
-    n : pypsa.Network
-        Network to modify.
-    """
-    links = n.links
-    chp = links.index[
-        (links.carrier == "urban central solid biomass CHP") & ~links.p_nom_extendable
-    ]
-    heat_bus = links.bus1[chp] + " urban central heat"
-    links.loc[chp, "bus2"] = heat_bus.where(heat_bus.isin(n.buses.index), "")
+    n.links.loc[units.index, "geometry"] = units.geometry
 
 
 # TODO: PyPSA-Eur merge issue
@@ -6320,11 +6302,7 @@ def main(
 
     carriers_to_keep = params.pypsa_eur
     patch_electricity_network(n, carriers_to_keep)
-    unit_fuels = (
-        convert_existing_units_to_links(n, units, costs, spatial)
-        if keep_assets
-        else set()
-    )
+    unit_fuels = set(units.carrier.map(UNIT_FUELS)) if keep_assets else set()
 
     fn = inputs.heating_efficiencies
     year = int(params["energy_totals_year"])
@@ -6469,7 +6447,7 @@ def main(
         )
 
     if keep_assets:
-        connect_existing_chp_units(n)
+        convert_existing_units_to_links(n, units, costs, spatial)
 
     if options["ammonia"]:
         add_ammonia(n, costs, pop_layout, spatial, cf_industry)
