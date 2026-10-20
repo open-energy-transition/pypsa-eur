@@ -1760,16 +1760,6 @@ for file name mappings and configuration changes in detail.
 
 * Address various deprecations.
 
-* Allow running the sector model for isolated non-EU28 countries, by
-  filling missing sectoral data with defaults, average EU values or
-  zeros, if not available.
-  ([open-energy-transition/pypsa-eur#1](https://github.com/open-energy-transition/pypsa-eur/pull/1))
-
-* Enable retaining existing conventional capacities added in the power
-  only model for sector coupled applications.
-  ([open-energy-transition/pypsa-eur#4](https://github.com/open-energy-transition/pypsa-eur/pull/4))
-
-
 ## PyPSA-Eur 0.11.0 (25th May 2024)
 
 **New Features**
