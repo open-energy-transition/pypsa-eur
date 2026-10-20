@@ -1760,6 +1760,7 @@ for file name mappings and configuration changes in detail.
 
 * Address various deprecations.
 
+
 ## PyPSA-Eur 0.11.0 (25th May 2024)
 
 **New Features**
