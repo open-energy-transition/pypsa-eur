@@ -7,6 +7,7 @@
 import numpy as np
 import pandas as pd
 import pypsa
+import pytest
 import xarray as xr
 
 from scripts.add_electricity import (
@@ -16,6 +17,8 @@ from scripts.add_electricity import (
     attach_stores,
     conventional_candidates,
     estimate_efficiency,
+    group_small_units,
+    load_and_aggregate_powerplants,
     reduce_candidate_potentials,
 )
 from scripts.lib.validation.config.conventional import _EstimateEfficienciesConfig
@@ -144,6 +147,35 @@ def test_assign_unit_dates():
     assert result.lifetime.tolist() == [40.0, 50.0]
 
 
+@pytest.mark.parametrize(
+    ("min_capacity", "expected"),
+    [
+        (0.0, {"a": 0.5, "b": 0.7, "c": 0.4, "d": 3.0}),
+        (1.0, {"small-2010-25": 1.2, "small-2015-25": 0.4, "d": 3.0}),
+    ],
+)
+def test_group_small_units(min_capacity, expected):
+    """Small units of one candidate, build year and lifetime merge; others stay."""
+    units = pd.DataFrame(
+        {
+            "capacity": [0.5, 0.7, 0.4, 3.0],
+            "build_year": [2010, 2010, 2015, 2010],
+            "lifetime": [25.0, 25.0, 25.0, 25.0],
+            "lon": [4.0, 4.1, 4.2, 4.3],
+            "lat": [50.0, 50.1, 50.2, 50.3],
+        },
+        index=["a", "b", "c", "d"],
+    )
+    candidates = pd.Series("BE0 0 solar", index=units.index)
+
+    result = group_small_units(units, candidates, min_capacity)
+
+    assert result.capacity.to_dict() == pytest.approx(expected)
+    assert (result.candidate == "BE0 0 solar").all()
+    if min_capacity:
+        assert result.geometry["small-2010-25"].startswith("MULTIPOINT")
+
+
 def test_conventional_candidates():
     n = pypsa.Network()
     n.add("Bus", ["ac", "dc"], carrier=["AC", "DC"])
@@ -187,3 +219,51 @@ def test_reduce_candidate_potentials():
     reduce_candidate_potentials(n, ["onwind"])
 
     assert n.generators.p_nom_max[["b 0 onwind", "b 1 onwind"]].tolist() == [0.0, 100.0]
+
+
+@pytest.mark.parametrize(
+    ("keep_assets", "expected"),
+    [
+        (True, {"DE0 1 CCGT 0": 100.0, "DE0 1 CCGT 1": 300.0}),
+        (False, {"DE0 1 CCGT": 400.0}),
+    ],
+)
+def test_load_and_aggregate_powerplants_keeps_units_at_cluster_bus(
+    tmp_path, keep_assets, expected
+):
+    ppl_fn = tmp_path / "powerplants.csv"
+    pd.DataFrame(
+        {
+            "Name": ["a", "b"],
+            "Fueltype": ["Natural Gas", "Natural Gas"],
+            "Technology": ["CCGT", "CCGT"],
+            "Set": "PP",
+            "Country": "DE",
+            "Capacity": [100.0, 300.0],
+            "Efficiency": [0.5, 0.6],
+            "DateIn": [2000.0, 2010.0],
+            "DateOut": [2040.0, 2050.0],
+            "lat": [50.0, 51.0],
+            "lon": [10.0, 11.0],
+            "bus": "DE0 1",
+        }
+    ).to_csv(ppl_fn)
+    costs = pd.DataFrame(
+        {
+            "VOM": [4.0],
+            "FOM": [3.0],
+            "efficiency": [0.55],
+            "capital_cost": [1e4],
+            "marginal_cost": [50.0],
+            "fuel": [20.0],
+            "lifetime": [30.0],
+        },
+        index=["CCGT"],
+    )
+
+    ppl = load_and_aggregate_powerplants(
+        ppl_fn, costs, keep_assets=keep_assets, first_horizon=2030
+    )
+
+    assert ppl.p_nom.to_dict() == expected, "units keep their cluster bus"
+    assert (ppl.bus == "DE0 1").all()

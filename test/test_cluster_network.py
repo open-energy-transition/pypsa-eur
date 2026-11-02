@@ -7,9 +7,14 @@
 import geopandas as gpd
 import pandas as pd
 import pypsa
+import pytest
 from shapely.geometry import Polygon
 
-from scripts.cluster_network import busmap_from_shapes, sanitize_busmap
+from scripts.cluster_network import (
+    busmap_from_shapes,
+    cluster_reference_busmaps,
+    sanitize_busmap,
+)
 
 
 def test_sanitize_busmap_strips_values():
@@ -46,3 +51,22 @@ def test_busmap_from_shapes_returns_trimmed_labels():
 
     assert busmap.index.tolist() == ["bus1", "bus2"]
     assert busmap.tolist() == ["region_1", "region_2"]
+
+
+@pytest.mark.parametrize(
+    ("busmap", "expected"),
+    [
+        (["b1", "b2", "b3", "b4"], ["r1", "r1", "r2", "r2"]),
+        (["c1", "c1", "c1", "c2"], ["r2", "r2"]),
+    ],
+    ids=["unclustered", "clustered"],
+)
+def test_cluster_reference_busmaps_takes_reference_bus_with_most_load(busmap, expected):
+    buses = pd.Index(["b1", "b2", "b3", "b4"])
+    busmaps = pd.DataFrame({"busmap_2": ["r1", "r1", "r2", "r2"]}, index=buses)
+    load = pd.Series([1.0, 2.0, 5.0, 0.0], index=buses)
+
+    result = cluster_reference_busmaps(busmaps, pd.Series(busmap, index=buses), load)
+
+    assert result.busmap_2.tolist() == expected
+    assert result.index.tolist() == sorted(set(busmap))

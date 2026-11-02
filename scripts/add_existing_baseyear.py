@@ -812,7 +812,7 @@ def main(
 
     grouping_years_power = params.existing_capacities["grouping_years_power"]
     grouping_years_heat = params.existing_capacities["grouping_years_heat"]
-    if not params.clustering["keep_assets"]:
+    if options["enabled"] and not params.clustering["keep_assets"]:
         add_power_capacities_installed_before_baseyear(
             n=n,
             costs=costs,

@@ -23,17 +23,18 @@ rolling horizon.
 
 {{ rules("solve_network", "solve_operations_network") }}
 
-## Exporting a datarecord
+## Exporting and solving a datarecord
 
-The export writes the network that the solver gets as a datarecord, with the
-mathspec of its constraints. The math is static: `scripts/lib/mathspec/` holds
-the global constraints and the custom constraints of `solve_network`, and the
-record holds their data as tables. A constraint has rows only where the record
-holds its data. The export runs for perfect foresight only, and it needs the
-pixi environment `datarecord`:
-`pixi run -e datarecord snakemake -call build_datarecord`.
+`build_datarecord` writes the network that the solver gets as a datarecord.
+`solve_datarecord` builds a network from that record, solves it with PyPSA's
+own math, without the custom constraints of `solve_network`, and writes the
+solved network as a datarecord and as netCDF. Both need the pixi environment
+`datarecord`. `config/test/config.preaggregated.yaml` runs them for five
+Belgian regions over 2013 in 365 time segments, with perfect foresight over
+2030, 2040 and 2050 and every power plant aggregated per region and carrier:
+`pixi run -e datarecord snakemake -c4 --configfile config/test/config.preaggregated.yaml -- results/test-elec-preaggregated-perfect/networks/solved_datarecord_2050.nc`.
 
-{{ rules("build_datarecord") }}
+{{ rules("build_datarecord", "solve_datarecord") }}
 
 ## Library modules
 

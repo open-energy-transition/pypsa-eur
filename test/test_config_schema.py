@@ -209,13 +209,17 @@ class TestKeepAssets:
         },
     }
 
-    def test_accepts_valid_config(self):
-        assert validate_config(self.base).clustering.keep_assets
+    @pytest.mark.parametrize("n_clusters", ["all", 10])
+    def test_accepts_valid_config(self, n_clusters):
+        cfg = copy.deepcopy(self.base)
+        update_config(
+            cfg, {"clustering": {"cluster_network": {"n_clusters": n_clusters}}}
+        )
+        assert validate_config(cfg).clustering.keep_assets
 
     @pytest.mark.parametrize(
         ("override", "match"),
         [
-            ({"clustering": {"cluster_network": {"n_clusters": 10}}}, "n_clusters"),
             (
                 {"clustering": {"simplify_network": {"to_substations": True}}},
                 "to_substations",

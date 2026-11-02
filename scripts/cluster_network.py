@@ -642,6 +642,28 @@ def update_bus_coordinates(
     n.buses["y"] = busmap_df["y"]
 
 
+UNCLUSTERABLE_COLUMNS = [
+    "symbol",
+    "tags",
+    "under_construction",
+    "onshore_bus",
+    "geometry",
+    "underground",
+    "project_status",
+]
+
+
+def drop_unclusterable_columns(n: pypsa.Network) -> None:
+    """
+    Drop the bus and line columns that clustering cannot aggregate.
+
+    Earlier steps do not keep them up to date, and clustering would have to
+    merge differing values of them.
+    """
+    n.buses.drop(UNCLUSTERABLE_COLUMNS, axis=1, inplace=True, errors="ignore")
+    n.lines.drop(UNCLUSTERABLE_COLUMNS, axis=1, inplace=True, errors="ignore")
+
+
 def busmap_for_config(
     n: pypsa.Network,
     n_clusters: int,
@@ -777,6 +799,39 @@ def reference_busmaps(
     return busmaps
 
 
+def cluster_reference_busmaps(
+    busmaps: pd.DataFrame, busmap: pd.Series, load: pd.Series
+) -> pd.DataFrame:
+    """
+    Map each cluster to the reference bus that holds most of its load.
+
+    Parameters
+    ----------
+    busmaps : pd.DataFrame
+        The reference busmaps of the buses before clustering, from `reference_busmaps`.
+    busmap : pd.Series
+        The cluster of each bus before clustering.
+    load : pd.Series
+        The mean load per bus before clustering. Ties, such as clusters without
+        load, go to the first reference bus in sort order.
+
+    Returns
+    -------
+    pd.DataFrame
+        The reference busmaps indexed by cluster, with the columns of `busmaps`.
+    """
+    return pd.DataFrame(
+        {
+            col: load.groupby([busmap, busmaps[col]])
+            .sum()
+            .groupby(level=0)
+            .idxmax()
+            .map(lambda pair: pair[1])
+            for col in busmaps
+        }
+    )
+
+
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from scripts._helpers import mock_snakemake
@@ -805,6 +860,7 @@ if __name__ == "__main__":
         linemap = n.lines.index.to_series()
         clustering = pypsa.clustering.spatial.Clustering(n, busmap, linemap)
     else:
+        drop_unclusterable_columns(n)
         busmap = busmap_for_config(
             n, params.n_clusters, load, params, snakemake.input, solver_name
         )
@@ -825,9 +881,11 @@ if __name__ == "__main__":
 
     if params.keep_assets:
         busmaps = reference_busmaps(
-            nc.buses.index, load, params, snakemake.input, solver_name
+            n.buses.index, load, params, snakemake.input, solver_name
         )
-        nc.buses[busmaps.columns] = busmaps
+        nc.buses[busmaps.columns] = cluster_reference_busmaps(
+            busmaps, cluster_busmap, load
+        )
 
     # nc.shapes = n.shapes.copy()
     for which in ["onshore_regions", "offshore_regions"]:

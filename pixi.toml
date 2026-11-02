@@ -15,6 +15,8 @@ requires-pixi = ">=0.71.0"
 linopy = "0d"
 pypsa = "0d"
 atlite = "0d"
+duckdb = "0d"
+python-duckdb = "0d"
 
 [tasks]
 
@@ -71,7 +73,7 @@ highspy = ">=1.12.0"
 ipython = ">=9.7.0"
 jpype1 = ">=1.6.0"
 libgdal-netcdf = ">=3.10.3"
-linopy = ">=0.8,<0.9"
+linopy = ">=0.8,<0.10"
 lxml = ">=6.0.2"
 matplotlib = ">=3.10.7"
 memory_profiler = ">=0.61.0"
@@ -200,16 +202,23 @@ validate-config = "pytest test/test_config_schema.py::test_config_file_is_valid 
 [feature.test.dependencies]
 pytest = ">=8.4.2"
 
+[feature.datarecord]
+channels = [{ channel = "conda-forge/label/dev", priority = -1 }]
+
 [feature.datarecord.dependencies]
 scip = "10.0.*"
-duckdb = ">=1.5.4,<2"
+python = "3.13.*"
+highspy = { version = ">=1.13.2.dev0,<1.13.3", channel = "conda-forge/label/dev" }
+duckdb = ">=2.0,<3"
 narwhals = ">=2,<3,!=2.21.0"
 pyarrow = "*"
 pyparsing = ">=3.1"
+pypsa = ">=1.4"
 
 [feature.datarecord.pypi-dependencies]
-datarecord = { path = "/Users/brynpickering/Repos/energy-models/datarecord", editable = true }
-mathspec = { git = "https://github.com/energy-models/mathspec", rev = "8c481e8196878c9fe51979600ab4ce20d26dc8ef" }
+datarecord = { git = "https://github.com/energy-models/datarecord.git", rev = "dbdbe94312d90c6a31809572aa9f01e9234ca0ff" }
+[pypi-dependencies]
+mathspec = { git = "https://github.com/energy-models/mathspec.git", rev = "8982c556114992d149a83b3c6f3604c72e569829" }
 
 [environments]
 doc = { features = ["doc"], no-default-feature = true }

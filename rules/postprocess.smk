@@ -375,28 +375,85 @@ rule plot_interactive_bus_balance:
         scripts("plot_interactive_bus_balance.py")
 
 
-if config["foresight"] == "perfect":
+def DATARECORD_SOLVES(w):
+    """Return the solve modes of a combined datarecord: perfect, myopic and overnight in the last horizon."""
+    return [
+        "perfect",
+        "myopic",
+        f"overnight{config_provider('planning_horizons')(w)[-1]}",
+    ]
 
-    rule build_datarecord:
-        """Exports the network handed to the solver as a datarecord with its constraint math."""
-        input:
-            network=resources(f"networks/composed_{config['planning_horizons'][-1]}.nc"),
-        output:
-            directory=directory(resources("datarecords/composed")),
-        log:
-            logs("build_datarecord.log"),
-        benchmark:
-            benchmarks("build_datarecord")
-        resources:
-            mem_mb=10000,
-        params:
-            solving=config_provider("solving"),
-            foresight=config_provider("foresight"),
-            planning_horizons=config_provider("planning_horizons"),
-            sector=config_provider("sector"),
-            co2_sequestration_potential=config_provider(
-                "sector", "co2_sequestration_potential"
-            ),
-            custom_extra_functionality=input_custom_extra_functionality,
-        script:
-            scripts("build_datarecord.py")
+
+rule build_datarecord:
+    """Exports the network handed to the solver as a datarecord."""
+    input:
+        network=resources("networks/composed_{horizon}.nc"),
+        onshore_regions=resources("onshore_regions.geojson"),
+        offshore_regions=resources("offshore_regions.geojson"),
+        country_shapes=resources("country_shapes.geojson"),
+        offshore_shapes=resources("offshore_shapes.geojson"),
+    output:
+        directory=directory(resources("datarecords/composed_{horizon}")),
+    log:
+        logs("build_datarecord_{horizon}.log"),
+    benchmark:
+        benchmarks("build_datarecord_{horizon}")
+    resources:
+        mem_mb=4000,
+    params:
+        solving=config_provider("solving"),
+        foresight=config_provider("foresight"),
+        sector=config_provider("sector"),
+        co2_sequestration_potential=config_provider(
+            "sector", "co2_sequestration_potential"
+        ),
+    script:
+        scripts("build_datarecord.py")
+
+
+rule solve_datarecord:
+    input:
+        record=resources("datarecords/composed_{horizon}"),
+    output:
+        store=directory(RESULTS + "datarecords/{solve}/layered_{horizon}"),
+        revisions=RESULTS + "datarecords/{solve}/layered_{horizon}.json",
+    log:
+        solver=normpath(RESULTS + "logs/solve_datarecord/{solve}_solver_{horizon}.log"),
+        solver_patch=normpath(
+            RESULTS + "logs/solve_datarecord/{solve}_solver_patch_{horizon}.log"
+        ),
+        python=RESULTS + "logs/solve_datarecord/{solve}_python_{horizon}.log",
+    benchmark:
+        RESULTS + "benchmarks/solve_datarecord_{solve}_{horizon}"
+    wildcard_constraints:
+        solve=r"perfect|myopic|overnight\d{4}",
+    threads: solver_threads
+    resources:
+        mem_mb=config_provider("solving", "mem_mb"),
+    params:
+        solving=config_provider("solving"),
+    message:
+        """Solve the datarecord and an input scenario patch of it with PyPSA's own math, as layers over the inputs."""
+    script:
+        scripts("solve_datarecord.py")
+
+
+rule combine_datarecords:
+    """Combines the layered datarecords of every solve mode into one tree over the shared inputs and patch."""
+    input:
+        record=resources("datarecords/composed_{horizon}"),
+        stores=lambda w: [
+            RESULTS + f"datarecords/{solve}/layered_{w.horizon}"
+            for solve in DATARECORD_SOLVES(w)
+        ],
+        revisions=lambda w: [
+            RESULTS + f"datarecords/{solve}/layered_{w.horizon}.json"
+            for solve in DATARECORD_SOLVES(w)
+        ],
+    output:
+        store=directory(RESULTS + "datarecords/combined/layered_{horizon}"),
+        revisions=RESULTS + "datarecords/combined/layered_{horizon}.json",
+    log:
+        logs("combine_datarecords_{horizon}.log"),
+    script:
+        scripts("combine_datarecords.py")

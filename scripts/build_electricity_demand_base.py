@@ -61,6 +61,8 @@ def redistribute_attribute(
         orig = orig.to_crs(epsg=3035)
     if dest.crs != 3035:
         dest = dest.to_crs(epsg=3035)
+    orig = orig.set_geometry(orig.make_valid(method="structure", keep_collapsed=False))
+    dest = dest.set_geometry(dest.make_valid(method="structure", keep_collapsed=False))
     orig["area_orig"] = orig.area
     overlay = gpd.overlay(dest, orig, keep_geom_type=False)
     overlay["share"] = overlay.area / overlay.area_orig

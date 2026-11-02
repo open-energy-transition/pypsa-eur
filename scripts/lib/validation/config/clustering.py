@@ -191,21 +191,23 @@ class ClusteringConfig(BaseModel):
     )
     keep_assets: bool = Field(
         False,
-        description="Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+        description="Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. With `cluster_network: n_clusters: all` the network keeps its unsimplified topology; with a number of clusters, buses, lines and links are clustered as usual while each power plant stays its own unit at its cluster bus. Requires `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended with `n_clusters: all`.",
     )
     keep_assets_busmaps: list[int] = Field(
         default_factory=lambda: [5, 10],
-        description="Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+        description="Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries. The busmaps cluster the normally simplified network; with `cluster_network: n_clusters` a number, each cluster bus takes the busmap entry holding most of its load.",
+    )
+
+    keep_assets_min_capacity: float = Field(
+        0.0,
+        ge=0,
+        description="Capacity in MW below which renewable power plants are merged when `keep_assets` is true: into one unit per candidate, build year and lifetime, located at the multipoint of its members. 0 keeps every plant as its own unit.",
     )
 
     @model_validator(mode="after")
     def check_keep_assets(self):
         if not self.keep_assets:
             return self
-        if self.cluster_network.n_clusters != "all":
-            raise ValueError(
-                "clustering.keep_assets requires clustering.cluster_network.n_clusters: all."
-            )
         if self.simplify_network.to_substations:
             raise ValueError(
                 "clustering.keep_assets requires clustering.simplify_network.to_substations: false."

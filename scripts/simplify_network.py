@@ -39,6 +39,7 @@ from scripts._helpers import configure_logging, set_scenario_config
 from scripts.cluster_network import (
     busmap_for_admin_regions,
     cluster_regions,
+    drop_unclusterable_columns,
     sanitize_busmap,
 )
 
@@ -469,19 +470,7 @@ def simplify(
 
     substations_i = n.buses.query("substation_lv or substation_off").index
 
-    # some entries in n.buses are not updated in previous functions, therefore can be wrong. as they are not needed
-    # and are lost when clustering (for example with the simpl wildcard), we remove them for consistency:
-    remove = [
-        "symbol",
-        "tags",
-        "under_construction",
-        "onshore_bus",
-        "geometry",
-        "underground",
-        "project_status",
-    ]
-    n.buses.drop(remove, axis=1, inplace=True, errors="ignore")
-    n.lines.drop(remove, axis=1, errors="ignore", inplace=True)
+    drop_unclusterable_columns(n)
 
     if params.simplify_network["to_substations"]:
         n, substation_map = aggregate_to_substations(

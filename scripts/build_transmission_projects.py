@@ -129,6 +129,15 @@ def connect_new_lines(
 
         lines.loc[lines_port.index, f"bus{port}"] = lines_port["neighbor"]
 
+    self_loops = lines.index[lines.bus0 == lines.bus1]
+    if not self_loops.empty:
+        logger.warning(
+            "Both ports of the following lines connect to the same bus:\n"
+            + str(self_loops.to_list())
+            + "\n Lines will be ignored."
+        )
+        lines = lines.drop(self_loops)
+
     lines = lines.assign(under_construction=True)
 
     return lines, new_buses_df
@@ -406,6 +415,7 @@ def add_projects(
             # add new lines to network to be able to find added duplicates
             n.add("Line", new_lines.index, **new_lines)
         elif key == "new_links":
+            lines.index = lines.index.astype(str) + "_link"
             new_links, new_buses_df = connect_new_lines(
                 lines,
                 n,

@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# Overlay on config.europe-keep-assets-full.yaml for the full year 2013.
+
+run:
+  name: europe-keep-assets-full-year
+  disable_progressbar: true
+  shared_resources:
+    policy: false
+
+snapshots:
+  start: "2013-01-01"
+  end: "2014-01-01"
+  inclusive: left

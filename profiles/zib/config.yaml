@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: MIT
+
+executor: slurm
+jobs: 20
+latency-wait: 60
+default-resources:
+  slurm_partition: big
+  runtime: 60
+  mem_mb: 8000
+set-resources:
+  base_network: {mem_mb: 4000}
+  cluster_electricity_demand: {mem_mb: 12000}
+  compose_network: {mem_mb: 80000, runtime: 60, slurm_partition: high-mem}
+  build_datarecord: {mem_mb: 48000, runtime: 120, slurm_partition: high-mem}

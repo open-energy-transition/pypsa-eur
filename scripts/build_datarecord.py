@@ -2,178 +2,80 @@
 #
 # SPDX-License-Identifier: MIT
 """
-Exports the network handed to the solver as a datarecord with its mathspec.
+Exports the network handed to the solver as a datarecord.
 
-Reads the composed network of the last planning horizon (for perfect foresight
-the stacked multi-period network) and applies the same preparation that
-`solve_network` applies before it builds the model. It writes the network as a
-datarecord with `datarecord.tools.pypsa.PyPSA`, together with the data of the
-constraints that PyPSA's model does not hold: the global constraints of the
-network and the custom constraints of `solve_network`
-(`scripts.lib.mathspec_constraints`). It copies the base mathspec spec that
-datarecord ships and the static math of those constraints
-(`scripts/lib/mathspec/`) into `math/`, merges the three files, loads them
-with mathspec and checks that every name the merged spec binds to is in the
-written record.
+Reads the composed network of one planning horizon, applies the preparation
+that `solve_network` applies before it builds the model, and writes the
+network as a standalone datarecord with `datarecord.tools.pypsa.PyPSA`.
+The shapes are set here only, since not every composed network carries
+them: the clustered onshore and offshore regions on the buses, and the
+country and offshore shapes on a `country` dim that `bus.country` refers to
+(`set_shapes`).
+Custom constraints of `solve_network` are not exported: a solve of the record
+uses PyPSA's own math.
 
 The script needs the `datarecord` pixi environment:
 `pixi run -e datarecord snakemake -call build_datarecord`.
 """
 
 import logging
-import shutil
-from pathlib import Path
 
-import mathspec
+import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pypsa
-from datarecord import Record, combine, connect, write_record
-from datarecord.tools.pypsa import MATHSPEC, PyPSA
+from datarecord import Workspace
+from datarecord.tools.pypsa import PyPSA
 
 from scripts._helpers import configure_logging, set_scenario_config
-from scripts.lib.mathspec_constraints import SPECS, constraint_data, extension
 from scripts.solve_network import prepare_network
 
 logger = logging.getLogger(__name__)
 
+STUDY_REGION = "EU"
 
-def drop_bus_country_duplicates(n: pypsa.Network) -> None:
+
+def set_shapes(n: pypsa.Network, inputs) -> None:
     """
-    Drop a component `country` column that repeats the country of its bus.
+    Replace the network's shapes with the bus regions and the country shapes.
 
-    The bus country is the source of truth, and a record holds one attribute
-    `country`. A component whose `country` differs from the country of its
-    bus (`bus`, or `bus0` for a branch) raises.
+    Bus regions are `Bus` shapes of type `onshore` and `offshore`. Country and
+    offshore shapes are shapes of the component `country`, which the record
+    holds as a `country` dim, with the same two types. Where a bus names the
+    study region `EU`, it gets the dissolve of every country's shape of each
+    type. A `bus.country` naming no country shape is dropped, since the record
+    refers `bus.country` to the `country` dim.
     """
-    for c in n.components:
-        if c.name == "Bus" or "country" not in c.static:
-            continue
-        port = "bus" if "bus" in c.static else "bus0"
-        bus_country = c.static[port].map(n.buses.country)
-        clash = c.static.index[c.static.country != bus_country]
-        if not clash.empty:
-            raise ValueError(
-                f"{c.name} components {list(clash)} carry a country that differs "
-                "from the country of their bus."
-            )
-        c.static.drop(columns="country", inplace=True)
-
-
-def drop_port_voltages(n: pypsa.Network) -> None:
-    """
-    Drop the ``voltage_bus0`` and ``voltage_bus1`` columns of a branch.
-
-    They repeat ``v_nom`` of the bus at each port, which the record carries on
-    the bus. A branch whose port voltage differs from ``v_nom`` of its bus raises.
-    """
-    for c in n.components[list(n.branch_components)]:
-        for port in c.ports:
-            column = f"voltage_bus{port}"
-            if column not in c.static:
-                continue
-            bus_v_nom = c.static[f"bus{port}"].map(n.buses.v_nom)
-            clash = c.static.index[c.static[column] != bus_v_nom]
-            if not clash.empty:
-                raise ValueError(
-                    f"{c.name} components {list(clash)} carry a {column} that differs "
-                    "from v_nom of their bus."
-                )
-            c.static.drop(columns=column, inplace=True)
-
-
-def prefix_shared_entity_columns(n: pypsa.Network) -> None:
-    """
-    Prefix a custom component column with ``entity_`` where a bus column has its name.
-
-    A record has one flat attribute namespace, so a custom component column
-    whose name a bus column also takes (``location``, ``unit``, ``v_nom``, or
-    ``tags`` from OSM) cannot be told apart from it. The bus column keeps its
-    name, as the bus registry fixes most of them.
-    """
-    bus_columns = set(n.buses.columns) | set(n.components.buses.defaults.index)
-    for c in n.components:
-        if c.name in ("Bus", "Carrier", "GlobalConstraint", "Shape"):
-            continue
-        shared = [
-            column
-            for column in c.static.columns
-            if column in bus_columns and column not in c.defaults.index
-        ]
-        c.static.rename(
-            columns={column: f"entity_{column}" for column in shared}, inplace=True
-        )
-
-
-def rename_shared_one_port_names(n: pypsa.Network) -> None:
-    """
-    Give a one-port component a name of its own where a branch shares it.
-
-    A record names an entity once across all component types; PyPSA scopes
-    names per type, and PyPSA-Eur gives a load and the link that supplies it
-    one name (``EU shipping oil``). The one-port takes the suffix
-    `` (<type>)``; branch names stay, as the custom constraints read them.
-    PyPSA's ``rename_component_names`` fails on a generator here, as it looks
-    for a ``generator`` column in every component type.
-    """
-    branches = {
-        name for c in n.components[list(n.branch_components)] for name in c.static.index
+    n.remove("Shape", n.shapes.index)
+    sources = {
+        ("Bus", "onshore"): inputs.onshore_regions,
+        ("Bus", "offshore"): inputs.offshore_regions,
+        ("country", "onshore"): inputs.country_shapes,
+        ("country", "offshore"): inputs.offshore_shapes,
     }
-    for c in n.components[["Generator", "Load", "Store", "StorageUnit"]]:
-        shared = c.static.index.intersection(list(branches))
-        mapping = {name: f"{name} ({c.name})" for name in shared}
-        c.static.rename(index=mapping, inplace=True)
-        for frame in c.dynamic.values():
-            frame.rename(columns=mapping, inplace=True)
-        if c.name == "Generator":
-            n.buses["generator"] = n.buses.generator.replace(mapping)
-
-
-def add_zero_gas_usage(n: pypsa.Network) -> None:
-    """
-    Give every carrier a `gas_usage` of zero where no gas limit set one.
-
-    The static math of primary energy limits reads `gas_usage` beside
-    `co2_emissions`, so the record carries it for every network.
-    """
-    if "gas_usage" not in n.carriers:
-        n.carriers["gas_usage"] = 0.0
-
-
-def drop_land_use_columns(n: pypsa.Network) -> None:
-    """
-    Drop the ``nom_max_{carrier}_{period}`` bus columns of the land-use limit.
-
-    ``land_use_check`` confirms they hold the limit that the math states from
-    ``land_use_limit``, which carries the period as a dim.
-    """
-    n.buses.drop(
-        columns=n.buses.columns[n.buses.columns.str.startswith("nom_")], inplace=True
-    )
-
-
-def export_datarecord(
-    n: pypsa.Network,
-    config: dict,
-    custom_extra_functionality: str | None,
-    output: Path,
-) -> None:
-    """Write the record with the constraint data, copy the static math, then check them."""
-    data = constraint_data(n, config, custom_extra_functionality)
-    drop_land_use_columns(n)
-    base = PyPSA.to_datarecord(n)
-    record = combine(base, extension(data, base.schema))
-    con = connect()
-    write_record(None, record, con, uri=str(output / "record"))
-    math = output / "math"
-    math.mkdir(parents=True)
-    for source in (MATHSPEC, *SPECS):
-        shutil.copy(source, math / source.name)
-    spec = mathspec.merge([math / source.name for source in (MATHSPEC, *SPECS)])
-    PyPSA.check_spec(spec, Record.at(str(output / "record"), con))
-    logger.info(
-        f"Wrote the datarecord and a spec of {len(spec.constraints)} constraints "
-        f"to {output}."
-    )
+    for (component, which), path in sources.items():
+        shapes = gpd.read_file(path).to_crs(n.crs)
+        if component == "country" and (n.buses.country == STUDY_REGION).any():
+            region = gpd.GeoDataFrame(
+                {"name": [STUDY_REGION]}, geometry=[shapes.union_all()], crs=n.crs
+            )
+            shapes = pd.concat([shapes, region], ignore_index=True)
+        n.add(
+            "Shape",
+            f"{component} " + shapes.name + f" {which}",
+            geometry=shapes.geometry.values,
+            idx=shapes.name.values,
+            component=component,
+            type=which,
+        )
+    named = n.c.Shape.static.query("component == 'country'").idx
+    unknown = n.buses.country.notna() & ~n.buses.country.isin(named)
+    if unknown.any():
+        logger.warning(
+            f"Dropping bus countries without a country shape: "
+            f"{sorted(n.buses.country[unknown].unique())}."
+        )
+    n.buses.loc[unknown, "country"] = np.nan
 
 
 if __name__ == "__main__":
@@ -182,7 +84,8 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "build_datarecord",
-            configfiles="config/test/config.keep_assets.yaml",
+            configfiles="config/test/config.preaggregated.yaml",
+            horizon=2050,
         )
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
@@ -196,19 +99,18 @@ if __name__ == "__main__":
         config=snakemake.config,
         solve_opts=solve_opts,
         foresight=snakemake.params.foresight,
-        planning_horizons=str(snakemake.params.planning_horizons[-1]),
+        planning_horizons=snakemake.wildcards.horizon,
         co2_sequestration_potential=snakemake.params.co2_sequestration_potential,
         limit_max_growth=snakemake.params.sector["limit_max_growth"],
         rolling_horizon=solve_opts["rolling_horizon"],
     )
-    drop_bus_country_duplicates(n)
-    drop_port_voltages(n)
-    rename_shared_one_port_names(n)
-    prefix_shared_entity_columns(n)
-    add_zero_gas_usage(n)
-    export_datarecord(
-        n,
-        snakemake.config,
-        snakemake.params.custom_extra_functionality or None,
-        Path(snakemake.output.directory),
-    )
+
+    for c in n.components[["Bus", "Line", "Link"]]:
+        flags = c.static.columns.intersection(["under_construction", "underground"])
+        c.static[flags] = c.static[flags].fillna(False).astype(bool)
+
+    set_shapes(n, snakemake.input)
+
+    ws = Workspace()
+    ws.write(PyPSA.to_datarecord(n, ws.con), snakemake.output.directory)
+    logger.info(f"Wrote the datarecord to {snakemake.output.directory}.")

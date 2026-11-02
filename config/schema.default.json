@@ -684,15 +684,21 @@
         },
         "keep_assets": {
           "default": false,
-          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. With `cluster_network: n_clusters: all` the network keeps its unsimplified topology; with a number of clusters, buses, lines and links are clustered as usual while each power plant stays its own unit at its cluster bus. Requires `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended with `n_clusters: all`.",
           "type": "boolean"
         },
         "keep_assets_busmaps": {
-          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries. The busmaps cluster the normally simplified network; with `cluster_network: n_clusters` a number, each cluster bus takes the busmap entry holding most of its load.",
           "items": {
             "type": "integer"
           },
           "type": "array"
+        },
+        "keep_assets_min_capacity": {
+          "default": 0.0,
+          "description": "Capacity in MW below which renewable power plants are merged when `keep_assets` is true: into one unit per candidate, build year and lifetime, located at the multipoint of its members. 0 keeps every plant as its own unit.",
+          "minimum": 0,
+          "type": "number"
         }
       }
     },
@@ -14087,15 +14093,21 @@
         },
         "keep_assets": {
           "default": false,
-          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. Requires `cluster_network: n_clusters: all`, `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended.",
+          "description": "Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. With `cluster_network: n_clusters: all` the network keeps its unsimplified topology; with a number of clusters, buses, lines and links are clustered as usual while each power plant stays its own unit at its cluster bus. Requires `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended with `n_clusters: all`.",
           "type": "boolean"
         },
         "keep_assets_busmaps": {
-          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries.",
+          "description": "Numbers of clusters for which a busmap is written to the bus table as column `busmap_{n}` when `keep_assets` is true. Each must be at least the number of countries. The busmaps cluster the normally simplified network; with `cluster_network: n_clusters` a number, each cluster bus takes the busmap entry holding most of its load.",
           "items": {
             "type": "integer"
           },
           "type": "array"
+        },
+        "keep_assets_min_capacity": {
+          "default": 0.0,
+          "description": "Capacity in MW below which renewable power plants are merged when `keep_assets` is true: into one unit per candidate, build year and lifetime, located at the multipoint of its members. 0 keeps every plant as its own unit.",
+          "minimum": 0,
+          "type": "number"
         }
       }
     },

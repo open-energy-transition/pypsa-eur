@@ -1,0 +1,105 @@
+# yaml-language-server: $schema=../schema.default.json
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+#
+# The largest input datarecord: all of Europe, every bus, every power plant as
+# its own unit, one investment period (2030), January at hourly resolution.
+# It needs far more memory than a laptop, so run it on an HPC node and raise
+# the memory of the heavy rules, e.g.
+#
+#   pixi run -e datarecord snakemake -c4 \
+#     --set-resources compose_network:mem_mb=500000 build_datarecord:mem_mb=200000 \
+#     --configfile config/test/config.europe-keep-assets-full.yaml \
+#     -- resources/europe-keep-assets-full/datarecords/composed_2030
+
+run:
+  name: europe-keep-assets-full
+  disable_progressbar: true
+  shared_resources:
+    policy: false
+
+foresight: perfect
+planning_horizons: [2030]
+
+snapshots:
+  start: "2013-01-01"
+  end: "2013-02-01"
+  inclusive: left
+
+atlite:
+  default_cutout: europe-2013-sarah3-era5
+
+electricity:
+  gaslimit_enable: false
+  transmission_limit: vopt
+  extendable_carriers:
+    Generator:
+    - solar
+    - solar-hsat
+    - onwind
+    - offwind-ac
+    - offwind-dc
+    - offwind-float
+    - OCGT
+    - CCGT
+    - nuclear
+    StorageUnit:
+    - battery
+    Store:
+    - H2
+    Link:
+    - H2 pipeline
+  renewable_carriers:
+  - solar
+  - solar-hsat
+  - onwind
+  - offwind-ac
+  - offwind-dc
+  - offwind-float
+  estimate_renewable_capacities:
+    enable: true
+    from_powerplantmatching: true
+    year: 2020
+    expansion_limit: false
+    technology_mapping:
+      Offshore: offwind-ac
+      Onshore: onwind
+      PV: solar
+
+existing_capacities:
+  grouping_years_power:
+  - 1900
+  - 2025
+  conventional_carriers: []
+
+clustering:
+  keep_assets: true
+  keep_assets_busmaps: [100]
+  simplify_network:
+    to_380: false
+  temporal:
+    averaging: false
+    segmentation: false
+  cluster_network:
+    algorithm: kmeans
+    n_clusters: all
+
+sector:
+  enabled: false
+  heating: false
+
+solving:
+  solver:
+    name: highs
+    options: highs-hipo
+  check_objective:
+    enable: false
+  options:
+    transmission_losses: false
+
+conventional:
+  dynamic_fuel_price: false
+  unit_commitment: false
+  nuclear:
+    p_max_pu: data/nuclear_p_max_pu.csv

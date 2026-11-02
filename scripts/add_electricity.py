@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 import powerplantmatching as pm
 import pypsa
+import shapely
 import xarray as xr
 from pypsa.clustering.spatial import DEFAULT_ONE_PORT_STRATEGIES, normed_or_uniform
 
@@ -313,6 +314,57 @@ def points_to_wkt(df: pd.DataFrame) -> pd.Series:
     """Return WKT points in EPSG:4326 from the `lon` and `lat` columns."""
     points = gpd.GeoSeries(gpd.points_from_xy(df.lon, df.lat), index=df.index)
     return points.to_wkt()
+
+
+def group_small_units(
+    units: pd.DataFrame, candidates: pd.Series, min_capacity: float
+) -> pd.DataFrame:
+    """
+    Merge the units below `min_capacity` MW into one unit per candidate, build year and lifetime.
+
+    A merged unit is labelled ``small-<build_year>-<lifetime>`` and located at
+    the multipoint of its members, so it retires and sits where they do.
+
+    Parameters
+    ----------
+    units : pd.DataFrame
+        Units with columns `capacity`, `build_year`, `lifetime`, `lon` and `lat`.
+    candidates : pd.Series
+        The candidate each unit is a copy of.
+    min_capacity : float
+        The capacity in MW below which a unit is merged.
+
+    Returns
+    -------
+    pd.DataFrame
+        Units with columns `candidate`, `capacity`, `build_year`, `lifetime`
+        and `geometry` (WKT).
+    """
+    keys = ["candidate", "build_year", "lifetime"]
+    units = units.assign(candidate=candidates, geometry=points_to_wkt(units))[
+        [*keys, "capacity", "geometry"]
+    ]
+    small = units.capacity < min_capacity
+    merged = (
+        units[small]
+        .groupby(keys)
+        .agg(
+            capacity=("capacity", "sum"),
+            geometry=(
+                "geometry",
+                lambda g: shapely.multipoints(shapely.from_wkt(g.values)).wkt,
+            ),
+        )
+        .reset_index()
+    )
+    merged.index = [
+        f"small-{year}-{lifetime:g}"
+        for year, lifetime in zip(merged.build_year, merged.lifetime)
+    ]
+    logger.info(
+        f"Merging {small.sum()} units below {min_capacity} MW into {len(merged)}."
+    )
+    return pd.concat([units[~small], merged])
 
 
 def load_and_aggregate_powerplants(
@@ -1058,7 +1110,14 @@ def renewable_powerplants(
         df_fueltype = df.query("Fueltype == @fueltype")
         geometry = gpd.points_from_xy(df_fueltype.lon, df_fueltype.lat)
         caps = gpd.GeoDataFrame(df_fueltype, geometry=geometry, crs=4326)
-        plants[carrier] = caps.sjoin(class_regions)
+        joined = caps.sjoin(class_regions)
+        twice = joined.index.duplicated()
+        if twice.any():
+            logger.warning(
+                f"{carrier} plants {list(joined.index[twice])} lie in more than "
+                "one class region; each keeps its first."
+            )
+        plants[carrier] = joined[~twice]
     return plants
 
 
@@ -1097,11 +1156,59 @@ def add_fixed_copies_of_candidates(
     )
 
 
+def nearest_candidates(
+    n: pypsa.Network, plants: gpd.GeoDataFrame, candidates: pd.Series, carrier: str
+) -> pd.Series:
+    """
+    Replace candidates missing from the network by the candidate of the nearest class region.
+
+    A class region has no candidate where its bus was dropped from the renewable
+    profile for too little potential, which an existing plant does not rule out.
+
+    Parameters
+    ----------
+    plants : gpd.GeoDataFrame
+        The plants with their point geometry.
+    candidates : pd.Series
+        The candidate name of each plant.
+    carrier : str
+        The carrier of the plants and the candidates.
+
+    Returns
+    -------
+    pd.Series
+        The candidate name of each plant, every one in `n.generators`.
+    """
+    missing = ~candidates.isin(n.generators.index)
+    if not missing.any():
+        return candidates
+    regions = n.generators.query(
+        "carrier == @carrier and asset_status == 'candidate'"
+    ).geometry
+    regions = gpd.GeoDataFrame(
+        {"candidate": regions.index},
+        geometry=gpd.GeoSeries.from_wkt(regions.values),
+        crs=4326,
+    ).to_crs(3035)
+    stranded = plants.loc[missing, ["name", "capacity", "geometry"]].to_crs(3035)
+    nearest = stranded.sjoin_nearest(regions, distance_col="distance")
+    nearest = nearest[~nearest.index.duplicated()]
+    logger.warning(
+        f"{carrier} plants without a candidate in their class region join the "
+        f"nearest candidate:\n"
+        + nearest.assign(
+            region=candidates[missing], distance=nearest["distance"].div(1e3).round(1)
+        )[["name", "capacity", "region", "candidate", "distance"]].to_string()
+    )
+    return candidates.mask(missing, nearest.candidate)
+
+
 def attach_renewable_units(
     n: pypsa.Network,
     tech_map: dict[str, str],
     smk_inputs: dict,
     first_horizon: int,
+    min_capacity: float,
 ) -> None:
     """
     Attach each renewable power plant as a fixed generator with the profile of its resource class.
@@ -1116,24 +1223,27 @@ def attach_renewable_units(
         The rule inputs with `powerplants` and `class_regions_{carrier}`.
     first_horizon : int
         The first planning horizon.
+    min_capacity : float
+        The capacity in MW below which plants are merged (`group_small_units`).
     """
     for carrier, plants in renewable_powerplants(smk_inputs, tech_map).items():
         plants = plants.rename(columns=str.lower).assign(carrier=carrier)
         candidates = plants.bus + " " + plants.bin.astype(str) + " " + carrier
+        candidates = nearest_candidates(n, plants, candidates, carrier)
         lifetime = candidates.map(n.generators.lifetime)
         units = assign_unit_dates(plants, lifetime, first_horizon)
-        candidates = candidates[units.index]
-        names = candidates + " " + units.index.astype(str)
+        units = group_small_units(units, candidates[units.index], min_capacity)
+        names = units.candidate + " " + units.index.astype(str)
         logger.info(f"Adding {len(units)} {carrier} units.")
         add_fixed_copies_of_candidates(
             n,
-            pd.Index(candidates),
+            pd.Index(units.candidate),
             pd.Index(names),
             p_nom=units.capacity.set_axis(names),
             build_year=units.build_year.set_axis(names),
             lifetime=units.lifetime.set_axis(names),
         )
-        n.generators.loc[names, "geometry"] = points_to_wkt(units).set_axis(names)
+        n.generators.loc[names, "geometry"] = units.geometry.set_axis(names)
 
 
 def attach_renewable_powerplants(
@@ -1634,7 +1744,13 @@ def main(
     if keep_assets and estimate_renewable_caps["enable"]:
         tech_map = estimate_renewable_caps["technology_mapping"]
         if estimate_renewable_caps["from_powerplantmatching"]:
-            attach_renewable_units(n, tech_map, inputs, first_horizon)
+            attach_renewable_units(
+                n,
+                tech_map,
+                inputs,
+                first_horizon,
+                params.clustering["keep_assets_min_capacity"],
+            )
         if estimate_renewable_caps["from_irenastat"]:
             attach_renewable_estimates(
                 n, estimate_renewable_caps["year"], tech_map, params.countries
@@ -1673,6 +1789,7 @@ def main(
     if keep_assets and not ppl.empty:
         for c in n.components[["Generator", "StorageUnit"]]:
             units_i = c.static.index.intersection(ppl.index)
-            c.static.loc[units_i, "geometry"] = ppl.geometry[units_i]
+            if not units_i.empty:
+                c.static.loc[units_i, "geometry"] = ppl.geometry[units_i]
 
     logger.info("Completed electricity components")

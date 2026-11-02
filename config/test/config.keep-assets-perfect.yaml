@@ -1,0 +1,108 @@
+# yaml-language-server: $schema=../schema.default.json
+# SPDX-FileCopyrightText: Contributors to PyPSA-Eur <https://github.com/pypsa/pypsa-eur>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+tutorial: true
+
+run:
+  name: test-elec-keep-assets-perfect
+  disable_progressbar: true
+  shared_resources:
+    policy: false
+
+countries:
+- BE
+
+foresight: perfect
+planning_horizons: [2030, 2040, 2050]
+
+snapshots:
+  start: "2013-01-01"
+  end: "2014-01-01"
+  inclusive: left
+
+electricity:
+  gaslimit_enable: false
+  transmission_limit: vopt
+  extendable_carriers:
+    Generator:
+    - solar
+    - solar-hsat
+    - onwind
+    - offwind-ac
+    - offwind-dc
+    - offwind-float
+    - OCGT
+    - CCGT
+    - nuclear
+    StorageUnit:
+    - battery
+    Store:
+    - H2
+    Link:
+    - H2 pipeline
+  renewable_carriers:
+  - solar
+  - solar-hsat
+  - onwind
+  - offwind-ac
+  - offwind-dc
+  - offwind-float
+  estimate_renewable_capacities:
+    enable: true
+    from_powerplantmatching: true
+    year: 2020
+    expansion_limit: false
+    technology_mapping:
+      Offshore: offwind-ac
+      Onshore: onwind
+      PV: solar
+
+existing_capacities:
+  grouping_years_power:
+  - 1900
+  - 2025
+  conventional_carriers: []
+
+renewable:
+  offwind-ac:
+    max_depth: false
+  offwind-dc:
+    max_depth: false
+  offwind-float:
+    max_depth: false
+    min_depth: false
+
+clustering:
+  keep_assets: true
+  keep_assets_busmaps: [5]
+  exclude_carriers: []
+  simplify_network:
+    to_380: false
+  temporal:
+    averaging: false
+    segmentation: false
+  cluster_network:
+    algorithm: kmeans
+    n_clusters: all
+
+sector:
+  enabled: false
+  heating: false
+
+solving:
+  solver:
+    name: highs
+    options: highs-hipo
+  mem_mb: 4000
+  check_objective:
+    enable: false
+  options:
+    transmission_losses: false
+
+conventional:
+  dynamic_fuel_price: false
+  unit_commitment: false
+  nuclear:
+    p_max_pu: data/nuclear_p_max_pu.csv

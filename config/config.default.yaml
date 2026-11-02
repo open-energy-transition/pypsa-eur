@@ -1239,6 +1239,7 @@ clustering:
   keep_assets_busmaps:
   - 5
   - 10
+  keep_assets_min_capacity: 0.0
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration/#adjustments_cf
 adjustments:
