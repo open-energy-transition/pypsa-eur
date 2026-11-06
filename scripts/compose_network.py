@@ -122,6 +122,10 @@ if __name__ == "__main__":
 
     if foresight == "perfect":
         n = prepare_perfect_foresight(n, n_previous, params, current_horizon)
+        if not params.clustering["keep_assets"]:
+            adjust_renewable_capacity_limits(
+                n, str(current_horizon), renewable_carriers
+            )
         apply_phase_outs(n, phase_outs, horizons)
 
     apply_co2_budget_constraints(

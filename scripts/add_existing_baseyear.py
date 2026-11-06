@@ -30,6 +30,7 @@ import powerplantmatching as pm
 import pypsa
 import xarray as xr
 
+from scripts.add_electricity import cohort_build_years
 from scripts.build_energy_totals import cartesian
 from scripts.definitions.heat_system import HeatSystem
 from scripts.prepare_sector_network import cluster_heat_buses, define_spatial
@@ -165,6 +166,8 @@ def add_power_capacities_installed_before_baseyear(
     lifetime_values: dict[str, float],
     renewable_carriers: list[str],
     spatial: SimpleNamespace,
+    conventional: bool,
+    horizons: list[int] | None = None,
     solar_rooftop_ratio: float = 0.5,
 ) -> None:
     """
@@ -192,6 +195,13 @@ def add_power_capacities_installed_before_baseyear(
         List of renewable carriers in the network
     spatial: SimpleNamespace
         Container of spatial data
+    conventional: bool
+        Whether to add conventional plants. Without sector coupling,
+        `add_electricity` adds them, so only renewables are added here.
+    horizons: list[int], optional
+        The planning horizons. If given, renewables are grouped into cohorts that
+        retire between the same two horizons (`cohort_build_years`) instead of by
+        `grouping_years`.
     solar_rooftop_ratio: float
         Ratio of solar capacity to assign to rooftop vs utility-scale (between 0 and 1)
     """
@@ -244,6 +254,9 @@ def add_power_capacities_installed_before_baseyear(
         df_agg.DateIn + df_agg.Fueltype.map(costs.lifetime).fillna(30)
     )
 
+    if not conventional:
+        df_agg = df_agg.drop(df_agg.index)
+
     # include renewables in df_agg
     add_existing_renewables(
         df_agg=df_agg,
@@ -274,6 +287,13 @@ def add_power_capacities_installed_before_baseyear(
         right=True,
         include_lowest=True,
     ).astype(int)
+
+    if horizons is not None:
+        is_renewable = df_agg.Fueltype.isin(renewable_carriers)
+        for _, group in df_agg[is_renewable].groupby("Fueltype"):
+            df_agg.loc[group.index, "grouping_year"] = cohort_build_years(
+                group.DateIn, horizons, group.lifetime.iloc[0], group.DateIn.max()
+            ).astype(int)
 
     # calculate (adjusted) remaining lifetime before phase-out (+1 because assuming
     # phase out date at the end of the year)
@@ -812,7 +832,7 @@ def main(
 
     grouping_years_power = params.existing_capacities["grouping_years_power"]
     grouping_years_heat = params.existing_capacities["grouping_years_heat"]
-    if options["enabled"] and not params.clustering["keep_assets"]:
+    if not params.clustering["keep_assets"]:
         add_power_capacities_installed_before_baseyear(
             n=n,
             costs=costs,
@@ -824,6 +844,8 @@ def main(
             lifetime_values=params.costs["fill_values"],
             renewable_carriers=renewable_carriers,
             spatial=spatial,
+            conventional=options["enabled"],
+            horizons=params.horizons if params.foresight == "perfect" else None,
             solar_rooftop_ratio=params.existing_capacities["solar_rooftop_ratio"],
         )
 

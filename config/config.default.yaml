@@ -146,6 +146,7 @@ electricity:
     Link: []
   powerplants_filter: "(DateOut > 2025 or DateOut != DateOut) and (DateIn < 2026 or DateIn != DateIn)"
   custom_powerplants: false
+  powerplants_earliest_retirement:
   everywhere_powerplants: []
   conventional_carriers:
   - nuclear

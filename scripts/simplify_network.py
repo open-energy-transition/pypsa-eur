@@ -414,6 +414,21 @@ def remove_converters(n: pypsa.Network) -> pypsa.Network:
     return n, converter_map
 
 
+def relabel_dc_buses(n: pypsa.Network) -> None:
+    """
+    Set the carrier of all DC buses to AC, so that clustering can merge them with AC buses.
+
+    Parameters
+    ----------
+    n : pypsa.Network
+        The network to modify in place.
+    """
+    # TODO: long-term, rename all aggregated AC and DC carriers to `electricity` to avoid confusion
+    is_dc = n.buses.carrier == "DC"
+    logger.info(f"Simplifying {is_dc.sum()} DC bus carriers to AC.")
+    n.buses.loc[is_dc, "carrier"] = "AC"
+
+
 def simplify(
     n: pypsa.Network,
     params: dict,
@@ -449,12 +464,7 @@ def simplify(
     busmaps.append(converter_map)
 
     n, simplify_links_map = simplify_links(n, params.p_max_pu, params.p_min_pu)
-
-    # Rename all DC bus carriers to AC
-    # TODO: long-term, rename all aggregated AC and DC carriers to `electricity` to avoid confusion
-    is_dc_bus_carrier = n.buses["carrier"] == "DC"
-    logger.info(f"Simplifying {is_dc_bus_carrier.sum()} DC bus carriers to AC.")
-    n.buses.loc[is_dc_bus_carrier, "carrier"] = "AC"
+    relabel_dc_buses(n)
 
     busmaps.append(simplify_links_map)
 
@@ -516,8 +526,10 @@ if __name__ == "__main__":
         n_reference, busmaps_reference = simplify(
             n.copy(), params, linetype_380, snakemake.input.admin_shapes
         )
-        busmaps = [n.buses.index.to_series()]
-        regions_busmaps = [remove_converters(n.copy())[1]]
+        n, converter_map = remove_converters(n)
+        relabel_dc_buses(n)
+        busmaps = [converter_map]
+        regions_busmaps = busmaps
     else:
         n, busmaps = simplify(n, params, linetype_380, snakemake.input.admin_shapes)
         n_reference, busmaps_reference = n, busmaps

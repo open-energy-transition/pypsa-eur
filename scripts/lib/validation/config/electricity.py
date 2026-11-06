@@ -203,6 +203,10 @@ class ElectricityConfig(BaseModel):
         False,
         description="Filter query for the custom powerplant database.",
     )
+    powerplants_earliest_retirement: int | None = Field(
+        None,
+        description="Year before which conventional power plants without a decommissioning year do not retire, with `foresight: perfect`. Such a plant retires in the later of this year and its commissioning year plus the technology lifetime. Null retires it at its commissioning year plus the technology lifetime.",
+    )
     everywhere_powerplants: list[str] = Field(
         default_factory=list,
         description="List of conventional power plants to add to every node in the model with zero initial capacity. To be used in combination with `extendable_carriers` to allow for building conventional powerplants irrespective of existing locations.",

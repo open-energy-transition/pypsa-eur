@@ -96,6 +96,7 @@ def test_assign_technology_groups():
     n.add("Generator", "est", bus="b", carrier="solar", asset_status="estimate")
     n.add("Link", "l", bus0="b", bus1="b", carrier="DC")
     n.add("Store", "s", bus="b", carrier="solar")
+    n.add("Load", "d", bus="b", carrier="electricity")
 
     assign_technology_groups(n)
 
@@ -114,6 +115,8 @@ def test_assign_technology_groups():
         "DC",
         "existing",
     ]
+    assert n.loads.technology_group.to_dict() == {"d": "electricity"}
+    assert "asset_status" not in n.loads.columns
 
 
 def test_extend_busmaps():

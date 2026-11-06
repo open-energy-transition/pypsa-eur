@@ -191,7 +191,7 @@ class ClusteringConfig(BaseModel):
     )
     keep_assets: bool = Field(
         False,
-        description="Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. With `cluster_network: n_clusters: all` the network keeps its unsimplified topology; with a number of clusters, buses, lines and links are clustered as usual while each power plant stays its own unit at its cluster bus. Requires `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. `simplify_network: to_380: false` is recommended with `n_clusters: all`.",
+        description="Keep every physical asset as its own component: skip the topology changes of `simplify_network`, keep power plants as individual units and add one extendable candidate per bus and technology. With `cluster_network: n_clusters: all` the network keeps its unsimplified topology; with a number of clusters, buses, lines and links are clustered as usual while each power plant stays its own unit at its cluster bus. Requires `simplify_network: to_substations: false`, a clustering algorithm other than `hac`, `foresight: perfect`, `electricity: everywhere_powerplants: []` and `electricity: estimate_renewable_capacities: expansion_limit: false`. The busmaps cluster a network simplified with the remaining `simplify_network` options, so set them as in the pre-aggregated run to compare with.",
     )
     keep_assets_busmaps: list[int] = Field(
         default_factory=lambda: [5, 10],

@@ -268,15 +268,20 @@ def add_co2_emissions(n, costs, carriers):
 
 
 def assign_unit_dates(
-    units: pd.DataFrame, default_lifetime: pd.Series, first_horizon: int
+    units: pd.DataFrame,
+    default_lifetime: pd.Series,
+    first_horizon: int,
+    earliest_retirement: int | None = None,
 ) -> pd.DataFrame:
     """
     Set build year and lifetime of individual units from their commissioning and decommissioning years.
 
-    Missing commissioning years are filled with the mean of the carrier, missing
-    decommissioning years with the commissioning year plus the default lifetime
-    (30 years where unknown). Units without commissioning year and units retired
-    before the first planning horizon are dropped.
+    Missing commissioning years are filled with the mean of the carrier, or of all
+    units where no unit of the carrier has one. Missing decommissioning years are
+    filled with the commissioning year plus the default lifetime (30 years where
+    unknown), but no earlier than the earliest retirement year.
+    Units without commissioning year after the fill and units retired before the
+    first planning horizon are dropped.
 
     Parameters
     ----------
@@ -286,28 +291,54 @@ def assign_unit_dates(
         Lifetime per unit used where `dateout` is missing.
     first_horizon : int
         The first planning horizon.
+    earliest_retirement : int, optional
+        The year before which units without `dateout` do not retire.
 
     Returns
     -------
     pd.DataFrame
         Units with columns `build_year` and `lifetime`.
     """
-    datein = units.datein.fillna(units.groupby("carrier").datein.transform("mean") // 1)
+    carrier_mean = units.groupby("carrier").datein.transform("mean")
+    datein = units.datein.fillna(carrier_mean.fillna(units.datein.mean()) // 1)
     if datein.isna().any():
         logger.warning(
             f"Dropping {datein.isna().sum()} units without commissioning year "
             f"of carriers {units.carrier[datein.isna()].unique().tolist()}."
         )
     units = units.assign(datein=datein).dropna(subset="datein")
-    dateout = units.dateout.combine_first(
-        units.datein + default_lifetime.reindex(units.index).fillna(30)
-    )
+    filled = units.datein + default_lifetime.reindex(units.index).fillna(30)
+    if earliest_retirement is not None:
+        filled = filled.clip(lower=earliest_retirement)
+    dateout = units.dateout.combine_first(filled)
     units = units.assign(
         build_year=units.datein.astype(int), lifetime=dateout - units.datein
     )
     retired = units.build_year + units.lifetime <= first_horizon
     logger.info(f"Dropping {retired.sum()} units retired by {first_horizon}.")
     return units.loc[~retired]
+
+
+def last_active_horizon(units: pd.DataFrame, horizons: list[int]) -> pd.Series:
+    """
+    Return the last planning horizon in which each unit is active, that is, the last horizon before its retirement year.
+
+    Parameters
+    ----------
+    units : pd.DataFrame
+        Units with columns `build_year` and `lifetime`.
+    horizons : list[int]
+        The planning horizons.
+
+    Returns
+    -------
+    pd.Series
+        The last active horizon per unit, NaN for units retired by the first horizon.
+    """
+    retirement = units.build_year + units.lifetime
+    return pd.cut(
+        retirement, bins=[*horizons, np.inf], labels=horizons, ordered=False
+    ).astype(float)
 
 
 def points_to_wkt(df: pd.DataFrame) -> pd.Series:
@@ -375,7 +406,8 @@ def load_and_aggregate_powerplants(
     exclude_carriers: list = None,
     estimate_efficiencies: dict | None = None,
     keep_assets: bool = False,
-    first_horizon: int | None = None,
+    horizons: list[int] | None = None,
+    earliest_retirement: int | None = None,
 ) -> pd.DataFrame:
     if not aggregation_strategies:
         aggregation_strategies = {}
@@ -430,19 +462,25 @@ def load_and_aggregate_powerplants(
     )
 
     if keep_assets:
-        units = assign_unit_dates(ppl, ppl.lifetime, first_horizon)
+        units = assign_unit_dates(ppl, ppl.lifetime, horizons[0], earliest_retirement)
         units["geometry"] = points_to_wkt(units)
         units.index = units.bus + " " + units.carrier + " " + units.index.astype(str)
         return units
-
-    ppl["lifetime"] = (ppl.dateout - ppl.datein).fillna(np.inf)
-    ppl["build_year"] = ppl.datein.fillna(0).astype(int)
 
     strategies = {
         **DEFAULT_ONE_PORT_STRATEGIES,
         **{"country": "first"},
         **aggregation_strategies.get("generators", {}),
     }
+    if horizons is None:
+        ppl["lifetime"] = (ppl.dateout - ppl.datein).fillna(np.inf)
+        ppl["build_year"] = ppl.datein.fillna(0).astype(int)
+        ppl["last_horizon"] = 0
+    else:
+        ppl = assign_unit_dates(ppl, ppl.lifetime, horizons[0], earliest_retirement)
+        ppl["last_horizon"] = last_active_horizon(ppl, horizons).astype(int)
+        ppl["retirement"] = ppl.build_year + ppl.lifetime
+        strategies |= {"build_year": "max", "retirement": "min"}
     strategies = {k: v for k, v in strategies.items() if k in ppl.columns}
 
     to_aggregate = ~ppl.carrier.isin(exclude_carriers)
@@ -466,7 +504,7 @@ def load_and_aggregate_powerplants(
                 suffix = pd.cut(df_c.efficiency, bins=bins, labels=labels).astype(str)
                 df.update({"carrier": df_c.carrier + " " + suffix + " efficiency"})
 
-    grouper = ["bus", "carrier"]
+    grouper = ["bus", "carrier", "last_horizon"]
     weights = df.groupby(grouper).p_nom.transform(normed_or_uniform)
 
     for k, v in strategies.items():
@@ -476,6 +514,9 @@ def load_and_aggregate_powerplants(
 
     aggregated = df.groupby(grouper, as_index=False).agg(strategies)
     aggregated.index = aggregated.bus + " " + aggregated.carrier
+    if horizons is not None:
+        aggregated.index += " " + aggregated.last_horizon.astype(str)
+        aggregated.lifetime = aggregated.retirement - aggregated.build_year
     aggregated.build_year = aggregated.build_year.astype(int)
     aggregated.carrier = aggregated.carrier.str.replace(
         r" Q\d+ efficiency", "", regex=True
@@ -744,7 +785,7 @@ def attach_conventional_generators(
     conventional_inputs: dict,
     unit_commitment: pd.DataFrame = None,
     fuel_price: pd.DataFrame = None,
-    keep_assets: bool = False,
+    fixed_existing: bool = False,
 ):
     """
     Attach conventional generators to the network.
@@ -771,7 +812,7 @@ def attach_conventional_generators(
         DataFrame containing unit commitment data, by default None.
     fuel_price : pd.DataFrame, optional
         DataFrame containing fuel price data, by default None.
-    keep_assets : bool, optional
+    fixed_existing : bool, optional
         If True, existing units of conventional carriers are fixed and one
         extendable candidate per bus is added for each extendable carrier.
     """
@@ -784,7 +825,7 @@ def attach_conventional_generators(
     )
 
     candidates_i = pd.Index([])
-    if keep_assets:
+    if fixed_existing:
         candidates = conventional_candidates(
             n, costs, sorted(set(extendable_carriers["Generator"]) & set(carriers))
         )
@@ -836,7 +877,7 @@ def attach_conventional_generators(
         p_nom=ppl.p_nom.where(ppl.carrier.isin(conventional_carriers), 0),
         p_nom_extendable=(
             ppl.index.isin(candidates_i)
-            if keep_assets
+            if fixed_existing
             else ppl.carrier.isin(extendable_carriers["Generator"])
         ),
         efficiency=ppl.efficiency,
@@ -1296,60 +1337,142 @@ def country_capacities(
     return pd.Series(0.0, index=countries)
 
 
+def irena_additions(year: int, tech_map: dict, countries: list) -> pd.DataFrame:
+    """
+    Return IRENASTAT capacity additions by technology and country up to a year.
+
+    The additions are the yearly increase of the reported capacity. The first
+    reported year holds all capacity up to that year.
+
+    Returns
+    -------
+    pd.DataFrame
+        Additions in MW, indexed by `Technology` and `Country`, with one column per year.
+    """
+    capacities = pm.data.IRENASTAT().powerplant.convert_country_to_alpha2()
+    capacities = capacities.query(
+        "Year <= @year and Technology in @tech_map and Country in @countries"
+    )
+    cumulative = (
+        capacities.groupby(["Technology", "Country", "Year"])
+        .Capacity.sum()
+        .unstack("Year", fill_value=0.0)
+    )
+    return cumulative.diff(axis=1).fillna(cumulative)
+
+
+def cohort_build_years(
+    build_year: pd.Series, horizons: list, lifetime: float, year: int
+) -> pd.Series:
+    """
+    Map build years to the latest build year of their cohort.
+
+    A cohort holds all build years that retire between the same two planning
+    horizons, so all its members are active in the same horizons. The cohort
+    edges are each horizon minus `lifetime`, and the last cohort ends in `year`.
+    Build years after `year` map to NaN.
+    """
+    edges = sorted({h - lifetime for h in horizons if h - lifetime < year} | {year})
+    return pd.cut(
+        build_year, bins=[-np.inf, *edges], labels=edges, ordered=False
+    ).astype(float)
+
+
 def attach_renewable_estimates(
-    n: pypsa.Network, year: int, tech_map: dict, countries: list
+    n: pypsa.Network, year: int, tech_map: dict, countries: list, horizons: list
 ) -> None:
     """
     Attach the IRENASTAT capacities not covered by renewable units as fixed estimate generators.
 
-    The remainder per country is distributed to the candidates of the country
-    with the heuristic `n.generators_t.p_max_pu.mean() * n.generators.p_nom_max`.
-    Each estimate is named `{candidate} estimate`, is built in `year` and has
-    the lifetime of its candidate.
+    For each cohort of `cohort_build_years`, the missing capacity of a country
+    is the IRENASTAT additions minus the capacity of the units built in that
+    cohort. The missing capacity is distributed to the candidates of the
+    country with the heuristic `n.generators_t.p_max_pu.mean() * n.generators.p_nom_max`.
+    Each estimate is named `{candidate} estimate-{build_year}`, is built in the
+    last year of its cohort and has the lifetime of its candidate. Cohorts
+    that retire before the first horizon are dropped.
 
     Parameters
     ----------
     n : pypsa.Network
         The network with renewable units and candidates.
     year : int
-        The year of the IRENASTAT capacities.
+        The last year of the IRENASTAT capacities.
     tech_map : dict
         A dictionary mapping fuel types to carrier names.
     countries : list
         The country codes to estimate capacities for.
+    horizons : list
+        The planning horizons.
     """
     if not len(countries) or not len(tech_map):
         return
 
-    capacities = irena_capacities(year, tech_map, countries)
+    additions = irena_additions(year, tech_map, countries)
     country = n.generators.bus.map(n.buses.country)
     dist = n.generators_t.p_max_pu.mean() * n.generators.p_nom_max
 
     for ppm_technology, tech in tech_map.items():
+        if ppm_technology not in additions.index.get_level_values("Technology"):
+            continue
         is_tech = n.generators.carrier == tech
         is_candidate = n.generators.asset_status == "candidate"
         candidates_i = n.generators.index[is_tech & is_candidate]
         units_i = n.generators.index[is_tech & ~is_candidate]
-        stats = country_capacities(capacities, ppm_technology, countries)
-        existent = n.generators.p_nom[units_i].groupby(country[units_i]).sum()
-        missing = stats - existent.reindex(countries, fill_value=0.0)
-        p_nom = (
-            dist[candidates_i]
-            .groupby(country[candidates_i])
-            .transform(lambda s: normed(s) * missing[s.name])
+        lifetime = n.generators.lifetime[candidates_i].unique()
+        if len(lifetime) != 1:
+            raise ValueError(
+                f"{tech} candidates have several lifetimes {lifetime.tolist()}; "
+                "the estimate cohorts need one."
+            )
+        lifetime = lifetime[0]
+
+        stats = additions.loc[ppm_technology].reindex(countries, fill_value=0.0)
+        stats = stats.T.groupby(
+            cohort_build_years(stats.columns.to_series(), horizons, lifetime, year)
+        ).sum()
+        units = n.generators.loc[units_i]
+        existent = (
+            units.p_nom.groupby(
+                [
+                    cohort_build_years(units.build_year, horizons, lifetime, year),
+                    country[units_i],
+                ]
+            )
+            .sum()
+            .unstack(fill_value=0.0)
+            .reindex(index=stats.index, columns=countries, fill_value=0.0)
         )
-        p_nom = p_nom[p_nom > 0.1]
-        logger.info(f"Adding {len(p_nom)} {tech} estimates.")
+        missing = (stats - existent).clip(lower=0.0)
+        missing = missing[missing.index + lifetime > horizons[0]]
+
+        share = dist[candidates_i].groupby(country[candidates_i]).transform(normed)
+        p_nom = (
+            pd.DataFrame(
+                {
+                    by: share * country[candidates_i].map(missing.loc[by])
+                    for by in missing.index
+                }
+            )
+            .stack()
+            .loc[lambda s: s > 0.1]
+        )
+        logger.info(
+            f"Adding {len(p_nom)} {tech} estimates [MW]:\n"
+            f"{p_nom.groupby(level=1).sum().round(1).to_string()}"
+        )
         if p_nom.empty:
             continue
-        names = p_nom.index + " estimate"
+        candidates = p_nom.index.get_level_values(0)
+        build_years = p_nom.index.get_level_values(1).astype(int)
+        names = candidates + " estimate-" + build_years.astype(str)
         add_fixed_copies_of_candidates(
             n,
-            p_nom.index,
+            candidates,
             names,
             p_nom=p_nom.set_axis(names),
-            build_year=year,
-            lifetime=n.generators.lifetime[p_nom.index].set_axis(names),
+            build_year=pd.Series(build_years, index=names),
+            lifetime=n.generators.lifetime[candidates].set_axis(names),
         )
         n.generators.loc[names, "asset_status"] = "estimate"
 
@@ -1664,7 +1787,8 @@ def main(
             exclude_carriers=params.clustering["exclude_carriers"],
             estimate_efficiencies=params.conventional["estimate_efficiencies"],
             keep_assets=keep_assets,
-            first_horizon=first_horizon,
+            horizons=params.horizons if foresight == "perfect" else None,
+            earliest_retirement=params.electricity["powerplants_earliest_retirement"],
         )
     else:
         ppl = pd.DataFrame()
@@ -1713,7 +1837,7 @@ def main(
         conventional_inputs=conventional_inputs,
         unit_commitment=unit_commitment,
         fuel_price=fuel_price,
-        keep_assets=keep_assets,
+        fixed_existing=foresight == "perfect",
     )
 
     attach_wind_and_solar(
@@ -1753,7 +1877,11 @@ def main(
             )
         if estimate_renewable_caps["from_irenastat"]:
             attach_renewable_estimates(
-                n, estimate_renewable_caps["year"], tech_map, params.countries
+                n,
+                estimate_renewable_caps["year"],
+                tech_map,
+                params.countries,
+                params.horizons,
             )
         reduce_candidate_potentials(n, sorted(renewable_carriers - {"hydro"}))
     elif estimate_renewable_caps["enable"]:

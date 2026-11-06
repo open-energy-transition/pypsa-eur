@@ -694,19 +694,21 @@ ASSET_COMPONENTS = ["Generator", "Link", "StorageUnit", "Store", "Line", "Transf
 
 def assign_technology_groups(n: pypsa.Network) -> None:
     """
-    Fill the `technology_group` and `asset_status` columns of all assets with a carrier.
+    Fill the `technology_group` of all assets and loads with a carrier, and the `asset_status` of the assets.
 
-    The technology group is the carrier. A carrier that assets of several
-    component types share (``gas`` of a generator and of a store) names one
-    group per type, `{carrier} ({component})`. Missing asset states are
-    `candidate` for extendable and `existing` for other assets.
+    The technology group is the carrier. A carrier that several component
+    types share (``gas`` of a generator and of a store) names one group per
+    type, `{carrier} ({component})`. Missing asset states are `candidate` for
+    extendable and `existing` for other assets. Loads get no asset state.
 
     Parameters
     ----------
     n : pypsa.Network
         The network to modify in place.
     """
-    components = [c for c in n.components[ASSET_COMPONENTS] if "carrier" in c.static]
+    components = [
+        c for c in n.components[[*ASSET_COMPONENTS, "Load"]] if "carrier" in c.static
+    ]
     types = pd.concat(
         [
             pd.Series(c.name, index=c.static.carrier.astype(str).unique())
@@ -720,6 +722,8 @@ def assign_technology_groups(n: pypsa.Network) -> None:
         is_shared = group.isin(shared)
         group[is_shared] = group[is_shared] + f" ({c.name})"
         static["technology_group"] = group
+        if c.name == "Load":
+            continue
         default_status = pd.Series("existing", index=static.index)
         default_status[c.extendables] = "candidate"
         if "asset_status" not in static.columns:

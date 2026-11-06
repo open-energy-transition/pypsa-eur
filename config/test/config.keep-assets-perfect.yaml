@@ -24,6 +24,7 @@ snapshots:
 
 electricity:
   gaslimit_enable: false
+  powerplants_earliest_retirement: 2035
   transmission_limit: vopt
   extendable_carriers:
     Generator:
@@ -52,7 +53,8 @@ electricity:
   estimate_renewable_capacities:
     enable: true
     from_powerplantmatching: true
-    year: 2020
+    from_irenastat: true
+    year: 2024
     expansion_limit: false
     technology_mapping:
       Offshore: offwind-ac
@@ -78,8 +80,6 @@ clustering:
   keep_assets: true
   keep_assets_busmaps: [5]
   exclude_carriers: []
-  simplify_network:
-    to_380: false
   temporal:
     averaging: false
     segmentation: false

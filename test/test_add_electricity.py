@@ -13,11 +13,14 @@ import xarray as xr
 from scripts.add_electricity import (
     assign_unit_dates,
     attach_load,
+    attach_renewable_estimates,
     attach_storageunits,
     attach_stores,
+    cohort_build_years,
     conventional_candidates,
     estimate_efficiency,
     group_small_units,
+    last_active_horizon,
     load_and_aggregate_powerplants,
     reduce_candidate_potentials,
 )
@@ -130,7 +133,11 @@ def test_estimate_efficiency():
     np.testing.assert_allclose(eta, expected)
 
 
-def test_assign_unit_dates():
+@pytest.mark.parametrize(
+    ("earliest_retirement", "expected_lifetime"),
+    [(None, [40.0, 50.0, 45.0]), (2045, [45.0, 50.0, 45.0])],
+)
+def test_assign_unit_dates(earliest_retirement, expected_lifetime):
     units = pd.DataFrame(
         {
             "carrier": ["CCGT", "CCGT", "CCGT", "coal"],
@@ -140,11 +147,21 @@ def test_assign_unit_dates():
     )
     lifetime = pd.Series(40.0, index=units.index)
 
-    result = assign_unit_dates(units, lifetime, first_horizon=2030)
+    result = assign_unit_dates(units, lifetime, 2030, earliest_retirement)
 
-    assert result.index.tolist() == [0, 1]
-    assert result.build_year.tolist() == [2000, 1995]
-    assert result.lifetime.tolist() == [40.0, 50.0]
+    assert result.index.tolist() == [0, 1, 3]
+    assert result.build_year.tolist() == [2000, 1995, 1995]
+    assert result.lifetime.tolist() == expected_lifetime
+
+
+def test_last_active_horizon():
+    units = pd.DataFrame(
+        {"build_year": [1990, 2005, 2016, 2035], "lifetime": [30, 30, 25, 30]}
+    )
+
+    result = last_active_horizon(units, [2030, 2040, 2050])
+
+    np.testing.assert_array_equal(result, [np.nan, 2030, 2040, 2050])
 
 
 @pytest.mark.parametrize(
@@ -222,14 +239,15 @@ def test_reduce_candidate_potentials():
 
 
 @pytest.mark.parametrize(
-    ("keep_assets", "expected"),
+    ("keep_assets", "horizons", "expected"),
     [
-        (True, {"DE0 1 CCGT 0": 100.0, "DE0 1 CCGT 1": 300.0}),
-        (False, {"DE0 1 CCGT": 400.0}),
+        (True, [2030, 2040], {"DE0 1 CCGT 0": 100.0, "DE0 1 CCGT 1": 300.0}),
+        (False, [2030, 2040], {"DE0 1 CCGT 2030": 100.0, "DE0 1 CCGT 2040": 300.0}),
+        (False, None, {"DE0 1 CCGT": 400.0}),
     ],
 )
 def test_load_and_aggregate_powerplants_keeps_units_at_cluster_bus(
-    tmp_path, keep_assets, expected
+    tmp_path, keep_assets, horizons, expected
 ):
     ppl_fn = tmp_path / "powerplants.csv"
     pd.DataFrame(
@@ -262,8 +280,71 @@ def test_load_and_aggregate_powerplants_keeps_units_at_cluster_bus(
     )
 
     ppl = load_and_aggregate_powerplants(
-        ppl_fn, costs, keep_assets=keep_assets, first_horizon=2030
+        ppl_fn, costs, keep_assets=keep_assets, horizons=horizons
     )
 
     assert ppl.p_nom.to_dict() == expected, "units keep their cluster bus"
     assert (ppl.bus == "DE0 1").all()
+
+
+@pytest.mark.parametrize(
+    ("horizons", "expected"),
+    [
+        ([2030, 2040, 2050], [2000, 2010, 2020, 2024, np.nan]),
+        ([2030], [2000, 2024, 2024, 2024, np.nan]),
+    ],
+)
+def test_cohort_build_years(horizons, expected):
+    build_year = pd.Series([1995, 2005, 2015, 2022, 2025])
+    result = cohort_build_years(build_year, horizons, 30, 2024)
+    pd.testing.assert_series_equal(result, pd.Series(expected), check_names=False)
+
+
+def test_attach_renewable_estimates(monkeypatch):
+    """Missing capacity per cohort becomes one estimate per cohort, retired cohorts are dropped."""
+    additions = pd.DataFrame(
+        [[20.0, 30.0, 40.0, 50.0]],
+        index=pd.MultiIndex.from_tuples(
+            [("Onshore", "BE")], names=["Technology", "Country"]
+        ),
+        columns=pd.Index([1995, 2005, 2015, 2022], name="Year"),
+    )
+    monkeypatch.setattr(
+        "scripts.add_electricity.irena_additions", lambda *args: additions
+    )
+    n = pypsa.Network()
+    n.set_snapshots(range(2))
+    n.add("Bus", "b", country="BE")
+    n.add(
+        "Generator",
+        "b 0 onwind",
+        bus="b",
+        carrier="onwind",
+        p_nom_extendable=True,
+        p_nom_max=100.0,
+        p_max_pu=pd.Series([0.4, 0.6]),
+        lifetime=30.0,
+        resource_class=0,
+        asset_status="candidate",
+    )
+    n.add(
+        "Generator",
+        "b 0 onwind unit",
+        bus="b",
+        carrier="onwind",
+        p_nom=10.0,
+        build_year=2015,
+        lifetime=30.0,
+        asset_status="existing",
+    )
+
+    attach_renewable_estimates(
+        n, 2024, {"Onshore": "onwind"}, ["BE"], [2030, 2040, 2050]
+    )
+
+    estimates = n.generators.query("asset_status == 'estimate'")
+    assert estimates[["p_nom", "build_year"]].to_dict("index") == {
+        "b 0 onwind estimate-2010": {"p_nom": 30.0, "build_year": 2010},
+        "b 0 onwind estimate-2020": {"p_nom": 30.0, "build_year": 2020},
+        "b 0 onwind estimate-2024": {"p_nom": 50.0, "build_year": 2024},
+    }
