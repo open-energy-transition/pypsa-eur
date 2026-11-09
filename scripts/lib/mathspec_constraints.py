@@ -35,6 +35,7 @@ MATH = Path(__file__).with_name("mathspec")
 SPECS = (MATH / "global_constraints.yaml", MATH / "extra_functionality.yaml")
 DTYPES = {"float": nw.Float64, "int": nw.Int64, "bool": nw.Boolean, "str": nw.String}
 BOUNDS = {"<=": "upper", ">=": "lower", "==": "equal"}
+LAND_USE = "tech_capacity_expansion_limit"
 KINDS = {
     ("primary_energy", "co2_emissions"): "co2_limit",
     ("primary_energy", "gas_usage"): "gas_limit",
@@ -295,7 +296,7 @@ def global_constraint_data(n: pypsa.Network) -> Data:
     A constraint that selects carriers reads them from ``<kind>_carrier``.
     """
     _require_multi_period(n)
-    glcs = n.global_constraints
+    glcs = n.global_constraints[n.global_constraints.type != LAND_USE]
     if glcs.empty:
         return {}
     declared = _declarations()["parameters"]
@@ -682,7 +683,7 @@ def retrofit_gas_boiler_constraint(n: pypsa.Network) -> Data:
 
 
 def land_use_data(n: pypsa.Network) -> Data:
-    """The limits PyPSA builds from the ``nom_max_{carrier}_{period}`` bus columns."""
+    """The limits of the ``tech_capacity_expansion_limit`` global constraints of ``add_land_use_constraint``."""
     gens = n.generators[
         n.generators.p_nom_extendable
         & np.isfinite(n.generators.p_nom_max)
@@ -714,30 +715,26 @@ def growth_data(n: pypsa.Network) -> Data:
 
 def land_use_check(n: pypsa.Network) -> None:
     """
-    Fail unless every ``nom_*`` bus column is the limit ``add_land_use_constraint`` sets.
+    Fail unless the ``tech_capacity_expansion_limit`` global constraints are the limits ``add_land_use_constraint`` sets.
 
-    The math states the land-use limit from ``p_nom_max`` itself, so a bus
-    column with any other meaning would be a PyPSA constraint it misses.
+    The math states the land-use limit from ``p_nom_max`` itself, so a
+    constraint of this type with any other limit would be one it misses.
     """
     gens = n.generators[n.generators.p_nom_extendable]
     limits = gens.groupby(["carrier", "bus", "build_year"]).p_nom_max.min()
-    limits = limits[np.isfinite(limits)]
-    for column in n.buses.columns[n.buses.columns.str.startswith("nom_")]:
-        if not re.fullmatch(r"nom_max_.+_\d{4}", column):
-            raise UnsupportedConstraintError(
-                f"Bus column '{column}' is a PyPSA capacity limit per bus and carrier "
-                "that add_land_use_constraint does not set."
-            )
-        carrier, period = column.removeprefix("nom_max_").rsplit("_", 1)
-        actual = n.buses[column].dropna().sort_index()
-        expected = limits.xs((carrier, int(period)), level=["carrier", "build_year"])
-        if not actual.equals(
-            expected.sort_index().rename(column).rename_axis(actual.index.name)
-        ):
-            raise UnsupportedConstraintError(
-                f"Bus column '{column}' is not the land-use limit that "
-                "add_land_use_constraint derives from p_nom_max."
-            )
+    limits = limits[np.isfinite(limits)].rename(None)
+    glcs = n.global_constraints[n.global_constraints.type == LAND_USE]
+    keys = [glcs.carrier_attribute, glcs.bus, glcs.investment_period.astype(int)]
+    stated = glcs.constant.set_axis(
+        pd.MultiIndex.from_arrays(keys, names=limits.index.names)
+    ).rename(None)
+    if (glcs.sense != "<=").any() or not stated.sort_index().equals(
+        limits.sort_index()
+    ):
+        raise UnsupportedConstraintError(
+            "The tech_capacity_expansion_limit global constraints are not the "
+            "land-use limits that add_land_use_constraint derives from p_nom_max."
+        )
 
 
 def growth_check(n: pypsa.Network) -> None:

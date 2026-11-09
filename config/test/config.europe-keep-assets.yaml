@@ -64,8 +64,6 @@ clustering:
   keep_assets: true
   keep_assets_busmaps: [100]
   keep_assets_min_capacity: 0.0
-  simplify_network:
-    to_380: false
   temporal:
     averaging: false
     segmentation: false

@@ -24,6 +24,7 @@ snapshots:
 
 electricity:
   gaslimit_enable: false
+  powerplants_earliest_retirement: 2035
   transmission_limit: vopt
   extendable_carriers:
     Generator:

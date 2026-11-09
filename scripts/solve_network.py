@@ -96,20 +96,18 @@ def add_land_use_constraint(n: pypsa.Network) -> None:
     n.generators.loc[gen_i, "p_nom_min"] = 0
     # check minimum capacities
     check_p_min_p_max(p_nom_max)
-    # adjust name to fit syntax of nominal constraint per bus
-    df = p_nom_max.reset_index()
-    df["name"] = df.apply(
-        lambda row: (
-            f"nom_max_{row['carrier']}"
-            + (f"_{row['build_year']}" if row["build_year"] is not None else "")
-        ),
-        axis=1,
+    limits = p_nom_max.reset_index()
+    period = limits.build_year.astype(int).astype(str)
+    n.add(
+        "GlobalConstraint",
+        "land_use " + limits.carrier + " " + limits.bus + " " + period,
+        type="tech_capacity_expansion_limit",
+        carrier_attribute=limits.carrier.values,
+        bus=limits.bus.values,
+        investment_period=limits.build_year.values,
+        sense="<=",
+        constant=limits.p_nom_max.values,
     )
-
-    for name in df.name.unique():
-        df_carrier = df[df.name == name]
-        bus = df_carrier.bus
-        n.buses.loc[bus, name] = df_carrier.p_nom_max.values
 
 
 def add_solar_potential_constraints(n: pypsa.Network, config: dict) -> None:

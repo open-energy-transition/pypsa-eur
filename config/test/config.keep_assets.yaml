@@ -103,8 +103,6 @@ renewable:
 clustering:
   keep_assets: true
   keep_assets_busmaps: [5, 10]
-  simplify_network:
-    to_380: false
   temporal:
     averaging: 24h
   cluster_network:

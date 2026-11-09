@@ -45,47 +45,47 @@ from scripts._helpers import configure_logging, set_scenario_config
 
 logger = logging.getLogger(__name__)
 
-PATCH: list[tuple[str, list[str] | None, float]] = [
+PATCH: list[tuple[str, list[str], float]] = [
     ("capital_cost", ["offwind-ac", "offwind-dc", "offwind-float"], 1.3),
     ("p_nom_max", ["onwind"], 0.5),
-    ("nom_max_onwind", None, 0.5),
+    ("constant", ["onwind"], 0.5),
     ("p_max_pu", ["solar", "solar-hsat"], 0.9),
 ]
 
 
 def scenario_patch(record: RecordLike) -> WorkingRecord:
     """
-    Scale each attribute in `PATCH`.
+    Scale each attribute in `PATCH` on the entities of its carriers.
 
-    An entry with carriers scales the attribute on the entities of those
-    carriers; one without scales every per-period bus limit
-    ``<attribute>_<period>`` on every bus.
+    A global constraint's carrier is its `carrier_attribute`, so the onwind
+    `constant` entry scales the land-use limits of `add_land_use_constraint`.
     """
     w = WorkingRecord(record)
-    entity = record.properties["entity"].select("entity", "carrier")
-    for attribute, carriers, factor in PATCH:
-        names = (
-            [attribute]
-            if carriers
-            else [a for a in record.attributes if a.startswith(f"{attribute}_")]
-        )
-        if not names:
-            raise KeyError(f"The record has no attribute {attribute}_<period>.")
-        for name in names:
-            rows = record.attributes[name]
-            if carriers:
-                rows = rows.join(entity, "entity").filter(
-                    f"carrier IN ({', '.join(repr(c) for c in carriers)})"
-                )
-            keys = [
-                c
-                for c in rows.columns
-                if c not in ("attribute", "breakpoint", "value", "carrier")
-            ]
-            w.set(
-                name,
-                rows.select(*keys, SQLExpression(f"value * {factor}").alias("value")),
+    carriers_of = (
+        record.properties["entity"]
+        .select("entity", "carrier")
+        .filter("carrier IS NOT NULL")
+        .union(
+            record.attributes["carrier_attribute"].select(
+                "entity", SQLExpression("value").alias("carrier")
             )
+        )
+    )
+    for attribute, carriers, factor in PATCH:
+        rows = (
+            record.attributes[attribute]
+            .join(carriers_of, "entity")
+            .filter(f"carrier IN ({', '.join(repr(c) for c in carriers)})")
+        )
+        keys = [
+            c
+            for c in rows.columns
+            if c not in ("attribute", "breakpoint", "value", "carrier")
+        ]
+        w.set(
+            attribute,
+            rows.select(*keys, SQLExpression(f"value * {factor}").alias("value")),
+        )
     return w
 
 

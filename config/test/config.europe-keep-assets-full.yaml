@@ -76,8 +76,6 @@ existing_capacities:
 clustering:
   keep_assets: true
   keep_assets_busmaps: [100]
-  simplify_network:
-    to_380: false
   temporal:
     averaging: false
     segmentation: false
