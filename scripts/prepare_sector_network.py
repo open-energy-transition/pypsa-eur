@@ -3530,6 +3530,11 @@ def add_heat(
             )
 
             for sec_i in sec_floor:
+                # share of this building type in the space heat demand of the load,
+                # approximated by heated floor area (= 1 if building types are not disaggregated)
+                floor_area_ct = floor_area_file.loc[ct, "value"]
+                share_i = floor_area_ct.loc[sec_i] / floor_area_ct.loc[sec_floor].sum()
+                space_heat_demand_i = space_heat_demand * share_i
                 # get floor aread at node and region (urban/rural) in m^2
                 floor_area_node = (
                     pop_layout.loc[node].fraction
@@ -3544,9 +3549,9 @@ def add_heat(
                 capital_cost = (
                     retro_data.loc[(ct, sec_i), ("cost")]
                     * floor_area_node
-                    / ((1 - dE) * space_heat_demand.max())
+                    / ((1 - dE) * space_heat_demand_i.max())
                 )
-                if space_heat_demand.max() == 0:
+                if space_heat_demand_i.max() == 0:
                     capital_cost = capital_cost.apply(lambda b: 0 if b == np.inf else b)
 
                 # number of possible retrofitting measures 'strengths' (set in list at config.yaml 'l_strength')
@@ -3579,7 +3584,7 @@ def add_heat(
                         carrier="retrofitting",
                         p_nom_extendable=True,
                         p_nom_max=dE_diff[strength]
-                        * space_heat_demand.max(),  # maximum energy savings for this renovation strength
+                        * space_heat_demand_i.max(),  # maximum energy savings for this renovation strength
                         p_max_pu=space_pu,
                         p_min_pu=space_pu,
                         country=ct,
