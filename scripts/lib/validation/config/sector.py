@@ -165,6 +165,14 @@ class _RetrofittingConfig(BaseModel):
         False,
         description="Add retrofitting as an endogenous system which co-optimise space heat savings.",
     )
+    WWHR_endogen: bool = Field(
+        False,
+        description="Add waste water heat recovery systems (WWHRS) as an endogenous option to reduce residential hot water demand. The expansion is limited by `sector: reduce_hot_water_factor`.",
+    )
+    disaggregate_building_types: bool = Field(
+        False,
+        description="Disaggregate residential retrofitting into apartment blocks (AB), single-family houses (SFH) and multi-family houses (MFH) instead of one residential building type.",
+    )
     cost_factor: float = Field(1.0, description="Weight costs for building renovation.")
     interest_rate: float = Field(
         0.04, description="The interest rate for investment in building components."
@@ -643,6 +651,17 @@ class SectorConfig(BaseModel):
         description="A positive factor can mean renovation or demolition of a building. If the factor is negative, it can mean an increase in floor area, increased thermal comfort, population growth. The default factors are determined by the `Eurocalc Homes and buildings decarbonization scenario <http://tool.european-calculator.eu/app/buildings/building-types-area/?levers=1ddd4444421213bdbbbddd44444ffffff11f411111221111211l212221>`_.",
     )
 
+    reduce_hot_water_factor: dict[int, float] = Field(
+        default_factory=lambda: {
+            2030: 0.05,
+            2035: 0.1,
+            2040: 0.2,
+            2045: 0.4,
+            2050: 0.6,
+        },
+        description="Maximum share of residential hot water demand per planning horizon that can be reduced by waste water heat recovery systems (WWHRS), used if `sector: retrofitting: WWHR_endogen` is enabled. Limits the expansion of WWHRS.",
+    )
+
     retrofitting: _RetrofittingConfig = Field(
         default_factory=_RetrofittingConfig, description="Retrofitting configuration."
     )
@@ -915,6 +934,11 @@ class SectorConfig(BaseModel):
     conventional_generation: dict[str, str] | list = Field(
         default_factory=lambda: {"OCGT": "gas", "CCGT": "gas"},
         description="Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel.",
+    )
+
+    keep_existing_capacities: bool = Field(
+        False,
+        description="Keep the existing capacities of the carriers in `sector: conventional_generation` from the electricity network as installed (`p_nom`) and minimum (`p_nom_min`) capacities of the corresponding links.",
     )
 
     biomass_to_liquid: bool = Field(
