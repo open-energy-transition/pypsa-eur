@@ -1079,7 +1079,11 @@ def sample_dE_costs_area(
 
 def calculate_WWHR_costs(households):
     """
-    Calculates the costs for waste water heat recovery (WWHR) based on the number of households per region
+    Calculates the costs for waste water heat recovery (WWHR) based on the
+    number of households per region.
+
+    Returns the investment costs per node [EUR], annualised [EUR/a] if
+    `annualise_cost` is True.
     """
     pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
     housholds_spatial = pd.merge(
@@ -1087,24 +1091,25 @@ def calculate_WWHR_costs(households):
     ).set_index("name")
     housholds_spatial = (
         housholds_spatial.fraction * housholds_spatial["Households (thousands)"] * 1000
-    )  # number in thousands
-    costs_WWHR = (
+    )  # number of households per node
+
+    cost_WWHR = (
         pd.read_csv(snakemake.input.cost_germany, index_col=0, usecols=[0, 1, 2, 3])
         .loc["hot water (WWHRS)"]
         .astype(float)
     )
+    investment = cost_WWHR["cost_fix"]  # EUR per household
+    lifetime = cost_WWHR["life_time"]  # years
 
     if annualise_cost:
         if interest_rate > 0:
-            costs_WWHR = interest_rate / (
-                1.0 - 1.0 / (1.0 + interest_rate) ** costs_WWHR.loc["life_time"]
-            )
+            annuity_WWHR = interest_rate / (1.0 - (1.0 + interest_rate) ** -lifetime)
         else:
-            costs_WWHR = 1 / costs_WWHR.loc["life_time"]
+            annuity_WWHR = 1.0 / lifetime
+    else:
+        annuity_WWHR = 1.0
 
-    costs_WWHR = costs_WWHR * housholds_spatial
-
-    return costs_WWHR
+    return investment * annuity_WWHR * housholds_spatial
 
 
 if __name__ == "__main__":
