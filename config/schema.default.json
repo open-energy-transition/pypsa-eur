@@ -5288,12 +5288,29 @@
           "markdownDescription": "A positive factor can mean renovation or demolition of a building. If the factor is negative, it can mean an increase in floor area, increased thermal comfort, population growth. The default factors are determined by the [Eurocalc Homes and buildings decarbonization scenario ](http://tool.european-calculator.eu/app/buildings/building-types-area/?levers=1ddd4444421213bdbbbddd44444ffffff11f411111221111211l212221).",
           "type": "object"
         },
+        "reduce_hot_water_factor": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Maximum share of residential hot water demand per planning horizon that can be reduced by waste water heat recovery systems (WWHRS), used if `sector: retrofitting: WWHR_endogen` is enabled. Limits the expansion of WWHRS.",
+          "type": "object"
+        },
         "retrofitting": {
           "description": "Configuration for `sector.retrofitting` settings.",
           "properties": {
             "retro_endogen": {
               "default": false,
               "description": "Add retrofitting as an endogenous system which co-optimise space heat savings.",
+              "type": "boolean"
+            },
+            "WWHR_endogen": {
+              "default": false,
+              "description": "Add waste water heat recovery systems (WWHRS) as an endogenous option to reduce residential hot water demand. The expansion is limited by `sector: reduce_hot_water_factor`.",
+              "type": "boolean"
+            },
+            "disaggregate_building_types": {
+              "default": false,
+              "description": "Disaggregate residential retrofitting into apartment blocks (AB), single-family houses (SFH) and multi-family houses (MFH) instead of one residential building type.",
               "type": "boolean"
             },
             "cost_factor": {
@@ -5807,6 +5824,11 @@
             }
           ],
           "description": "Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel."
+        },
+        "keep_existing_capacities": {
+          "default": false,
+          "description": "Keep the existing capacities of the carriers in `sector: conventional_generation` from the electricity network as installed (`p_nom`) and minimum (`p_nom_min`) capacities of the corresponding links.",
+          "type": "boolean"
         },
         "biomass_to_liquid": {
           "default": true,
@@ -9104,6 +9126,16 @@
         "retro_endogen": {
           "default": false,
           "description": "Add retrofitting as an endogenous system which co-optimise space heat savings.",
+          "type": "boolean"
+        },
+        "WWHR_endogen": {
+          "default": false,
+          "description": "Add waste water heat recovery systems (WWHRS) as an endogenous option to reduce residential hot water demand. The expansion is limited by `sector: reduce_hot_water_factor`.",
+          "type": "boolean"
+        },
+        "disaggregate_building_types": {
+          "default": false,
+          "description": "Disaggregate residential retrofitting into apartment blocks (AB), single-family houses (SFH) and multi-family houses (MFH) instead of one residential building type.",
           "type": "boolean"
         },
         "cost_factor": {
@@ -12767,12 +12799,29 @@
           "markdownDescription": "A positive factor can mean renovation or demolition of a building. If the factor is negative, it can mean an increase in floor area, increased thermal comfort, population growth. The default factors are determined by the [Eurocalc Homes and buildings decarbonization scenario ](http://tool.european-calculator.eu/app/buildings/building-types-area/?levers=1ddd4444421213bdbbbddd44444ffffff11f411111221111211l212221).",
           "type": "object"
         },
+        "reduce_hot_water_factor": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Maximum share of residential hot water demand per planning horizon that can be reduced by waste water heat recovery systems (WWHRS), used if `sector: retrofitting: WWHR_endogen` is enabled. Limits the expansion of WWHRS.",
+          "type": "object"
+        },
         "retrofitting": {
           "description": "Configuration for `sector.retrofitting` settings.",
           "properties": {
             "retro_endogen": {
               "default": false,
               "description": "Add retrofitting as an endogenous system which co-optimise space heat savings.",
+              "type": "boolean"
+            },
+            "WWHR_endogen": {
+              "default": false,
+              "description": "Add waste water heat recovery systems (WWHRS) as an endogenous option to reduce residential hot water demand. The expansion is limited by `sector: reduce_hot_water_factor`.",
+              "type": "boolean"
+            },
+            "disaggregate_building_types": {
+              "default": false,
+              "description": "Disaggregate residential retrofitting into apartment blocks (AB), single-family houses (SFH) and multi-family houses (MFH) instead of one residential building type.",
               "type": "boolean"
             },
             "cost_factor": {
@@ -13286,6 +13335,11 @@
             }
           ],
           "description": "Add a more detailed description of conventional carriers. Any power generation requires the consumption of fuel from nodes representing that fuel."
+        },
+        "keep_existing_capacities": {
+          "default": false,
+          "description": "Keep the existing capacities of the carriers in `sector: conventional_generation` from the electricity network as installed (`p_nom`) and minimum (`p_nom_min`) capacities of the corresponding links.",
+          "type": "boolean"
         },
         "biomass_to_liquid": {
           "default": true,

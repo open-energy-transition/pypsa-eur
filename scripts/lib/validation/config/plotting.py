@@ -849,6 +849,7 @@ _TECH_COLORS: dict[str, str] = {
     "urban central resistive heater": "#8cdf85",
     "retrofitting": "#8487e8",
     "building retrofitting": "#8487e8",
+    "WWHRS": "#5054de",
     # hydrogen
     "H2 for industry": "#f073da",
     "H2 for shipping": "#ebaee0",
